@@ -1,9 +1,9 @@
 # 00. Repository map and phase 0 decisions
 
-**Status: in progress.** Six of seven reconnaissance explorers have reported; the repository-layout
-explorer and the completeness critic are still running. Sections marked *pending* below are filled in
-by a follow-up commit on this branch. Everything else is settled and is what later agents are briefed
-from.
+**Status: in progress.** All seven reconnaissance explorers have reported; the completeness critic is
+still running. Section 9 (decisions that belong to the founder) may gain entries from it, and section 10
+is filled in by a follow-up commit on this branch. Everything else is settled and is what later agents are
+briefed from.
 
 Evidence for every claim here is in [`00-recon-reports.md`](00-recon-reports.md), which records each
 explorer's findings verbatim with confidence levels and sources.
@@ -51,18 +51,104 @@ Two absences that change how work is done:
   local stack. Supabase work is therefore migration-file-first, applied against a hosted project or a
   Supabase branch, and RLS tests run against that rather than against a local container.
 
-### Layout decision — *pending*
+### Layout decision: a pnpm-workspaces monorepo
 
-The brief requires a stated decision with a reason. Since the repository is empty, "build inside existing
-conventions" is not available and the real question is what shape to scaffold: a single Next.js app at the
-root with sibling Worker directories, or a workspace monorepo. The deciding constraint is that the brand
-file and tokens stylesheet must be consumed by a Vercel app, several Cloudflare Workers, and generated
-documents, without duplication. The explorer weighing this is still running; the decision and the
-directory tree land in the follow-up commit.
+The brief requires a stated decision with a reason. "Build inside existing conventions" was not available,
+so the decision is what to scaffold, and it is **a pnpm workspaces monorepo** — not Turborepo, not npm
+workspaces, not a single app at the root.
+
+**The reason, in one sentence:** the two hardest non-negotiables — one brand file, one tokens stylesheet —
+each have consumers in three different runtimes (Node on Vercel, workerd on Cloudflare, Deno on Supabase
+edge functions) plus CI codegen, and only a named workspace package turns "everything reads from this one
+file" into a *declared dependency* that Vercel's skip-unaffected graph, wrangler's bundler, pnpm's strict
+resolver and CI can each enforce. With relative imports it stays a convention, and a convention decays on
+the first agent-written PR.
+
+Three checkable facts rule out the single-root-app alternative:
+
+1. A single root `tsconfig` cannot host `@cloudflare/workers-types` alongside Next's DOM lib without
+   colliding on `fetch`, `Request`, `Response` and `caches`. Per-app tsconfigs are mandatory the moment
+   there is more than one runtime.
+2. Vercel's automatic skip-unaffected build detection requires `pnpm-workspace.yaml`, unique package names
+   and explicit inter-package dependencies. Without them every commit rebuilds the web app.
+3. Cloudflare Workers Builds is designed around a per-Worker root directory, build command and watch paths.
+   Three Workers cost three dashboard configs and zero CI code.
+
+**Ceremony is deliberately kept out**, because two founders maintain this: no Turborepo, no changesets, no
+versioning, no publishing. Every package is `"private": true`, `"version": "0.0.0"`, consumed as
+`workspace:*`. Internal packages export **raw TypeScript** (`"exports": { ".": "./src/index.ts" }`) — Next
+consumes them via `transpilePackages`, and wrangler's esbuild and Deno compile TypeScript directly — so
+there is no per-package build step. The only generator in the tree is `packages/tokens`, which parses
+`tokens.css` into a TypeScript custom-property map for emails and PDFs. Versions are pinned once in the
+workspace catalogue. Net cost over a flat layout: about ten small files.
+
+#### Where the brief's literal paths land
+
+The brief names `src/brand/brand.ts` and `src/styles/tokens.css`, and grants the escape hatch itself ("or
+the equivalent under the repo's conventions"). The equivalents are:
+
+| Brief's path | This repository |
+|---|---|
+| `src/brand/brand.ts` | `packages/brand/src/brand.ts` |
+| `src/styles/tokens.css` | `packages/tokens/src/tokens.css` |
+
+Recorded here so no later agent reads it as drift. The alternative that preserves the literal paths —
+putting both under `apps/web/src/` and having the Workers import upward — is rejected: it makes three
+Cloudflare Workers depend on the Next.js app, inverts the dependency graph, breaks Vercel's
+skip-unaffected detection, and drags Next and React types into workerd typechecking.
+
+#### One non-negotiable is literally unsatisfiable, and how it is satisfied instead
+
+The brief says "No string that identifies the company appears anywhere else." That cannot hold: `wrangler`
+requires a Worker `name`, wrangler routes require the domain in `routes[].pattern`, `supabase/config.toml`
+requires a `project_id`, and every workspace `package.json` requires a `name`.
+
+Resolution: the brand guard is a test that **asserts each of those literals equals the value in
+`brand.ts`**, over a written allowlist of infrastructure files, plus a hard ban everywhere else. The
+allowlist is `wrangler.jsonc` (×3), `supabase/config.toml`, and each `package.json` `name` field. Anything
+outside it fails the guard.
+
+#### Toolchain pins that will otherwise bite
+
+- **`vitest` must be pinned to 4.1.11.** `@cloudflare/vitest-pool-workers@0.22.0` peers `vitest ^4.1.0`
+  while the current latest is 5.0.0, so any agent running `pnpm add -D vitest` installs 5.0.0 and breaks
+  every Worker test. Pin it in the workspace catalogue.
+- **No TypeScript project references / composite builds.** Next.js does not understand them
+  (`vercel/next.js#67372`), even though TypeScript 7 supports them. This is why internal packages ship raw
+  TypeScript.
+
+The full file-level directory tree for the foundation milestone is in
+[`00-recon-reports.md`](00-recon-reports.md).
 
 ---
 
-## 2. The design tokens, and the divergence that has to be escalated
+## 2. Section 7's SDK and MCP plan is void: Stainless has wound down
+
+**Verified independently, not taken from an agent's word.** Stainless announced on **18 May 2026** that it
+is joining Anthropic and winding down its hosted products: *"Starting today, new signups, projects, and
+SDKs will not be available."* Existing customers keep the SDKs they already generated; new projects cannot
+be created.
+
+The specification depends on it in four places — §7 line 700 ("a hand-held OpenAPI of 25 endpoints or fewer
+so Stainless's free tier generates the SDKs, docs and MCP server at zero cost"), the §7 stack table line
+723, §7 line 773, and §9 line 924 ("MCP server … generated with Stainless"). It is also an **internal
+contradiction**: §0 and §10.2 both record the acquisition, and §0 reads it as making "spec-to-SDK-to-MCP a
+commodity pipeline", while §7 plans on a free tier that no longer accepts projects.
+
+Consequences, which are not optional extras:
+
+- The repository **owns `openapi/`** — the OpenAPI document is a first-class source file, not a generator
+  input handed to a vendor.
+- **`apps/mcp` is hand-written** against protocol revision `2026-07-28`, with the §7 MUST/MUST-NOT list
+  implemented directly rather than generated.
+- **The 25-endpoint budget stays, but its stated justification is void.** It was "so Stainless's free tier
+  covers five generators". The real reason now is maintenance surface for two founders — every endpoint is
+  a hand-written MCP tool, a hand-written SDK method and a documented contract. Keeping the cap is still
+  right; the reason in the design note must be the true one.
+
+---
+
+## 3. The design tokens, and the divergence that has to be escalated
 
 This is the most consequential finding of phase 0.
 
@@ -131,7 +217,7 @@ One defect in the artboard is fixed rather than copied: the code panel's punctua
 
 ---
 
-## 3. The contract: four envelope shapes, reconciled into one
+## 4. The contract: four envelope shapes, reconciled into one
 
 The specification prints **four different envelopes and they do not agree**: §2 is a response wrapper with
 `ok`/`module`/`meta` and nested `entity`/`dimensions`; §7 is a flat data row with `raw` and no wrapper;
@@ -202,7 +288,7 @@ per-connected-account monthly metering, and **11.8** replaces the flat 10-credit
 
 ---
 
-## 4. Stack: the dlt trade-off, recorded as the kickoff requires
+## 5. Stack: the dlt trade-off, recorded as the kickoff requires
 
 The kickoff mandates TypeScript extractors on Cloudflare Workers. Specification §7 recommends dlt on
 Trigger.dev compute, and pairs them for exactly one reason, stated verbatim at line 718: *"Cloudflare
@@ -278,7 +364,7 @@ Section 7's cost table is already stale against §8 and §11:
 
 ---
 
-## 5. Platform terms, as engineering constraints
+## 6. Platform terms, as engineering constraints
 
 Two clauses set the architecture's shape. Google Ads Developer Policies forbid letting third parties
 "avoid applying for their own Google Ads developer access and Google Cloud Platform project", and require
@@ -312,7 +398,7 @@ design note.
 
 ---
 
-## 6. The marketing site cannot ship as designed
+## 7. The marketing site cannot ship as designed
 
 The artboard was written against the pre-decision pitch, not against section 11. Roughly 40% of its copy
 survives unchanged.
@@ -338,7 +424,7 @@ no marketing string can outrun the specification.
 
 ---
 
-## 7. Built on open questions — flagged, as the brief requires
+## 8. Built on open questions — flagged, as the brief requires
 
 The kickoff says not to build on anything the specification marks unverified or open without flagging it.
 These are the ones the plan does build on:
@@ -360,7 +446,7 @@ These are the ones the plan does build on:
 
 ---
 
-## 8. Decisions that belong to the founder, not the orchestrator
+## 9. Decisions that belong to the founder, not the orchestrator
 
 *Provisional — the completeness critic may add to this list.*
 
@@ -374,7 +460,7 @@ These are the ones the plan does build on:
 
 ---
 
-## 9. What phase 1 does with this
+## 10. What phase 1 does with this
 
 *Pending the layout explorer and the critic.* The foundation milestone is the brand file, the tokens
 stylesheet, the Supabase schema for the §15 account model, authentication, the invitation flow and RLS

@@ -2215,3 +2215,368 @@ SUPABASE pg_cron: the light, pure-SQL, non-networked half of scheduling, and not
 EXTERNAL, unchanged from section 7: DataForSEO for SERP (use $0.002 live for synchronous endpoints, $0.0006 standard queue only for scheduled watch and diagnose collection); ECB reference rates cached daily with Open Exchange Rates at $12/month as the fallback for the ~10 currencies beyond ECB's 32 pairs; Stainless Free for SDK, docs and MCP generation at <=25 endpoints.
 
 COST DISCIPLINE FOR EVERY DESIGN NOTE: state the estimate per connected account per month, not per 1M calls, because section 11.3 abolished per-call metering for Performance and section 7's table is priced against a unit that no longer exists. Budget the three lines that can actually break, in order: Supabase disk if raw ever lands in Postgres; KV writes if the cache is keyed per row; Workflow steps if step granularity ever drops below (connection, source, date). Workers CPU-ms, Queues operations and R2 operations are all under $15/month at 500 connected accounts and should not be optimised for.
+
+---
+
+## 7. Repository layout decision (scaffold shape, package manager, test runner, lint/format, CI, commit/branch conventions, design-note template)
+
+The repository is empty of code (three files: README.md, docs/MARKETING-DATA-PLANE.md, docs/MARKETPLANE-KICKOFF-PROMPT.md, plus design/marketplane/{Main.dc.html,support.js}), so there are no conventions to build inside; the decision is purely what to scaffold. The decision is (b): a pnpm-workspaces monorepo with apps/web, apps/api-edge, apps/scheduler, apps/mcp and packages/{brand,tokens,contract,db,connectors,documents} plus supabase/ at the repository root. The deciding constraint is the two single-source non-negotiables: brand.ts must be read by Node (Next on Vercel), workerd (three Cloudflare Workers) and Deno (Supabase edge functions), and tokens.css must be read by Tailwind in Next AND by Worker-rendered emails and PDFs — only a named workspace package makes that a declared, build-enforced dependency instead of a convention. Option (a) fails on three checkable points: Vercel's automatic skip-unaffected requires workspace membership with explicit package.json deps, Cloudflare Workers Builds needs a per-Worker Root directory with its own package boundary, and a single root tsconfig cannot hold @cloudflare/workers-types and Next's DOM lib without global collisions on fetch/Request/Response/caches. Every platform in the stack is verified to support this shape: Vercel documents Root Directory plus filtered installs (pnpm install --filter web...), Cloudflare Workers Builds documents Root directory, Build command, Deploy command and Build watch paths per Worker, Supabase's CLI defaults to ./supabase/config.toml at the repository root with pgTAP tests under supabase/tests/ run by supabase test db, and Tailwind v4's own docs say shared theme variables "can be maintained in a separate package within a monorepo". Two toolchain facts constrain the build and must be pinned: @cloudflare/vitest-pool-workers@0.22.0 peers vitest ^4.1.0 while vitest latest is 5.0.0, and Next.js does not understand TypeScript project references, so internal packages must ship raw TypeScript consumed via transpilePackages rather than composite builds. Section 7's Stainless plan is dead — Stainless announced on 2026-05-18 that it is joining Anthropic and winding down all hosted products with new signups, projects and SDKs unavailable — so the repository must own openapi/ and hand-write apps/mcp rather than outsource SDK/docs/MCP generation.
+
+### Findings (26)
+
+**The repository has no code, no package.json, no CI and no conventions to inherit; the only prior art is three markdown/HTML documents and one design runtime file. 'Build inside this repository's conventions' is therefore a null option — the only real choice is what shape to scaffold.**  
+`certain` · source: `/home/user/dataaggregator (find, git log)`  
+> find output: ./design/marketplane/Main.dc.html, ./design/marketplane/support.js, ./README.md, ./docs/MARKETPLANE-KICKOFF-PROMPT.md, ./docs/MARKETING-DATA-PLANE.md. git log: 3 commits (3651cde Initial commit, 01f6386 docs: add binding specification…, a057890 Merge pull request #1).
+
+**The brand file has at least four distinct runtimes as consumers, which is what forces a package rather than a directory: Next server/client on Vercel (Node), the public API edge and scheduler and MCP server on Cloudflare (workerd), Supabase edge functions (Deno), and CI codegen for the SDK README.**  
+`certain` · source: `docs/MARKETPLANE-KICKOFF-PROMPT.md:43-48`  
+> "Every page, email, invoice, generated document, MCP server description and SDK README reads from it. No string that identifies the company appears anywhere else."
+
+**The tokens stylesheet has two incompatible consumption modes — a Tailwind/PostCSS pipeline in Next, and raw string inlining inside a Worker that renders emails and PDF exports. A single package that emits both tokens.css (verbatim) and a generated tokens.ts custom-property map satisfies both without duplicating a value.**  
+`certain` · source: `docs/MARKETPLANE-KICKOFF-PROMPT.md:49-56`  
+> "Tailwind's theme maps onto those variables; shadcn components are re-themed from them; the marketing site, the dashboard, emails and PDF exports all consume them. Nothing hard-codes a hex value outside this file."
+
+**Tailwind v4's own documentation blesses the tokens-as-workspace-package pattern explicitly, and gives the exact mechanism for mapping an existing custom property into Tailwind's theme without redefining the value.**  
+`certain` · source: `https://tailwindcss.com/docs/theme, https://tailwindcss.com/docs/colors (via Context7 /websites/tailwindcss)`  
+> "Shared theme variables can be maintained in a separate package within a monorepo or published as an NPM package." and `@theme inline { --color-canvas: var(--acme-canvas-color); }` with `[data-theme="dark"]` overrides on :root.
+
+**Vercel builds a monorepo app by setting Root Directory to the app folder; automatic skipping of unaffected projects requires pnpm workspaces with a pnpm-workspace.yaml, unique package names, and inter-package dependencies declared explicitly in each package.json. Option (a)'s relative-import sharing declares nothing, so every commit would rebuild the web app.**  
+`certain` · source: `https://vercel.com/docs/monorepos (last_updated 2026-08-11)`  
+> "The monorepo must be using npm, yarn, pnpm, or Bun workspaces… Packages in the workspace must be included in the workspace definition (`workspaces` key in `package.json` for npm and yarn or `pnpm-workspace.yaml` for pnpm)… All packages within the workspace must have a **unique** `name` field… Dependencies between packages in the monorepo must be explicitly stated in each package's `package.json`."
+
+**Vercel supports filtered installs so the web build does not install the Workers' dependency tree.**  
+`certain` · source: `https://vercel.com/docs/monorepos#filtered-installs`  
+> vercel.json: {"installCommand": "pnpm install --filter web..."}
+
+**Cloudflare Workers Builds natively supports a monorepo with multiple Workers on one repository: each Worker gets its own Root directory, Build command, Deploy command (default `npx wrangler deploy`) and Build watch paths. This closes the 'how does wrangler build a worker in a monorepo' question without a custom CI deploy job.**  
+`certain` · source: `https://developers.cloudflare.com/workers/ci-cd/builds/configuration/`  
+> Field names: "Root directory" (optional, "helpful in monorepos to isolate a specific project within the repository for builds"), "Build command", "Deploy command" ("will default to npx wrangler deploy"), "Build variables and secrets", "Build watch paths" ("a new build and deploy will trigger for each Worker if the change is within each of its included watch paths").
+
+**Wrangler's documented monorepo limitation is confined to automatic framework detection, not to bundling a Worker that imports a workspace package. It does not apply to a hand-written wrangler.jsonc Worker, and workspace-root node_modules export resolution was fixed in workers-sdk.**  
+`likely` · source: `https://developers.cloudflare.com/workers/framework-guides/automatic-configuration/ ; https://github.com/cloudflare/workers-sdk/pull/7130`  
+> "Support for monorepos and npm/yarn/pnpm workspaces is currently limited. Wrangler analyzes the project directory where you run the command, but does not detect dependencies installed at the workspace root" — stated on the automatic-configuration (framework detection) page, whose failure mode is "framework detection to fail if the framework is listed as a dependency in the workspace's root package.json". Separately, cloudflare/workers-sdk PR #7130 "Fix wrangler module import under npm monorepos" makes wrangler resolve workspace-root node_modules rather than only a relative node_modules.
+
+**Supabase belongs at the repository root, not under apps/. The CLI defaults to ./supabase/config.toml relative to the working directory; a non-root location requires SUPABASE_WORKDIR or --workdir on every CLI invocation and every CI step, for zero benefit.**  
+`certain` · source: `https://supabase.com/docs/guides/local-development/managing-config ; https://supabase.com/docs/guides/local-development/overview`  
+> "When you run `supabase init`, it creates ./supabase/config.toml… You may override the directory path by specifying the SUPABASE_WORKDIR environment variable or --workdir flag." Migrations live in supabase/migrations.
+
+**The kickoff's foundation requirement of 'row-level security tests' has a native runner that is not the JS test runner: pgTAP SQL files under supabase/tests/, executed by `supabase test db`. This is a second, SQL-shaped test surface the CI must carry, and it is another reason supabase/ sits at the root.**  
+`certain` · source: `https://supabase.com/docs/guides/database/testing`  
+> "all SQL files use pgTAP as the test runner"; test files follow supabase/tests/<table>_rls.test.sql; runnable by `supabase test db`, `pg_prove`, or plain psql; minimum CLI v1.11.4.
+
+**The test runner must be pinned to Vitest 4.1.x, not the latest 5.0.0, because the Cloudflare Workers test pool has not moved to Vitest 5. Using `latest` will break Worker integration tests on the first install.**  
+`certain` · source: `npm registry (npm view @cloudflare/vitest-pool-workers version peerDependencies; npm view vitest dist-tags)`  
+> @cloudflare/vitest-pool-workers@0.22.0 peerDependencies: {"vitest": "^4.1.0", "@vitest/runner": "^4.1.0", "@vitest/snapshot": "^4.1.0"}. npm view vitest dist-tags: latest 5.0.0, V4 4.1.11.
+
+**Internal packages must export raw TypeScript and be listed in Next's `transpilePackages`, NOT wired with TypeScript project references / composite builds, because Next.js does not understand project references. This also removes the per-package build step entirely: wrangler's esbuild compiles TS directly and Deno reads TS directly, so only packages/tokens needs a generator.**  
+`likely` · source: `https://nextjs.org/docs/app/api-reference/config/next-config-js/transpilePackages (via Context7 /vercel/next.js) ; https://github.com/vercel/next.js/issues/67372`  
+> Next docs: "Use `transpilePackages` in `next.config.js` to explicitly include external packages for bundling, which is useful for packages not pre-bundled, such as those from a monorepo" and "useful for dependencies shipping raw TypeScript, JSX, or modern syntax". Against: open issue vercel/next.js#67372 "Next.js does not understand TypeScript project references".
+
+**pnpm's strict, non-hoisted node_modules is a correctness feature for this specific project, not just a speed one: a Worker that imports a package it did not declare fails at build time, which is what makes 'no string that identifies the company appears anywhere else' and 'nothing hard-codes a hex value outside this file' enforceable rather than aspirational. npm workspaces hoist, so an undeclared import silently succeeds.**  
+`likely` · source: `pnpm -v (10.33.0); https://pnpm.io/settings`  
+> pnpm 10.33.0 installed; pnpm settings doc: "Only auth and registry settings are read from .npmrc files. All other settings (like hoistPattern, nodeLinker, shamefullyHoist, etc.) must be configured in pnpm-workspace.yaml".
+
+**pnpm 10 catalogs give one place to pin every version across all apps and packages, which is the mechanism that keeps the vitest 4.1.x pin (and react/next/tailwind/wrangler) from drifting between workspaces as two founders add packages.**  
+`certain` · source: `https://pnpm.io/settings (catalogs)`  
+> pnpm-workspace.yaml supports `catalog:` (default versions) and `catalogs:` (named sets), e.g. `catalog:\n  chalk: ^4.1.2`.
+
+**Section 7's SDK/docs/MCP generation plan is void: Stainless announced on 2026-05-18 that it is joining Anthropic and winding down all hosted products, with new signups, projects and SDKs immediately unavailable. The repository must therefore own the OpenAPI document and hand-write the MCP Worker; a top-level openapi/ directory and apps/mcp are consequences of this, not optional extras.**  
+`certain` · source: `docs/MARKETING-DATA-PLANE.md:700,723,773,924 vs https://www.stainless.com/blog/stainless-is-joining-anthropic/`  
+> Spec: "a hand-held OpenAPI of 25 endpoints or fewer so Stainless's free tier generates the SDKs, docs and MCP server at zero cost" (700) and "| SDK and MCP generation | Stainless Free | 5 generators… | $0 at 25 endpoints or fewer, 5 seats, 100 preview builds/month |" (723). Against: "As Stainless focuses on Claude Platform capabilities… it will wind down all hosted Stainless products" and "Starting immediately, new signups, projects, and SDKs are not available" (2026-05-18).
+
+**The kickoff's Workers-only extraction rule eliminates a second language toolchain from the tree. Section 7 recommends dlt (Python) on Trigger.dev; the kickoff overrides it with TypeScript extractors on Workers. This means no pyproject.toml, no uv/poetry, no Python CI matrix — packages/connectors is plain TypeScript.**  
+`certain` · source: `docs/MARKETPLANE-KICKOFF-PROMPT.md:60-62 ; docs/MARKETING-DATA-PLANE.md:797 (Corrections from fact-check)`  
+> "Write extractors in TypeScript on Workers rather than adopting a Python extraction library, so the whole system stays on these three providers; record the trade-off against section 7's dlt recommendation in the phase 1 design note." The spec itself concedes the reason: "Cloudflare Workers has no native long-running Python, so Cloudflare orchestrates but something else must run dlt."
+
+**Section 13.3's connector unit shape maps onto one workspace package with no friction: packages/connectors/src/sources/<name>/{client.ts,normalize.ts,backfill.ts,fixtures/,contract.test.ts}. Keeping all connectors in one package (rather than one package per connector) is the two-founder answer — the contract test, the metric dictionary and the envelope are shared, and 13.3's rule that 'a new metric requires a dictionary PR first' is enforced by making the dictionary a different package (packages/contract) that connectors import.**  
+`certain` · source: `docs/MARKETING-DATA-PLANE.md:1398, 1406-1412`  
+> "Each connector is a self-contained unit: `sources/<name>/{client,normalize,backfill,fixtures,contract.test}`." and "Metric names come from the shared dictionary (`spend`, `impressions`, `clicks`, `conversions`, `conversion_value`, `revenue`); a new metric requires a dictionary PR first."
+
+**The account model in section 15 dictates the foundation migration set and the RLS test set exactly: organisation, workspace, member (owner/admin/analyst/viewer), connection, api_key — with tenant isolation 'enforced at the database row level' and 'No cross-workspace aggregation ever'.**  
+`certain` · source: `docs/MARKETING-DATA-PLANE.md:1489-1495`  
+> "| Organisation | The paying company… Strict tenant isolation enforced at the database row level. | Workspace | One client or brand inside an organisation… No cross-workspace aggregation ever. | Member | …Roles: owner, admin, analyst, viewer. Invited by email. | Connection | One authorised platform account in a workspace… | API key | …Scoped to a workspace, with a spend budget and an allow-list of tools. |"
+
+**Section 15's eight dashboard screens fix the app router group layout for apps/web: Connect, Ask, Watch, Numbers, Usage and billing, Developers, Settings — preceded by sign-up/organisation/workspace creation. Only sign-up, invite acceptance and settings/members are in the foundation milestone; the other six are route stubs.**  
+`certain` · source: `docs/MARKETING-DATA-PLANE.md:1503-1510`  
+> "1. Sign up and create an organisation, then the first workspace. 2. Connect… 3. Ask… 4. Watch… 5. Numbers… 6. Usage and billing… 7. Developers: API keys, the MCP setup prompt, the agent skill file, SDK snippets, request logs. 8. Settings: members and roles, data region, data deletion, sub-processor list, audit log."
+
+**A naive 'no company string outside brand.ts' guard is unimplementable, because infrastructure identifiers legitimately carry the name: wrangler Worker names, wrangler route patterns containing the domain, supabase config.toml project_id, and the @marketplane/* package scope. The guard must be a match test (assert the literal equals the brand value) for these files and a ban everywhere else, with a written allowlist.**  
+`likely` · source: `docs/MARKETPLANE-KICKOFF-PROMPT.md:43-48 (rule) vs wrangler/supabase config requirements`  
+> Rule: "No string that identifies the company appears anywhere else." Unavoidable carriers: wrangler.jsonc `name`, wrangler `routes[].pattern` (api.<domain>/*), supabase/config.toml `project_id`, package.json `name` fields, pnpm-workspace.yaml.
+
+**Commit convention is already established by the repository's only content commit and should be adopted rather than invented: Conventional Commits with a lowercase type, a wrapped body at ~88 columns, and two trailers.**  
+`certain` · source: `git log 01f6386 (full format)`  
+> Commit 01f6386: subject "docs: add binding specification, kickoff brief and design artboard"; trailers "Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>" and "Claude-Session: https://claude.ai/code/session_...".
+
+**Branch convention is likewise already established: agent branches are claude/<slug>-<6-char-id>, merged to main by pull request, never pushed to main directly.**  
+`certain` · source: `git branch -a; git log`  
+> Branches: `claude/marketplane-build-kickoff-cgbfxz`, `main`; merge commit a057890 "Merge pull request #1 from Mouthfully/claude/marketplane-build-kickoff-cgbfxz". Remote: https://github.com/Mouthfully/dataaggregator.
+
+**Every design note has three mandatory sections from the kickoff, plus two more forced by the kickoff's conflict and unverified-flag rules, plus one forced by its no-scope-widening rule.**  
+`certain` · source: `docs/MARKETPLANE-KICKOFF-PROMPT.md:5,10,104,105`  
+> "Each PR carries a short design note under `docs/marketplane/` with the cost estimate, the platform-terms check, and what was left out." (104) + "Where it and the specification disagree, the specification's section 11 decisions win and the conflict is recorded in the phase design note under `docs/marketplane/`." (5) + "Where it marks something as unverified or open, do not build on it without flagging it in the PR." + "Never widen scope in a PR; open an issue instead." (105)
+
+**The design artboard's own token values do not match the kickoff's description of them, which is a design-system problem but has a layout consequence: packages/tokens must expose semantic role names so the value fight is settled in one file without touching any consumer.**  
+`certain` · source: `design/marketplane/Main.dc.html:11-56 vs docs/MARKETPLANE-KICKOFF-PROMPT.md:49-56`  
+> Artboard uses `font-family: "Figtree"`, `'Young Serif', Georgia, serif` for display, `'Geist Mono', monospace`, ground `#F4F6FA`, ink `#0F172A`, action `#2563EB`, border `#CBD5E1`, radius `20px`, shadow `0 24px 60px rgba(15,23,42,0.12)`. Kickoff says "electric indigo as the single call-to-action colour, teal for reads, coral for writes and competitor alerts, amber for restatements, Geist and Geist Mono" — no teal, coral, amber or Geist sans appears in the artboard.
+
+**Turborepo is not worth its cost at foundation. Its main lever (dependsOn ^build caching) is neutralised by source-only internal packages that have no build step, and both deploy targets already do their own change detection (Vercel skip-unaffected, Workers Builds watch paths). pnpm -r / --filter covers a 10-workspace repo; adopt turbo only if CI wall time exceeds ~4 minutes.**  
+`likely` · source: `https://vercel.com/docs/monorepos ; https://developers.cloudflare.com/workers/ci-cd/builds/configuration/ ; npm view turbo version`  
+> Vercel documents `turbo run build --filter=web` as one option but also documents plain filtered installs; Workers Builds documents per-Worker "Build watch paths". turbo latest is 2.10.12 (one turbo.json), so adoption later is cheap and reversible.
+
+**Bun and npm workspaces were considered and rejected. Bun 1.3.11 is installed and Vercel supports Bun workspaces, but wrangler and the Supabase CLI are npm-shaped and Bun has no catalog equivalent for central version pinning. npm 10.9.7 hoists, which defeats the undeclared-import guard that makes the two single-source rules enforceable.**  
+`likely` · source: `shell (node -v, npm -v, pnpm -v, bun -v, corepack -v)`  
+> Installed: node v22.22.2, npm 10.9.7, pnpm 10.33.0, yarn 1.22.22, bun 1.3.11, corepack 0.34.6.
+
+### Exact values (21)
+
+- Installed toolchain: node v22.22.2 | npm 10.9.7 | pnpm 10.33.0 | yarn 1.22.22 | bun 1.3.11 | corepack 0.34.6 | wrangler NOT installed | supabase CLI NOT installed | deno NOT installed
+- next = 16.3.4 (engines: node >=20.9.0; peer react ^18.2.0 || ^19.0.0; peer @playwright/test ^1.51.1)
+- react = 19.2.8
+- typescript = 7.0.2 (latest, stable 2026-07-08, Go-native; other stable lines available: 6.0.3, 5.9.3)
+- tailwindcss = 4.3.3 ; @tailwindcss/postcss = 4.3.3
+- wrangler = 4.129.0
+- @cloudflare/workers-types = 5.20260907.1
+- @cloudflare/vitest-pool-workers = 0.22.0 — peerDependencies vitest ^4.1.0, @vitest/runner ^4.1.0, @vitest/snapshot ^4.1.0
+- vitest: latest = 5.0.0, V4 tag = 4.1.11 — PIN 4.1.11 (5.0.0 breaks the Workers pool)
+- @biomejs/biome = 2.5.12 ; eslint = 10.10.0 ; prettier = 3.9.6 ; oxlint = 1.81.0
+- turbo = 2.10.12 ; @changesets/cli = 3.0.2 (NOT recommended) ; syncpack = 15.3.3 (NOT needed, catalogs replace it)
+- supabase (npm CLI) = 2.116.0 ; zod = 4.5.4 ; shadcn = 4.21.0 ; react-email = 6.9.3 ; @react-email/components = 1.0.12 ; drizzle-orm = 0.45.2
+- Vercel project settings to use: Root Directory = apps/web ; Install Command = pnpm install --filter @marketplane/web... ; Build Command = framework default (next build) ; Skip deployment toggle = Enabled (under Root Directory settings) ; optional apps/web/vercel.json { "relatedProjects": [...] } (max 3 linked projects)
+- Cloudflare Workers Builds fields (one connected Worker per app): "Root directory" = apps/api-edge | apps/scheduler | apps/mcp ; "Build command" (optional) ; "Deploy command" default `npx wrangler deploy` ; "Build variables and secrets" ; "Build watch paths" = apps/<name>/**, packages/**, pnpm-lock.yaml
+- Supabase CLI defaults: ./supabase/config.toml ; ./supabase/migrations ; ./supabase/tests (pgTAP, run by `supabase test db`, min CLI v1.11.4) ; override only via SUPABASE_WORKDIR env or --workdir flag
+- Tailwind v4 wiring in apps/web/app/globals.css: `@import "tailwindcss";` then `@import "@marketplane/tokens/tokens.css";` then `@theme inline { --color-ground: var(--mp-color-ground); ... }` ; dark values under `:root:not([data-theme="light"])` @media (prefers-color-scheme: dark) and `:root[data-theme="dark"]`
+- Stainless config location (for the record, now unusable): .stainless/{workspace.json, openapi.json, stainless.yml} at repo root; hosted products wound down 2026-05-18, "new signups, projects, and SDKs are not available"
+- package.json packageManager field = "pnpm@10.33.0" ; .node-version file = "22"
+- Design artboard literal values (for packages/tokens/src/tokens.css seeding): ground #F4F6FA, card #FFFFFF, ink #0F172A, muted ink #475569, faint ink #64748B, border #CBD5E1, hairline #E2E8F0, tint #F9FAFC, action #2563EB, action-hover #1D4ED8, radius-card 20px, radius-pill 999px, shadow-card 0 24px 60px rgba(15,23,42,0.12), display font 'Young Serif', body font 'Figtree', mono font 'Geist Mono'
+- Git: remote https://github.com/Mouthfully/dataaggregator ; branches main + claude/marketplane-build-kickoff-cgbfxz ; commit trailers already in use: `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` and `Claude-Session: https://claude.ai/code/session_01Hu8TqrMA16q8ny8PxHM68g`
+- Workspace package names (all private, version 0.0.0, never published): @marketplane/web, @marketplane/api-edge, @marketplane/scheduler, @marketplane/mcp, @marketplane/brand, @marketplane/tokens, @marketplane/contract, @marketplane/db, @marketplane/connectors, @marketplane/documents
+
+### Conflicts raised (6)
+
+- Stainless (spec section 7) vs reality. Spec 7 line 700 and the stack table line 723 make Stainless Free the SDK/docs/MCP generator, and line 773 justifies the ≤25-endpoint budget by Stainless's free tier; line 924 says the MCP server is 'generated with Stainless'. But Stainless announced on 2026-05-18 that it is joining Anthropic and winding down all hosted products — 'Starting immediately, new signups, projects, and SDKs are not available'. The spec half-knows this (line 1036: 'Anthropic acquired Stainless (May 2026)') but section 7 was never updated. REALITY WINS. Layout consequence: a top-level openapi/ directory owned by this repo, a hand-written apps/mcp Worker, and an in-repo generator for the SDK and docs. Keep the ≤25-endpoint budget as scope discipline, but record in the design note that its stated justification is void and the real reason is now maintenance surface.
+- dlt/Trigger.dev (spec section 7, lines 700 and 715-716) vs TypeScript-on-Workers (kickoff non-negotiable 3, lines 60-62). The kickoff explicitly overrides and explicitly demands the trade-off be recorded in the phase 1 design note. KICKOFF WINS — it is the governing brief, and the spec's own fact-check correction (line 797, 'Cloudflare Workers has no native long-running Python') shows the dlt line was already unstable. Layout consequence: no Python toolchain in the tree at all; packages/connectors is TypeScript-only.
+- Literal path `src/brand/brand.ts` / `src/styles/tokens.css` (kickoff 43, 49) vs a monorepo. The kickoff grants the escape hatch itself ('or the equivalent under the repo's conventions'). RECOMMENDED EQUIVALENTS: packages/brand/src/brand.ts and packages/tokens/src/tokens.css. The alternative that preserves the literal paths — putting both under apps/web/src/ and having Workers import upward — must be rejected: it makes three Cloudflare Workers depend on the Next.js app, which inverts the dependency graph, breaks Vercel's skip-unaffected detection, and drags Next/React types into workerd typechecking. The mapping must be stated in docs/marketplane/00-repo-map.md so no later agent treats it as drift.
+- Design artboard vs kickoff token description. Artboard: Figtree (body), Young Serif (display), Geist Mono, action #2563EB, ground #F4F6FA. Kickoff: 'electric indigo as the single call-to-action colour, teal for reads, coral for writes and competitor alerts, amber for restatements, Geist and Geist Mono'. The artboard contains no teal, coral, amber, or Geist sans, and contains a serif display face the kickoff never mentions. NOT MY AREA TO RESOLVE — flag to the design-system agent. Layout consequence only: packages/tokens must be authored with semantic role names (--mp-color-action, --mp-color-read, --mp-color-write, --mp-color-restatement, --mp-font-display, --mp-font-body, --mp-font-mono) so whichever side wins, no consumer file changes.
+- Toolchain conflict, not a spec conflict: vitest latest (5.0.0) vs @cloudflare/vitest-pool-workers@0.22.0 (peer ^4.1.0). Any agent that runs `pnpm add -D vitest` will install 5.0.0 and break Worker tests. PIN 4.1.11 via the pnpm catalog. Same class of trap: typescript latest is 7.0.2 and Next does not understand TS project references (vercel/next.js#67372), so composite builds must not be used even though TS 7 supports them.
+- Internal contradiction in the kickoff: 'No string that identifies the company appears anywhere else' is literally unsatisfiable because wrangler.jsonc requires a Worker `name`, wrangler routes require the domain in `routes[].pattern`, supabase/config.toml requires `project_id`, and every workspace package.json requires a `name`. RESOLUTION: the brand guard is a match test for a written allowlist of infrastructure files (assert the literal equals the value in brand.ts) and a hard ban everywhere else. Record the allowlist in 00-repo-map.md.
+
+### Open or unverified (9)
+
+- Spec 7 'Open questions' (line 803): 'What do Stainless Starter/Pro, Speakeasy and Fern actually cost above free? All three withhold prices, so crossing 25 endpoints has an unknown bill.' This is now moot for Stainless (wound down) and unresolved for Speakeasy/Fern. Anything the build assumes about SDK generation cost must be flagged in the PR that lands openapi/.
+- Spec 7 (line 796): 'Stainless offers a 30-day trial above the free tier plus a free Starter plan for qualifying open-source projects' — superseded by the wind-down; do not build a CI job against it.
+- Not verified: whether Vercel's automatic skip-unaffected detects a change to a non-JS file inside a workspace package (packages/tokens/src/tokens.css). The docs say 'the project source code has changed' and 'any of the project's internal dependencies have changed' without qualifying file type. If a tokens-only change fails to trigger a web rebuild, fall back to the documented Ignored Build Step. Flag in the foundation PR.
+- Not verified: Cloudflare Workers Builds limits and pricing for three connected Workers on one repository (build minutes, concurrent builds). The spec's cost table (line 725-731) prices Workers Paid, Workflows, Queues and Supabase Pro but contains no Workers Builds line. The foundation design note's cost estimate must either source this or mark it unknown.
+- Not verified: which `compatibility_date` and whether `nodejs_compat` is required for packages/contract and packages/connectors under workerd. Zod 4.x and any Node-shaped built-in usage decide this. Must be settled and pinned identically across all three wrangler.jsonc files before the first Worker merges, or the three Workers will silently diverge.
+- Not verified: that a source-only @marketplane/contract typechecks cleanly under both @cloudflare/workers-types 5.x and Next's DOM lib. Mitigation designed in (packages/* tsconfig sets "lib": ["ES2023"] with no "dom" and no "types"), but the first cross-runtime import in the foundation PR is the real test. If it fails, the fallback is per-runtime entry points ("exports": {"worker": ..., "default": ...}), which is a bigger maintenance cost and must be argued for in a design note.
+- TypeScript 7.0.2 is stable but three months old (2026-07-08) and is a compiler rewrite; Next 16 uses the project-local tsc CLI. If TS 7 misbehaves with Next 16 or Biome, the fallback is 6.0.3. Treat the TS major as a flagged choice in the foundation design note, not a settled one.
+- Spec 11.11 residual risk 'Connector rot is a permanent cost line' with the mitigation 'Routine B (section 13) makes each connector a contract-tested unit with fixtures; budget one engineer permanently'. The layout supports this (packages/connectors with per-source fixtures and contract tests) but the maintenance budget is a business assumption the build cannot verify.
+- The spec's section 9 week 7-8 requires an 'Agent skill file, CLI, docs' and section 15 screen 7 requires 'the agent skill file'. No home for these is proposed at foundation; they will need apps/cli and a skills/ or .well-known/ artefact. Flag so a later agent does not scatter them.
+
+### Recommendation
+
+DECISION: Option (b) — a pnpm workspaces monorepo. Not Turborepo, not Bun, not npm workspaces, and not option (a).
+
+REASON, in one sentence: the two hardest non-negotiables (one brand file, one tokens stylesheet) each have consumers in three different runtimes — Node on Vercel, workerd on Cloudflare, Deno on Supabase — plus CI codegen, and only a named workspace package turns "everything reads from this one file" into a declared dependency that Vercel's skip-unaffected graph, wrangler's bundler, pnpm's strict resolver and CI can all enforce; option (a)'s relative imports make it a convention that decays on the first agent-written PR.
+
+Supporting reasons, in priority order: (1) a single root tsconfig cannot host @cloudflare/workers-types alongside Next's DOM lib without colliding on fetch/Request/Response/caches, so per-app tsconfigs are mandatory once there is more than one runtime; (2) Vercel's automatic skip-unaffected requires pnpm-workspace.yaml with unique names and explicit inter-package deps — option (a) satisfies none of them, so every commit rebuilds the web app; (3) Cloudflare Workers Builds is designed for exactly this (per-Worker Root directory, Build command, Deploy command, Build watch paths), so three Workers cost three dashboard configs and zero CI code; (4) three deploy targets with three different change-detection systems need three package boundaries to point at.
+
+COST CONTROL (the two-founder answer): keep the ceremony out. No Turborepo, no changesets, no versioning, no publishing — every package is "private": true, "version": "0.0.0", consumed as workspace:*. No per-package build step: internal packages export raw TypeScript ("exports": {".": "./src/index.ts"}), Next consumes them via transpilePackages, wrangler's esbuild and Deno compile TS directly. The only generator in the tree is packages/tokens (css -> ts custom-property map). All versions pinned once in the pnpm-workspace.yaml catalog. Net added ceremony versus option (a): about ten small files.
+
+=== DIRECTORY TREE (foundation milestone, file level) ===
+Legend: [F] lands in the foundation PR series; [S] stub only at foundation; [L] later milestone, shown so nobody invents a different home.
+
+/
+├── .github/
+│   ├── workflows/ci.yml                            [F]
+│   ├── workflows/db.yml                            [F]
+│   ├── workflows/openapi.yml                       [L]
+│   ├── PULL_REQUEST_TEMPLATE.md                    [F]
+│   └── CODEOWNERS                                  [F]
+├── apps/
+│   ├── web/                                        [F]  Next 16 on Vercel (marketing + dashboard)
+│   │   ├── app/layout.tsx
+│   │   ├── app/globals.css            @import tailwindcss; @import @marketplane/tokens/tokens.css; @theme inline
+│   │   ├── app/icon.svg               (re-exported from @marketplane/brand assets at build)
+│   │   ├── app/(marketing)/layout.tsx
+│   │   ├── app/(marketing)/page.tsx                [S] hero shell only; full site is milestone 7
+│   │   ├── app/(auth)/sign-up/page.tsx
+│   │   ├── app/(auth)/sign-in/page.tsx
+│   │   ├── app/(auth)/callback/route.ts
+│   │   ├── app/(auth)/accept-invite/[token]/page.tsx
+│   │   ├── app/(dashboard)/layout.tsx
+│   │   ├── app/(dashboard)/onboarding/page.tsx      create organisation, then first workspace (s15 screen 1)
+│   │   ├── app/(dashboard)/connect/page.tsx        [S]
+│   │   ├── app/(dashboard)/ask/page.tsx            [S]
+│   │   ├── app/(dashboard)/watch/page.tsx          [S]
+│   │   ├── app/(dashboard)/numbers/page.tsx        [S]
+│   │   ├── app/(dashboard)/usage/page.tsx          [S]
+│   │   ├── app/(dashboard)/developers/page.tsx     [S]
+│   │   ├── app/(dashboard)/settings/page.tsx
+│   │   ├── app/(dashboard)/settings/members/page.tsx
+│   │   ├── actions/{organisation.ts,workspace.ts,member.ts,invitation.ts}
+│   │   ├── components/ui/{button.tsx,card.tsx,input.tsx,badge.tsx,table.tsx}   shadcn, re-themed from tokens
+│   │   ├── lib/supabase/{server.ts,browser.ts,middleware.ts}
+│   │   ├── middleware.ts
+│   │   ├── components.json                          shadcn config, cssVariables: true
+│   │   ├── next.config.ts                           transpilePackages: ["@marketplane/brand","@marketplane/tokens","@marketplane/contract","@marketplane/db","@marketplane/documents"]
+│   │   ├── postcss.config.mjs
+│   │   ├── tsconfig.json
+│   │   ├── vercel.json
+│   │   └── package.json
+│   ├── api-edge/                                   [F] health-check Worker only, to prove the target
+│   │   ├── src/index.ts
+│   │   ├── src/router.ts                           [L]
+│   │   ├── src/auth/api-key.ts                     [L]
+│   │   ├── test/health.test.ts
+│   │   ├── wrangler.jsonc
+│   │   ├── vitest.config.ts                        vitest-pool-workers
+│   │   ├── tsconfig.json
+│   │   └── package.json
+│   ├── scheduler/                                  [L] Workflows + Queues
+│   └── mcp/                                        [L] hand-written MCP Worker (Stainless is gone)
+├── packages/
+│   ├── brand/                                      [F]
+│   │   ├── src/brand.ts            <-- THE brand file (kickoff's src/brand/brand.ts)
+│   │   ├── src/claims.ts           allowed marketing claims, per kickoff non-negotiable 1
+│   │   ├── src/index.ts
+│   │   ├── src/brand.test.ts       asserts every required field is non-empty and well-formed
+│   │   ├── assets/{logo.svg,logo-mark.svg,favicon.svg,og-default.png}
+│   │   ├── tsconfig.json
+│   │   └── package.json            exports: ".", "./assets/*"
+│   ├── tokens/                                     [F]
+│   │   ├── src/tokens.css          <-- THE tokens stylesheet (kickoff's src/styles/tokens.css), light + dark
+│   │   ├── scripts/build-tokens.mjs  parses tokens.css -> dist/tokens.ts {light,dark} maps for email/PDF
+│   │   ├── dist/                     gitignored, generated
+│   │   ├── tsconfig.json
+│   │   └── package.json            exports: "./tokens.css" -> src/tokens.css, "." -> dist/tokens.ts
+│   ├── contract/                                   [F] the envelope is the contract (kickoff 5)
+│   │   ├── src/envelope.ts         fetched_at, source_updated_at, restates_until, is_provisional,
+│   │   │                           attribution_window, fx_source, fx_rate_date, raw
+│   │   ├── src/metrics.ts          the dictionary: spend, impressions, clicks, conversions,
+│   │   │                           conversion_value, revenue (13.3 rule 2)
+│   │   ├── src/entities.ts         entity_type, native_entity_type, native_id
+│   │   ├── src/errors.ts
+│   │   ├── src/index.ts
+│   │   ├── src/envelope.test.ts    proves an unlabelled conversion count cannot be constructed
+│   │   ├── tsconfig.json
+│   │   └── package.json
+│   ├── db/                                         [F]
+│   │   ├── src/types.generated.ts  from `supabase gen types typescript --local`; CI diffs for drift
+│   │   ├── src/index.ts
+│   │   ├── tsconfig.json
+│   │   └── package.json
+│   ├── connectors/                                 [L] 13.3 unit shape lives here
+│   │   └── src/sources/<name>/{client.ts,normalize.ts,backfill.ts,fixtures/,contract.test.ts}
+│   └── documents/                                  [F] invitation email only at foundation
+│       ├── src/emails/{layout.tsx,invitation.tsx}  consumes @marketplane/brand + @marketplane/tokens
+│       ├── src/pdf/                                [L] invoices, report exports
+│       ├── tsconfig.json
+│       └── package.json
+├── supabase/                                       [F] root, per CLI default
+│   ├── config.toml
+│   ├── seed.sql
+│   ├── migrations/
+│   │   ├── 20260908000100_extensions.sql          pgcrypto, pg_cron, pgtap
+│   │   ├── 20260908000200_organisations.sql
+│   │   ├── 20260908000300_workspaces.sql
+│   │   ├── 20260908000400_members_and_roles.sql   owner|admin|analyst|viewer
+│   │   ├── 20260908000500_invitations.sql
+│   │   ├── 20260908000600_connections.sql
+│   │   ├── 20260908000700_api_keys.sql            workspace-scoped, spend budget, tool allow-list
+│   │   └── 20260908000800_rls_policies.sql        every tenant table keyed on organisation + workspace
+│   ├── tests/
+│   │   ├── 000_helpers.sql
+│   │   ├── organisations_rls.test.sql
+│   │   ├── workspaces_rls.test.sql
+│   │   ├── members_rls.test.sql
+│   │   ├── invitations_rls.test.sql
+│   │   ├── connections_rls.test.sql
+│   │   ├── api_keys_rls.test.sql
+│   │   └── cross_workspace_isolation.test.sql     proves "No cross-workspace aggregation ever" (s15)
+│   └── functions/                                  [L] Deno edge functions
+├── openapi/                                        [L] marketplane.yaml (<=25 endpoints) + budget check
+├── scripts/                                        [F]
+│   ├── check-brand.mjs        bans identity strings outside packages/brand/src/brand.ts;
+│   │                          match-tests the allowlist (wrangler names/routes, supabase project_id, pkg names)
+│   ├── check-tokens.mjs       bans #hex, rgb(), hsl(), oklch() outside packages/tokens/src/tokens.css
+│   ├── check-db-types.sh      regenerates types and fails on drift
+│   └── verify.sh              lint + typecheck + test + build + both guards (the pre-push gate)
+├── docs/
+│   ├── MARKETING-DATA-PLANE.md                     (exists)
+│   ├── MARKETPLANE-KICKOFF-PROMPT.md               (exists)
+│   └── marketplane/
+│       ├── TEMPLATE.md                             [F]
+│       ├── 00-repo-map.md                          [F] phase 0 output, required by the kickoff
+│       └── 01-foundation.md                        [F]
+├── design/marketplane/{Main.dc.html,support.js}    (exists, untouched)
+├── .editorconfig                                   [F]
+├── .gitignore                                      [F]
+├── .node-version            "22"                   [F]
+├── biome.jsonc                                     [F]
+├── tsconfig.base.json                              [F]
+├── vitest.config.ts         projects: node + workers [F]
+├── pnpm-workspace.yaml      packages + catalog      [F]
+├── package.json             private, packageManager pnpm@10.33.0, scripts [F]
+├── pnpm-lock.yaml                                   [F]
+└── README.md                                       (exists, update build status)
+
+=== PACKAGE MANAGER ===
+pnpm 10.33.0, declared as "packageManager": "pnpm@10.33.0" (corepack 0.34.6 is present). pnpm-workspace.yaml lists packages: ["apps/*", "packages/*"] and carries a `catalog:` block pinning every shared version in one place — next 16.3.4, react 19.2.8, tailwindcss 4.3.3, wrangler 4.129.0, @cloudflare/workers-types 5.20260907.1, vitest 4.1.11, @cloudflare/vitest-pool-workers 0.22.0, typescript 7.0.2, zod 4.5.4. Every package.json references them as "catalog:". Rejected: npm (hoisting defeats the undeclared-import guard that makes the brand/tokens rules enforceable), bun (no catalogs; wrangler and supabase CLI are npm-shaped), yarn 1 (unmaintained).
+
+=== TEST RUNNER ===
+Three surfaces, two runners, no more:
+1. Vitest 4.1.11 (PINNED — 5.0.0 breaks the Workers pool), root vitest.config.ts using `projects`: a "node" project for packages/* unit tests and the 13.3 offline connector contract tests, and a "workers" project per Worker app using @cloudflare/vitest-pool-workers 0.22.0 against real workerd with Miniflare bindings.
+2. pgTAP under supabase/tests/, run by `supabase test db`. This is the row-level-security test suite the foundation milestone requires; it is SQL, not TypeScript, and cannot be folded into Vitest.
+3. Playwright deferred to the dashboard milestone (Next 16 peers @playwright/test ^1.51.1). Not at foundation.
+Every connector fixture is a recorded real response with PII scrubbed and contract tests run offline in CI (13.3 rule 6).
+
+=== LINT / FORMAT ===
+Biome 2.5.12 alone, one biome.jsonc at the root: formatter + linter + import sorting for TS/TSX/JS/JSON/CSS. No ESLint, no Prettier. Reason: two founders, one config, one binary, no plugin resolution across ten workspaces. Trade-off to record in the design note: this gives up eslint-config-next's Next-specific rules (the @next/next/no-img-element class); mitigation is that `next build` still surfaces the build-breaking subset and the two rules that actually matter here are custom anyway. Add to biome.jsonc: `noRestrictedImports` forbidding apps/* from importing another app (packages only), and forbidding any import of @marketplane/tokens/dist from a Next component (Next reads the CSS, Workers read the TS map).
+The two project-specific rules are node scripts, not lint plugins, because they must scan CSS, SQL, MDX and wrangler.jsonc — outside any JS linter's reach: scripts/check-brand.mjs and scripts/check-tokens.mjs, both wired into `pnpm verify` and into CI as their own named steps so a failure names the rule that was broken.
+
+=== CI JOBS (.github/workflows) ===
+ci.yml, on pull_request and push to main, one job "verify":
+  checkout@v4 -> pnpm/action-setup@v4 (reads packageManager) -> setup-node@v4 with node-version-file: .node-version and cache: pnpm
+  pnpm install --frozen-lockfile
+  pnpm check:brand           # identity strings outside the brand file
+  pnpm check:tokens          # hard-coded colours outside the tokens file
+  pnpm lint                  # biome ci .
+  pnpm typecheck             # tsc --noEmit per workspace, pnpm -r
+  pnpm test                  # vitest run (node + workers projects)
+  pnpm build                 # pnpm -r build
+db.yml, same triggers, job "database":
+  supabase start -> supabase db reset (migrations + seed) -> supabase db lint -> supabase test db (pgTAP RLS)
+  -> supabase gen types typescript --local, diffed against packages/db/src/types.generated.ts; drift fails the job
+openapi.yml [later milestone], job "contract":
+  endpoint count <= 25 (scripts/check-endpoint-budget.mjs), spec lint, then regenerate MCP tool descriptions and
+  SDK types and diff them — "any hand-edited drift fails the gate" (spec 13.4 docs parity)
+Deploys are NOT GitHub Actions: Vercel's Git integration builds apps/web (Root Directory apps/web, skip-unaffected on), and Cloudflare Workers Builds builds each Worker from its own Root directory with Build watch paths covering apps/<name>/** and packages/**. CI verifies; the platforms deploy.
+Branch protection on main: require the verify and database jobs, require one review, squash merge only, linear history.
+
+=== COMMIT AND BRANCH CONVENTIONS ===
+Adopt what the repository already does rather than inventing:
+Commits — Conventional Commits, lowercase type, imperative subject under 72 chars, body wrapped at 88, blank line before trailers. Types: feat, fix, docs, chore, refactor, test, perf, build, ci. Scope is the workspace or connector: feat(web):, feat(api-edge):, feat(db):, feat(connectors/google-ads):, docs(marketplane):. Mandatory trailers, both already in use on 01f6386:
+  Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+  Claude-Session: <session url>
+Branches — claude/<milestone>-<unit>-<6-char-id>, e.g. claude/foundation-rls-policies-a1b2c3, matching the existing claude/marketplane-build-kickoff-cgbfxz shape. One builder agent, one isolated worktree, one branch, one PR, per 13.3. Never commit to main. PR title equals the head commit subject. PR body ends with the two lines the tooling requires (Generated with Claude Code + session link) and links its design note.
+PR template (.github/PULL_REQUEST_TEMPLATE.md) requires: link to docs/marketplane/NN-<slug>.md, a checkbox that `pnpm verify` passed locally, a checkbox that no scope was widened (with the issue number if something was deferred), and a checkbox that any unverified/open spec item built on is flagged in the note.
+
+=== DESIGN-NOTE TEMPLATE (docs/marketplane/TEMPLATE.md) ===
+Filename docs/marketplane/NN-<slug>.md, NN zero-padded and sequential; 00-repo-map.md is fixed by the kickoff. Front matter: unit, milestone, branch, PR, date, author agent. Ten sections, the first three mandated verbatim by the kickoff, the next two by its conflict and unverified-flag rules, the sixth by its no-scope-widening rule:
+1. What was built — one paragraph, plus the exact files added or changed.
+2. Cost estimate — table (line item | unit price | assumed MVP volume | $/month | source), with section 7's cost table (spec lines 725-731) as the baseline, and a running total delta against the previous note. Every row cites a published price or is marked (unpriced).
+3. Platform-terms check — table (platform | clause and URL | date read | what it constrains here | how this unit complies | residual risk). Five rows are mandatory on every note even when the answer is "not touched": no shared platform tokens across tenants; no cross-customer aggregation or benchmarking on platform data; per-workspace data separation; the Meta client-list obligation (spec 3.5); contact data hashed at the edge and never stored raw (spec 3.2).
+4. Envelope and correctness — which envelope fields this unit emits or consumes; explicit answer to "can this unit emit an unlabelled conversion count?"; which restatement clock applies.
+5. Spec conflicts — where the kickoff and the spec disagreed, which section 11 decision was applied, and what was done. Empty is an acceptable answer; absent is not.
+6. Unverified or open items built on — each quoted from the spec with its own flag, why proceeding is safe, and what would falsify it.
+7. What was left out — deliberate omissions with the issue number opened for each.
+8. Tests — what proves this works, which fixtures, and what is explicitly not covered.
+9. Rollback — how to undo, including the down-migration or the previous Worker version.
+10. Follow-ups — ordered, each an issue link.
+
+=== FIRST THREE PRs, IN ORDER ===
+PR 1 docs(marketplane): phase 0 repo map and design-note template — 00-repo-map.md (this decision, the brand/tokens path mapping, the check-brand allowlist), TEMPLATE.md, PULL_REQUEST_TEMPLATE.md. No code.
+PR 2 build: pnpm workspace scaffold — root package.json, pnpm-workspace.yaml with the catalog, tsconfig.base.json, biome.jsonc, .node-version, vitest.config.ts, ci.yml, both guard scripts, and an empty apps/web that builds. Proves the gate before anything depends on it.
+PR 3 feat(brand,tokens): the two single sources — packages/brand and packages/tokens with tokens.css seeded from the artboard values under semantic role names, the css->ts generator, Tailwind @theme inline wiring in apps/web, and both guards turned from warn to fail.
+Supabase schema, auth, invitations and the pgTAP RLS suite follow as PRs 4-6.

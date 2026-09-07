@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "api-edge",
+  "main": "src/index.ts",
+
+  // Capped at the OLDER of the two workerd binaries in this workspace, not the newer one.
+  // wrangler 4.129.0 bundles workerd 1.20260903.1, but @cloudflare/vitest-pool-workers
+  // 0.22.0 pulls miniflare 5.20260815.0-alpha whose workerd supports dates only up to
+  // 2026-08-22. A later date typechecks and deploys but fails every test with
+  // ERR_RUNTIME_FAILURE. Raise this only when the pool's miniflare catches up.
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  }
+}

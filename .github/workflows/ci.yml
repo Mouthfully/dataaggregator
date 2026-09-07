@@ -1,0 +1,89 @@
+# The repository's own gate. Everything the kickoff requires before a push -- lint, typecheck,
+# unit tests, build -- plus the two repository guards.
+#
+# CI verifies; the platforms deploy. Vercel's Git integration builds apps/web and Cloudflare
+# Workers Builds builds each Worker from its own root directory, so there is no deploy job here.
+#
+# BOTH GUARDS ENFORCE. They are the reason the two single-source non-negotiables are properties
+# of the repository rather than promises in a document, so they fail the build like any other
+# check. Each has a documented escape hatch for the cases where a literal is the point:
+# `brand-guard-ignore:` and `tokens-guard-ignore:`, on the offending line or the one above it.
+# Reach for the hatch with a reason, never by widening an exempt list.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # No version pinned here: pnpm/action-setup reads "packageManager" from package.json,
+      # which is the one place the pnpm version is declared.
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      # cache: pnpm caches the pnpm content-addressable store, keyed on pnpm-lock.yaml.
+      # It must come after pnpm is installed -- setup-node shells out to `pnpm store path`.
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm exec biome lint .
+
+      # Biome has no `--check` flag: bare `biome format` IS the check, exiting non-zero on any
+      # file it would reformat. `--write` is the one that changes files.
+      - name: Format check
+        run: pnpm exec biome format .
+
+      # Per-workspace tsconfigs, deliberately: apps/web needs the DOM lib and apps/api-edge needs
+      # @cloudflare/workers-types, and the two collide on fetch/Request/Response/caches.
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      # Every package with tests, not just the Worker. apps/api-edge runs under real workerd via
+      # @cloudflare/vitest-pool-workers rather than jsdom, which needs vitest 4.x -- the pool peers
+      # ^4.1.0 and vitest 5 breaks it. That pin lives in pnpm-workspace.yaml's catalog and is
+      # enforced at install time by strict-peer-dependencies.
+      - name: Test
+        run: pnpm -r test
+
+      # Both apps, not just the web one. @cloudflare/vitest-pool-workers uses its own transform
+      # pipeline rather than wrangler's deploy bundle, so a broken wrangler.jsonc or an esbuild
+      # bundling failure passes the test step and only surfaces at deploy. `pnpm -r build` covers
+      # apps/web (next build) and apps/api-edge (wrangler deploy --dry-run); packages with no
+      # build script are skipped.
+      - name: Build
+        run: pnpm -r build
+
+      # Both guards run even when a step above failed, so their output is always visible on the
+      # run. `!cancelled()` rather than `always()`: a cancelled run should stop, not carry on.
+      - name: Brand guard
+        if: ${{ !cancelled() }}
+        run: node scripts/check-brand.mjs
+
+      - name: Tokens guard
+        if: ${{ !cancelled() }}
+        run: node scripts/check-tokens.mjs

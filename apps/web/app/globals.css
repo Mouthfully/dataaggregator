@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* The single source of truth for design tokens. Resolved through the workspace package
+   export map (@repo/tokens -> "./tokens.css"), not a relative path, so the dependency is
+   declared and Vercel's skip-unaffected build detection can see it. */
+@import "@repo/tokens/tokens.css";
+
+/* Tailwind v4 is CSS-first: there is no tailwind.config.js.
+   `@theme inline` maps Tailwind's theme onto the custom properties defined by the imported
+   token file rather than re-declaring their values here -- utilities emit
+   `var(--mp-ground)` and the token file stays the only place a value is written. */
+@theme inline {
+  --color-ground: var(--mp-ground);
+}

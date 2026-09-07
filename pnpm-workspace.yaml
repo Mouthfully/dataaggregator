@@ -1,0 +1,39 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Every version in the workspace is pinned here once and referenced as "catalog:"
+# from each package.json. Do not add a bare version to a package.json.
+catalog:
+  # --- Next.js app (apps/web) ---
+  next: 16.3.4
+  react: 19.2.8
+  react-dom: 19.2.8
+  "@types/react": 19.2.18
+  "@types/react-dom": 19.2.7
+  # @types/node tracks the Node major this repo runs on (v22), not the latest major.
+  "@types/node": 22.20.1
+
+  # --- language + styling ---
+  typescript: 7.0.2
+  tailwindcss: 4.3.3
+  "@tailwindcss/postcss": 4.3.3
+
+  # --- Cloudflare Workers (apps/api-edge) ---
+  wrangler: 4.129.0
+  "@cloudflare/workers-types": 5.20260907.1
+  "@cloudflare/vitest-pool-workers": 0.22.0
+
+  # VERSION TRAP: vitest latest is 5.0.0, but @cloudflare/vitest-pool-workers@0.22.0
+  # peers vitest ^4.1.0. Running `pnpm add -D vitest` installs 5.0.0 and breaks every
+  # Worker test. This pin is deliberate and EXACT: with resolution-mode=highest a caret
+  # range would float, and this is the one version the repo cannot afford to float.
+  # Do not bump it without bumping the pool first.
+  vitest: 4.1.11
+
+  # --- tooling ---
+  "@biomejs/biome": 2.5.12
+
+  # NOTE: only add a catalog entry when a package.json references it as "catalog:".
+  # An unreferenced pin is worse than no pin: it reads as authoritative while the tree
+  # actually resolves that package transitively at some other version.

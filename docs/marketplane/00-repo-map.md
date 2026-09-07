@@ -78,7 +78,16 @@ versioning, no publishing. Every package is `"private": true`, `"version": "0.0.
 `workspace:*`. Internal packages export **raw TypeScript** (`"exports": { ".": "./src/index.ts" }`) — Next
 consumes them via `transpilePackages`, and wrangler's esbuild and Deno compile TypeScript directly — so
 there is no per-package build step. The only generator in the tree is `packages/tokens`, which parses
-`tokens.css` into a TypeScript custom-property map for emails and PDFs. Versions are pinned once in the
+`tokens.css` into a TypeScript custom-property map for emails and PDFs.
+
+That generator is the one **deliberate exception** to "no per-package build step", and it is worth
+naming rather than leaving as an apparent contradiction. The `./tokens.css` export is raw and needs
+no build; the `.` export does, because Workers render transactional emails and PDF exports that have
+no stylesheet and no cascade and therefore need every token resolved per theme. The package's
+`prepare` script regenerates it on every install, so the build step is invisible in normal use.
+The cost is real and recorded in `02-scaffold-and-foundation.md`: after `rm -rf dist` or
+`git clean -xfd` without a reinstall, Turbopack reports a bare "Can't resolve '#generated'" because
+it does not implement subpath-imports array fallback, even though TypeScript does. Versions are pinned once in the
 workspace catalogue. Net cost over a flat layout: about ten small files.
 
 #### Where the brief's literal paths land

@@ -87,3 +87,53 @@ jobs:
       - name: Tokens guard
         if: ${{ !cancelled() }}
         run: node scripts/check-tokens.mjs
+
+  # Row-level security is the whole tenant-isolation guarantee, so it is a regression gate rather
+  # than a one-off check someone once ran. `supabase start` needs Docker-in-Docker and a full
+  # Supabase stack; this needs a database, so it runs the real migrations against a plain
+  # PostgreSQL 16 service with the shim in supabase/tests/00_supabase_shim.sql.
+  #
+  # A separate job on purpose: it needs no Node toolchain, and a failure here should read as
+  # "isolation broke", not as part of a lint run.
+  database:
+    name: database
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The runner image ships a psql, but not necessarily one matching the server. Pin the client
+      # to 16 so a version skew never shows up as a confusing migration failure.
+      - name: Install psql 16
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client-16
+          psql --version
+
+      # Applies every migration in order, then the RLS suite. The suite exits non-zero if any
+      # assertion fails, and it asserts from seven principals -- none of them a superuser, because
+      # a superuser bypasses RLS and would make the whole thing pass trivially.
+      - name: Migrations and RLS suite
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: ./supabase/tests/run-local.sh

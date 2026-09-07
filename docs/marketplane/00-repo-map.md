@@ -1,9 +1,8 @@
 # 00. Repository map and phase 0 decisions
 
-**Status: in progress.** All seven reconnaissance explorers have reported; the completeness critic is
-still running. Section 9 (decisions that belong to the founder) may gain entries from it, and section 10
-is filled in by a follow-up commit on this branch. Everything else is settled and is what later agents are
-briefed from.
+**Status: complete.** Seven read-only explorers plus a completeness critic, 8/8 returned. The critic's
+verdict: *"phase 1 can be proposed now, and should be, with two narrow blockers named up front rather than
+discovered mid-build."* This document is what every later agent is briefed from.
 
 Evidence for every claim here is in [`00-recon-reports.md`](00-recon-reports.md), which records each
 explorer's findings verbatim with confidence levels and sources.
@@ -424,44 +423,176 @@ no marketing string can outrun the specification.
 
 ---
 
-## 8. Built on open questions — flagged, as the brief requires
+## 8. Guards against the two ways this contract could go wrong
+
+The completeness critic found one recommendation in the whole recon set that contradicts a binding
+non-negotiable and would have hardened into a wrong contract if it reached `packages/contract` unreviewed.
+Both guards are recorded here because they bind the next PR, not this one.
+
+**The freshness fields stay flat.** The API explorer's proposed TypeScript regrouped §7's row into nested
+`freshness{fetched_at, source_updated_at, restates_until, is_provisional}` and `fx{...}` objects. That is
+exactly what §7 line 762 refutes in terms: *"A single `freshness` timestamp cannot express three clocks,
+which is why the field set splits into `fetched_at`, `source_updated_at`, `restates_until` and
+`is_provisional`."* Kickoff non-negotiable 5 names the same four at the top level. **They stay at the top
+level.** The explorer's *additions* are adopted — `account_id`, `entity_id`, `timezone`, `fx_rate`,
+`fx_base`, `first_seen_at` — as additive top-level fields, because each is demanded elsewhere in the
+specification and printed nowhere. `entity{}` and `dimensions{}` keep §2's nesting because that is §2's own
+printed shape. Any further grouping is a contract change and is not made silently.
+
+**Section 13.3's connector contract is stale and must be restated before any connector merges.** The
+kickoff mandates both "follow the routines in section 13" *and* non-negotiable 5, and on four points they
+disagree. §13.3 wins on process — the self-contained connector unit, recorded fixtures with PII scrubbed,
+offline contract tests in CI, dictionary-PR-before-new-metric, currency normalised at fetch time. §2, §7
+and non-negotiable 5 win on the contract itself:
+
+| §13.3 as written | Amended to |
+|---|---|
+| `freshness{window_days, last_restated_at, is_final}` | The four flat fields |
+| `is_final` | `is_provisional` only — never both a flag and its complement on one row |
+| `conversion_value` | `conversions_value` (two printed envelopes and the Fivetran package) |
+| GA4 backfill 72 h | GA4 restates 12 days (§7 table, §9 backfill tier) |
+
+Left unamended, the mandatory pre-merge connector contract test would reject the envelope the API is
+required to emit.
+
+**A third guard, on process:** the "empty repository" premise is already false and mutated three times
+during reconnaissance. Local `main` is stale at the pre-documentation commit while `origin/main` has moved.
+Every agent fetches and re-reads `HEAD` before writing, branches from `origin/main` or the current branch
+and never from local `main`, and edits `README.md` rather than regenerating it.
+
+---
+
+## 9. Built on open questions — flagged, as the brief requires
 
 The kickoff says not to build on anything the specification marks unverified or open without flagging it.
-These are the ones the plan does build on:
+These are load-bearing for phase 1 and after; the full 19-item list is in
+[`00-recon-reports.md`](00-recon-reports.md).
 
-1. **Meta's 28-day restatement clock: delivery or first report?** (§7, open). The `restates_until` anchor
-   assumes first report. Resolution is empirical: diff a historical pull against a re-pull 30 days later.
-2. **Google Ads publishes no freshness or conversion-finalisation statement** (§7, open, three attempts
-   found nothing). The 90-day window is an upper bound, not a documented SLA; 90-day nightly re-pulls may
-   be over-engineered. Measure on a live account first.
-3. **Whether a headless API can qualify for Google Ads Standard Access at all** (§11.11, High severity).
-   Requires a written answer from Google in week 1. Design partners live within Basic limits meanwhile.
-4. **Whether Meta treats a pay-per-call API as a tech provider needing per-client authorisation**
-   (§11.11, High). Needs a legal read before pricing goes live.
-5. **DataForSEO LLM Responses total cost** (§7, unverified, "could be off by 2 to 3× in either direction").
-6. **Dark-mode card surface and hairline** — invented, no artboard source.
-7. **Whether anyone pays for verified root cause** (§11.11, High). The specification's own exit criterion
-   requires one paid `diagnose` case by week 12; if none, "the honest conclusion is that the product is a
-   report and a dataset, not a data plane."
+**Flagged in the PR that lands the contract types:**
+
+1. **Meta's 28-day clock: delivery or first report?** Unresolved in Meta's own docs, per both the
+   specification's researcher and its fact-checker. The `first_seen_at` anchor builds directly on it.
+   Settle empirically: diff a historical pull against a re-pull 30 days later.
+2. **Google Ads publishes no freshness or finalisation statement at all** — three attempts found nothing.
+   `restates_until = fetched_at + account conversion window` is a guess dressed as a contract, and 90-day
+   nightly re-pulls may be over-engineered.
+3. **GA4's 12 days carries Google's own disclaimer**: *"This is not a guarantee, nor an SLA or an SLO."*
+   It cannot be sold as a guarantee anywhere, the envelope's semantics included.
+
+**Flagged in the auth and onboarding PRs:**
+
+4. **Google OAuth sensitive-scope verification is unbounded.** The "3 to 5 days" figure could not be
+   sourced and Google publishes no duration; one observed case ran 2026-04-01 to 2026-06-12 unresolved.
+   **Never quote 3–5 days.** Self-serve signup gates on the outcome, not the roadmap.
+5. **Google Ads Standard Access may have no path for a headless product** (§11.11, High) — "RMF categories
+   are defined by what a tool displays." Nothing may be designed that needs more than 15,000 operations per
+   day until Google answers in writing. **The Numbers screen is a compliance artefact, not a feature.**
+6. **Whether Meta treats a pay-per-call API as a Tech Provider** needing per-client authorisation is
+   unresolved (§11.11, High). The client-list record and the Business-admin acceptance step are being
+   designed into the phase 1 schema on that basis.
+7. **Per-tenant Google developer tokens in a multi-tenant service are undocumented** — the specification's
+   own open question is "whose token appears in the request?". The `connections` schema encodes an answer
+   no source confirms.
+8. **`webmasters.readonly`'s sensitive-scope status is unconfirmed** — not listed on Google's OAuth scopes
+   page. Search Console could fall behind the same unbounded gate as GA4, which would remove it from the
+   launch connector list.
+
+**Flagged on every design note's cost estimate:**
+
+9. Performance COGS and the ~98% margin are marked unverified in §8; §7's table has no disk-growth term by
+   its own checker's admission; and the mandated stack adds two further uncosted terms (R2 object count, KV
+   write volume). §8's own open question is the sharpest: *"the ~98% margin assumption collapses if platform
+   limits force 3× to 5× redundant polling per useful row"* — which is exactly what the Workers scheduler
+   determines.
+10. **Do not hard-code Meta's rate-limit constants.** The specification flags its own 5,000+40× and
+    190,000+40× figures as not appearing in the cited source. Only `ads_api_access_tier` of the three
+    `x-fb-ads-insights-throttle` fields is named; do not invent the other two.
+
+**One item the critic flagged that is now closed:** it marked the Stainless wind-down as resting on a
+single unverified blog post. It was verified directly against the announcement during this session —
+published 18 May 2026, *"Starting today, new signups, projects, and SDKs will not be available."* It is a
+fact, not an assumption. Stainless pricing above the free tier remains unknown and is moot.
 
 ---
 
-## 9. Decisions that belong to the founder, not the orchestrator
+## 10. Gaps the orchestrator closes by deciding, not by asking
 
-*Provisional — the completeness critic may add to this list.*
+The critic separated *contested* from *unspecified*. These four are unspecified — no source contradicts
+another, nobody established an answer, and phase 1 cannot proceed without one. They are decided explicitly
+in the phase 1 design note rather than discovered mid-build.
 
-1. **Brand register: editorial-serif or bold-sans?** The artboard says Young Serif + Figtree; §14 and the
-   kickoff brief say Geist 800. Building from the artboard so work proceeds; this is reversible as a
-   variable swap, but it is a brand decision.
-2. **Pricing currency: EUR or USD?** The artboard prices in euros, §8 in dollars. Both envelope examples
-   convert to EUR. Needs to be decided once rather than diverging.
-3. **Default AI-answer model.** Batched Haiku 4.5 at ~$0.003 versus Sonar Pro at $0.024–$0.032 swings
+1. **How Supabase Auth maps onto organisation / workspace / member.** The central RLS design decision of
+   the whole foundation milestone: JWT custom claims via an auth hook, or a membership-table join inside
+   every policy; how the four roles enter the policy; how role changes propagate. Every migration and every
+   pgTAP test depends on it.
+2. **How a Cloudflare Worker authenticates an API key against Supabase without a service role that
+   bypasses RLS.** "No service-role bypass" is a hard gate from the platform-terms work, and §15 requires
+   workspace-scoped keys with a spend budget and a tool allow-list. Key format, hashing and lookup scheme,
+   and request identity at the edge are all unestablished. Blocks both `apps/api-edge` and the `api_keys`
+   migration.
+3. **Where the customer's OAuth grants live.** §15 says "in a vault" and non-negotiable 4 forbids shared
+   tokens. Supabase Vault/pgsodium, Cloudflare Secrets Store, or envelope encryption with a KMS key — and
+   who can decrypt, from which runtime. The `connections` table cannot be designed without it, and open
+   question 7 above means it may also need a per-tenant `developer_token` field.
+4. **How invitation emails are sent.** The invitation flow is in the first milestone and email delivery is
+   not one of the three mandated providers. Either Supabase Auth's built-in email suffices — no fourth
+   provider, so no written reason needed — or a sender like Resend does, which needs the written reason
+   non-negotiable 3 demands **plus** a sub-processor page entry per §3.2.
+
+---
+
+## 11. Decisions that belong to the founder
+
+Five, and the first three block work that is otherwise ready.
+
+1. **Brand display register.** *Option A (recommended, and what gets built absent an answer):* the artboard
+   as shipped — Young Serif 400 headlines, Figtree body, Geist Mono, cool `#F4F6FA` ground, one accent
+   `#2563EB`, editorial register. *Option B:* §14 as written — Geist 800 set tight, warm `#FBFBF8` ground
+   with `#ECE9E1` hairlines, electric indigo `#4F46FF`, bold-sans-tech register. No rule in the corpus
+   resolves this: §11 takes no design decision. Reversal is one token file, but only before the marketing
+   site is built. Either way the three semantic status hues are adopted from §14 for status marks only.
+2. **The brand file's identity facts**, which cannot be invented and which block non-negotiable 1 outright:
+   is *Marketplane* final (§12 only recommends it — "If forced to one"); is the domain registered and which
+   TLD is primary (the artboard hard-codes `api.marketplane.dev`); the legal entity name, company and VAT
+   number, registered postal address, support and legal email addresses; default locale and **currency**
+   (artboard EUR, §8 USD); and the data region to commit to publicly. §9 week 0 implies the company is not
+   yet incorporated — if so, the answer needed is *which fields ship as placeholders and which claims come
+   off the site until they are real.*
+3. **Which legal entity and which accounts own the platform credentials and hosted infrastructure.** The
+   answers are entity-bound, slow, and expensive to redo: under what entity the Google Ads developer token
+   and GCP project are applied for; under what entity the Meta app is created and Business Verification and
+   App Review are filed; who owns the Vercel team, the Cloudflare account and the Supabase organisation.
+   Google OAuth verification and Meta verification both start in week 1 on §9's plan and **both restart if
+   the entity changes**. The Meta 5.b.ii.2 client-list obligation also attaches to the entity.
+4. **Default AI-answer model.** Batched Haiku 4.5 at ~$0.003 versus Sonar Pro at $0.024–$0.032 swings
    blended COGS 3.2×. §11.8 makes it a published pass-through rate, so it is a pricing decision.
+5. **Pricing currency**, if not already settled by (2).
 
 ---
 
-## 10. What phase 1 does with this
+## 12. Phase 1 plan
 
-*Pending the layout explorer and the critic.* The foundation milestone is the brand file, the tokens
-stylesheet, the Supabase schema for the §15 account model, authentication, the invitation flow and RLS
-tests — in that order, because everything else reads from the first two.
+Sequenced so the two blocked decisions do not stall work that is ready. Each PR carries a design note under
+`docs/marketplane/` with a cost estimate **per connected account per month** (not per 1M calls — §11.3
+abolished the per-call unit for the largest revenue line), the 18-gate platform-terms check, and what was
+left out.
+
+| PR | What | Blocked on |
+|---|---|---|
+| **1** | This map, the evidence appendix, the design-note template, the PR template | — *(this PR)* |
+| **2** | pnpm workspace scaffold: pinned catalogue, Biome, vitest 4.1.11, CI, both guards in warn mode, an `apps/web` that actually builds, a health-check `apps/api-edge` to prove the Workers target | — |
+| **3** | `packages/brand` and `packages/tokens` | Founder decisions 1 and 2 |
+| **4** | Supabase schema: organisations, workspaces, members and roles, invitations, connections, API keys | Gaps 1–3 |
+| **5** | Auth and the invitation flow | Gaps 1 and 4 |
+| **6** | pgTAP RLS suite, including a cross-workspace isolation test that proves "no cross-workspace aggregation, ever" | Gaps 1–3 |
+
+**PR 2 is the one nobody can skip and nobody has done.** No install, build or typecheck has been executed
+in this session. Two things are asserted and untested: that a source-only shared package typechecks under
+both `@cloudflare/workers-types` and Next's DOM lib without colliding on `fetch`/`Request`/`Response`/
+`caches`, and that Vercel's skip-unaffected detection fires on a CSS-only change inside `packages/tokens`.
+The whole layout argument rests on both. PR 2 proves them or the layout decision reopens.
+
+Two cost lines to watch from the first migration, both of which the specification misses: Supabase disk at
+$0.125/GB if `raw` ever lands in Postgres as JSONB rather than as an R2 key, and KV writes at $5.00/million
+if the envelope cache is keyed per row. Mandated fixed monthly is roughly **$150–$200**, not §7's
+$110–$150 — §7's table has no Vercel line at all.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { brand, formatAddress } from "./brand.js";
+import { apiUrl, brand, formatAddress, siteUrl } from "./brand.js";
 import { CLAIMS, FORBIDDEN_CLAIMS, allowedClaims, withheldClaims } from "./claims.js";
 
 describe("the brand file", () => {
@@ -91,5 +91,33 @@ describe("the forbidden-claims list", () => {
         `allowed claim "${claim.id}" is also forbidden by: ${hit?.reason}`,
       ).toBeUndefined();
     }
+  });
+});
+
+describe("siteUrl, with the domain unsettled", () => {
+  it("uses an explicit override before anything else", () => {
+    expect(siteUrl({ PUBLIC_SITE_URL: "https://staging.example/", VERCEL_URL: "ignored" })).toBe(
+      "https://staging.example",
+    );
+  });
+
+  it("falls back to Vercel's per-deployment URL, so previews work with no domain at all", () => {
+    expect(siteUrl({ VERCEL_URL: "web-abc123.vercel.app" })).toBe("https://web-abc123.vercel.app");
+  });
+
+  it("falls back to localhost in development", () => {
+    expect(siteUrl({})).toBe("http://localhost:3000");
+  });
+
+  it("refuses to guess in production rather than emit a wrong absolute URL", () => {
+    // A placeholder string would have made this case silently succeed and put a fake hostname in
+    // an email. Null plus a throw is the safer pair.
+    expect(() => siteUrl({ NODE_ENV: "production" })).toThrow(/no public URL available/);
+  });
+
+  it("derives the API URL from the site URL until apiBaseUrl is settled", () => {
+    expect(apiUrl({ PUBLIC_SITE_URL: "https://staging.example" })).toBe(
+      "https://staging.example/api",
+    );
   });
 });

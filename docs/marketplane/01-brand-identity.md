@@ -14,8 +14,8 @@ them change what the product may claim, and both are recorded here rather than r
 | Responsible for content | Now On Company Limited | confirmed |
 | VAT number | — | **not supplied.** Thailand's 13-digit juristic-person number doubles as the Tax ID and, where the company is VAT-registered, the VAT number. Recorded as `companyRegistration`; `vatNumber` stays `null` until confirmed separately, because an invoice that prints a wrong VAT number is worse than one that prints none. |
 | Product name | not settled | Routed through the brand file from the first line; `@repo/*` package scope so no npm name is burned in. |
-| Domain | **unresolved — see below** | blocking |
-| Data region | **unresolved — see below** | blocking |
+| Domain | unresolved — see below | needed at OAuth registration, not before |
+| Data region | unresolved — see below | gates three claims, blocks no code |
 
 ## Constraint 1: the entity is Thai, and the artboard sells EU data protection
 
@@ -60,8 +60,20 @@ That is the mechanism that keeps this honest rather than a promise to remember.
 The support address is `support@help.zwitchy.io`, so the entity's live domain is **zwitchy.io**. The
 artboard hard-codes **`api.marketplane.dev`**, and the product name is not settled.
 
-This needs an answer before `packages/brand` lands, and it is expensive to change late — not because of the
-code, which reads one variable, but because of what depends on it:
+**This does not block development, and the earlier draft of this note was wrong to say it needed an
+answer before `packages/brand` landed.** The brand file shipped with `domain: null`, and `null` is a
+better placeholder than any string would be: a fake hostname is indistinguishable from a real one to
+every consumer, whereas a null is machine-detectable, so the claims gate can withhold what depends on
+it and `siteUrl()` can fall back.
+
+`siteUrl()` resolves in order: an explicit `PUBLIC_SITE_URL`, then Vercel's per-deployment URL
+(injected on every preview build), then `brand.domain`, then localhost. Local development and
+preview deployments therefore need no domain at all. In production with none of them set it throws
+rather than emit a wrong absolute URL into an email or an invoice — which is exactly the failure a
+placeholder string would have hidden.
+
+What genuinely needs the answer is narrower than the whole build, and it is expensive to change late
+— not because of the code, which reads one variable, but because of what depends on it:
 
 - **OAuth redirect URIs** are registered with Google and Meta. Changing the domain after Google OAuth
   sensitive-scope verification has started restarts it, and phase 0 recorded that verification as
@@ -71,7 +83,12 @@ code, which reads one variable, but because of what depends on it:
 - **The MCP registry namespace** is claimed by DNS or HTTP challenge against the domain.
 - Every published API base URL, SDK README and docs link.
 
-Until it is answered, nothing hard-codes either domain and the brand file carries the field unset.
+So the deadline is **the first Google or Meta OAuth registration**, which specification section 9
+puts in week 1 of the access track — deliberately early, because verification is the long pole, not
+because the code needs it. Everything between here and there (schema, auth, RLS, the data plane,
+even a preview deployment of the marketing site) runs without it.
+
+Until then nothing hard-codes either domain and the brand file carries the field unset.
 
 ## What ships regardless
 

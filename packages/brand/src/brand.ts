@@ -119,3 +119,52 @@ export function formatAddress(separator = ", "): string {
   const a = brand.postalAddress;
   return [a.street, `${a.postalCode} ${a.city}`, a.country].join(separator);
 }
+
+/**
+ * The site's base URL for the current environment.
+ *
+ * `brand.domain` is the CANONICAL PUBLIC domain and is deliberately null until it is settled. That
+ * does not block development, because nothing before launch needs the canonical name:
+ *
+ *   1. An explicit override, for a deployment that knows its own URL.
+ *   2. Vercel's own per-deployment URL, injected on every preview build.
+ *   3. The canonical domain, once it exists.
+ *   4. localhost, for local development.
+ *
+ * Only step 3 needs an answer, and only for two things: production, and the OAuth redirect URIs
+ * registered with Google and Meta. Everything else runs on steps 1, 2 and 4.
+ *
+ * In production with none of them set this throws rather than silently emitting a wrong absolute
+ * URL into an email or an invoice, which is the failure mode a placeholder string would have
+ * hidden.
+ *
+ * `env` is REQUIRED and has no default. This package is compiled into both the Next app and the
+ * Workers runtime, and `process.env` does not exist in workerd -- a Worker's environment arrives as
+ * the `env` binding on the request handler. Defaulting to `process.env` would typecheck under the
+ * DOM config and fail at runtime on the edge. Pass `process.env` from Node, `env` from a Worker.
+ */
+export function siteUrl(env: Record<string, string | undefined>): string {
+  const explicit = env.PUBLIC_SITE_URL;
+  if (explicit) return explicit.replace(/\/$/, "");
+
+  const vercel = env.VERCEL_PROJECT_PRODUCTION_URL ?? env.VERCEL_URL;
+  if (vercel) return `https://${vercel.replace(/\/$/, "")}`;
+
+  if (brand.domain) return `https://${brand.domain}`;
+
+  if (env.NODE_ENV === "production") {
+    throw new Error(
+      "siteUrl(): no public URL available. Set PUBLIC_SITE_URL, or settle brand.domain. " +
+        "Refusing to guess -- a wrong absolute URL in an email or invoice is worse than a failed build.",
+    );
+  }
+  return "http://localhost:3000";
+}
+
+/** The public API base URL, resolved the same way. Takes its environment for the same reason. */
+export function apiUrl(env: Record<string, string | undefined>): string {
+  const explicit = env.PUBLIC_API_URL;
+  if (explicit) return explicit.replace(/\/$/, "");
+  if (brand.apiBaseUrl) return brand.apiBaseUrl.replace(/\/$/, "");
+  return `${siteUrl(env)}/api`;
+}

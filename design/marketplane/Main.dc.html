@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; background: #F4F6FA; color: #0F172A; font-family: "Figtree", "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #2563EB; text-decoration: none; } a:hover { color: #1D4ED8; }
+    @keyframes mp-blink { 0%,49% { opacity: 1 } 50%,100% { opacity: 0 } }
+    @keyframes mp-rise { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+  </style>
+</helmet>
+
+<div data-screen-label="Marketplane" style="display: flex; flex-direction: column; background: #F4F6FA; min-height: 100vh;">
+
+  <!-- NAV -->
+  <div style="max-width: 1280px; margin: 0 auto; padding: 20px 40px; width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="width: 30px; height: 30px; border-radius: 999px; background: #0F172A; display: inline-flex; align-items: center; justify-content: center;"><span style="width: 12px; height: 12px; border-radius: 999px; background: #2563EB;"></span></span>
+      <span style="font-family: 'Young Serif', Georgia, serif; font-size: 22px;">Marketplane</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 28px; font-size: 15px; font-weight: 600; color: #0F172A; white-space: nowrap;">
+      <span>Product</span><span>Integrations</span><span>Pricing</span><span>Developers</span><span>Agencies</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 18px; flex-shrink: 0;">
+      <span style="font-size: 15px; font-weight: 600; white-space: nowrap;">Log in</span>
+      <a style="display: inline-flex; align-items: center; height: 44px; padding: 0 20px; background: #0F172A; color: #FFFFFF; font-size: 15px; font-weight: 700; border-radius: 999px; white-space: nowrap;" style-hover="background: #2563EB; color: #FFFFFF;">Start free</a>
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <div style="max-width: 1280px; margin: 0 auto; padding: 56px 40px 72px; width: 100%; box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 56px; align-items: center;">
+    <div style="display: flex; flex-direction: column; gap: 28px; align-items: flex-start;">
+      <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; padding: 8px 14px; border-radius: 999px; background: #2563EB; color: #FFFFFF;">Marketing data, finally in one place</span>
+      <h1 style="font-family: 'Young Serif', Georgia, serif; font-weight: 400; font-size: clamp(48px, 6.5vw, 78px); line-height: 1.0; letter-spacing: -0.02em; margin: 0; text-wrap: pretty;">Know what changed. And <span style="color: #2563EB;">why.</span></h1>
+      <p style="margin: 0; font-size: 20px; line-height: 1.5; color: #475569; max-width: 540px; text-wrap: pretty;">Marketplane connects your ads, analytics, email, search rankings and AI answers, reconciles them into one set of numbers, and explains every move. Plain English for the marketer. One schema for IT.</p>
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <a style="display: inline-flex; align-items: center; height: 56px; padding: 0 28px; background: #0F172A; color: #FFFFFF; font-size: 17px; font-weight: 700; border-radius: 999px;" style-hover="background: #2563EB; color: #FFFFFF;">Start free</a>
+        <a style="display: inline-flex; align-items: center; height: 56px; padding: 0 26px; border: 1px solid #CBD5E1; color: #0F172A; font-size: 17px; font-weight: 700; border-radius: 999px;" style-hover="background: #0F172A; color: #FFFFFF;">Book a demo</a>
+      </div>
+      <span style="font-size: 14px; font-weight: 500; color: #475569;">Free to start. No card. Read-only access, your logins stay yours.</span>
+    </div>
+
+    <!-- DEMO -->
+    <div style="display: flex; flex-direction: column; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 20px; overflow: hidden; box-shadow: 0 24px 60px rgba(15,23,42,0.12);">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid #CBD5E1;">
+        <span style="width: 10px; height: 10px; border-radius: 999px; background: #2563EB;"></span>
+        <span style="font-size: 14px; font-weight: 700;">Ask Marketplane</span>
+        <span style="flex-grow: 1;"></span>
+        <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #64748B;">{{ statusText }}</span>
+      </div>
+      <div style="padding: 16px 20px; display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid #E2E8F0; background: #F9FAFC;">
+        <sc-for list="{{ questions }}" as="q" hint-placeholder-count="4">
+          <button onClick="{{ q.pick }}" style="cursor: pointer; font-family: inherit; font-size: 13.5px; font-weight: 600; padding: 8px 13px; border-radius: 999px; border: 1.5px solid {{ q.border }}; background: {{ q.bg }}; color: {{ q.color }}; text-align: left;" style-hover="border-color: #0F172A;">{{ q.text }}</button>
+        </sc-for>
+      </div>
+      <div style="padding: 20px; display: flex; flex-direction: column; gap: 14px; min-height: 360px;">
+        <div style="align-self: flex-end; max-width: 80%; background: #0F172A; color: #FFFFFF; border-radius: 18px 18px 4px 18px; padding: 12px 16px; font-size: 15.5px; font-weight: 600; line-height: 1.4; min-height: 20px;">{{ typed }}<span style="display: inline-block; width: 2px; height: 16px; background: #2563EB; margin-left: 2px; vertical-align: -3px; animation: mp-blink 1s steps(1) infinite;"></span></div>
+        <sc-if value="{{ isThinking }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; background: #F4F6FA; border-radius: 4px 18px 18px 18px; font-family: 'Geist Mono', monospace; font-size: 12.5px; color: #475569;">
+            <sc-for list="{{ thinkingSteps }}" as="s" hint-placeholder-count="3"><span style="display: flex; gap: 10px; align-items: center;"><span style="width: 7px; height: 7px; border-radius: 999px; background: {{ s.dot }};"></span>{{ s.text }}</span></sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isAnswer }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; background: #F4F6FA; border-radius: 4px 18px 18px 18px; animation: mp-rise 0.4s ease-out;">
+            <p style="margin: 0; font-size: 16px; font-weight: 700; line-height: 1.45;">{{ answer.headline }}</p>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <sc-for list="{{ answer.causes }}" as="c" hint-placeholder-count="3">
+                <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; align-items: start; background: #FFFFFF; border-radius: 12px; padding: 10px 12px;">
+                  <span style="font-family: 'Young Serif', serif; font-size: 20px; line-height: 1.2; color: #2563EB;">{{ c.share }}</span>
+                  <span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #64748B;">{{ c.tag }}</span><span style="font-size: 14px; line-height: 1.45;">{{ c.text }}</span></span>
+                </div>
+              </sc-for>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: #64748B;">{{ answer.ruledOut }}</p>
+            <div style="display: flex; flex-direction: column; gap: 4px; border-top: 1px solid #E2E8F0; padding-top: 10px;">
+              <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">Do next</span>
+              <sc-for list="{{ answer.next }}" as="n" hint-placeholder-count="2"><span style="font-size: 14px; line-height: 1.5;">{{ n }}</span></sc-for>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGO STRIP -->
+  <div style="border-top: 1px solid #CBD5E1; border-bottom: 1px solid #CBD5E1; background: #FFFFFF;">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 22px 40px; display: flex; align-items: center; gap: 28px; flex-wrap: wrap; justify-content: space-between;">
+      <span style="font-size: 14px; font-weight: 600; color: #64748B; white-space: nowrap;">Reads from 22 sources</span>
+      <sc-for list="{{ logoStrip }}" as="l" hint-placeholder-count="8">
+        <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: #0F172A;"><span style="width: 22px; height: 22px; border-radius: 6px; background: #E2E8F0; border: 1px dashed #94A3B8;" title="logo placeholder"></span>{{ l }}</span>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- THREE PEOPLE -->
+  <div style="max-width: 1280px; margin: 0 auto; padding: 96px 40px; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 40px;">
+    <div style="display: flex; flex-direction: column; gap: 14px; max-width: 760px;">
+      <span style="font-size: 14px; font-weight: 700; color: #2563EB;">Who it is for</span>
+      <h2 style="font-family: 'Young Serif', serif; font-weight: 400; font-size: 52px; line-height: 1.05; letter-spacing: -0.015em; margin: 0; text-wrap: pretty;">Three people in the room. One set of numbers everyone trusts.</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px;">
+      <div style="background: #2563EB; color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 20px; padding: 30px; display: flex; flex-direction: column; gap: 14px; min-height: 260px;"><span style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">The marketer</span><span style="font-family: 'Young Serif', serif; font-size: 28px; line-height: 1.15;">Ask a question. Get the why.</span><p style="margin: 0; font-size: 16px; line-height: 1.5; color: #FFFFFF;">Ranked causes, the share each explains, and what to do about it. Never opens a spreadsheet.</p></div>
+      <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 20px; padding: 30px; display: flex; flex-direction: column; gap: 14px; min-height: 260px;"><span style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #64748B;">Marketing ops</span><span style="font-family: 'Young Serif', serif; font-size: 28px; line-height: 1.15;">One figure per metric.</span><p style="margin: 0; font-size: 16px; line-height: 1.5; color: #475569;">Reconciled numbers, a flag when a platform quietly revises last week, and audiences pushed to every platform from one place.</p></div>
+      <div style="background: #0F172A; color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 20px; padding: 30px; display: flex; flex-direction: column; gap: 14px; min-height: 260px;"><span style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #94A3B8;">IT and data</span><span style="font-family: 'Young Serif', serif; font-size: 28px; line-height: 1.15;">One key. One schema.</span><p style="margin: 0; font-size: 16px; line-height: 1.5; color: #CBD5E1;">Read-only OAuth, one tenant per client, EU hosting, audit log. Hosted MCP server and SDKs in TypeScript and Python.</p></div>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div style="background: #FFFFFF; border-top: 1px solid #CBD5E1; border-bottom: 1px solid #CBD5E1;">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 96px 40px; display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 64px; align-items: center;">
+      <div style="display: flex; flex-direction: column; gap: 32px;">
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <span style="font-size: 14px; font-weight: 700; color: #2563EB;">How it works</span>
+          <h2 style="font-family: 'Young Serif', serif; font-weight: 400; font-size: 52px; line-height: 1.05; letter-spacing: -0.015em; margin: 0;">Connect. Reconcile. Ask. Act.</h2>
+        </div>
+        <div style="display: flex; flex-direction: column;">
+          <div style="display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; padding: 18px 0; border-top: 1px solid #CBD5E1; align-items: start;"><span style="width: 36px; height: 36px; border-radius: 999px; background: #0F172A; color: #2563EB; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px;">1</span><div style="display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 19px; font-weight: 700;">Connect your accounts</span><span style="font-size: 15px; line-height: 1.5; color: #475569;">Sign in to the tools you already use. Nothing to install. Two minutes per account.</span></div></div>
+          <div style="display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; padding: 18px 0; border-top: 1px solid #E2E8F0; align-items: start;"><span style="width: 36px; height: 36px; border-radius: 999px; background: #0F172A; color: #2563EB; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px;">2</span><div style="display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 19px; font-weight: 700;">We reconcile the numbers</span><span style="font-size: 15px; line-height: 1.5; color: #475569;">Currencies converted, attribution windows aligned, late conversions credited back. Every row carries a freshness flag.</span></div></div>
+          <div style="display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; padding: 18px 0; border-top: 1px solid #E2E8F0; align-items: start;"><span style="width: 36px; height: 36px; border-radius: 999px; background: #0F172A; color: #2563EB; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px;">3</span><div style="display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 19px; font-weight: 700;">Ask, or set a watch</span><span style="font-size: 15px; line-height: 1.5; color: #475569;">Plain-English questions. Or watch a rival's prices, your spot in AI answers, or numbers that get revised.</span></div></div>
+          <div style="display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; padding: 18px 0; border-top: 1px solid #E2E8F0; border-bottom: 1px solid #CBD5E1; align-items: start;"><span style="width: 36px; height: 36px; border-radius: 999px; background: #0F172A; color: #2563EB; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px;">4</span><div style="display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 19px; font-weight: 700;">Act on it</span><span style="font-size: 15px; line-height: 1.5; color: #475569;">Push a do-not-target list to every ad platform. Send a segment to email. Drop the weekly summary in Slack.</span></div></div>
+        </div>
+      </div>
+      <div style="aspect-ratio: 4 / 3; border: 1px dashed #94A3B8; border-radius: 20px; background: #F4F6FA; display: flex; align-items: center; justify-content: center; text-align: center; padding: 32px;"><span style="font-size: 15px; font-weight: 600; color: #64748B; max-width: 300px; line-height: 1.5;">Image placeholder: product screenshot of the reconciled dashboard</span></div>
+    </div>
+  </div>
+
+  <!-- INTEGRATIONS -->
+  <div style="max-width: 1280px; margin: 0 auto; padding: 96px 40px; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 40px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap;">
+      <div style="display: flex; flex-direction: column; gap: 14px; max-width: 700px;">
+        <span style="font-size: 14px; font-weight: 700; color: #2563EB;">Integrations</span>
+        <h2 style="font-family: 'Young Serif', serif; font-weight: 400; font-size: 52px; line-height: 1.05; letter-spacing: -0.015em; margin: 0;">Plays nice with your stack.</h2>
+        <p style="margin: 0; font-size: 18px; line-height: 1.5; color: #475569; text-wrap: pretty;">Ads, analytics, email, competitors and search, all speaking the same language, so you can put them side by side.</p>
+      </div>
+      <a style="display: inline-flex; align-items: center; height: 48px; padding: 0 22px; border: 1px solid #CBD5E1; color: #0F172A; font-size: 15px; font-weight: 700; border-radius: 999px;" style-hover="background: #0F172A; color: #FFFFFF;">All 22 integrations</a>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px;">
+      <sc-for list="{{ sourceGroups }}" as="g" hint-placeholder-count="5">
+        <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+          <span style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #64748B;">{{ g.name }}</span>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="4">
+              <div style="display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600;"><span style="width: 26px; height: 26px; border-radius: 8px; background: #E2E8F0; border: 1px dashed #94A3B8; flex-shrink: 0;" title="logo placeholder"></span>{{ it }}</div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- ALERTS -->
+  <div style="background: #0F172A; color: #FFFFFF;">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 96px 40px; display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 64px; align-items: center;">
+      <div style="display: flex; flex-direction: column; gap: 18px; align-items: flex-start;">
+        <span style="font-size: 14px; font-weight: 700; color: #93C5FD;">Watch</span>
+        <h2 style="font-family: 'Young Serif', serif; font-weight: 400; font-size: 52px; line-height: 1.05; letter-spacing: -0.015em; margin: 0;">Alerts that earn the ping.</h2>
+        <p style="margin: 0; font-size: 18px; line-height: 1.5; color: #CBD5E1; text-wrap: pretty;">Sources are checked on a schedule. You hear about it only when something is confirmed twice and matters to your numbers. No test variants, no figures that change tomorrow.</p>
+        <a style="display: inline-flex; align-items: center; height: 52px; padding: 0 24px; background: #2563EB; color: #FFFFFF; font-size: 16px; font-weight: 700; border-radius: 999px;" style-hover="background: #FFFFFF; color: #0F172A;">Set your first watch</a>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <sc-for list="{{ alerts }}" as="a" hint-placeholder-count="4">
+          <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 18px; padding: 16px 20px; background: #FFFFFF; color: #0F172A; border-radius: 16px; align-items: start;">
+            <div style="display: flex; flex-direction: column; gap: 4px; font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #64748B;"><span style="color: #2563EB; font-weight: 500;">{{ a.when }}</span><span>{{ a.kind }}</span></div>
+            <div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 16px; font-weight: 700; line-height: 1.35;">{{ a.title }}</span><span style="font-size: 14px; line-height: 1.45; color: #475569;">{{ a.body }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOUR VIEWS -->
+  <div style="max-width: 1280px; margin: 0 auto; padding: 96px 40px; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 40px;">
+    <div style="display: flex; flex-direction: column; gap: 14px; max-width: 760px;">
+      <span style="font-size: 14px; font-weight: 700; color: #2563EB;">What is inside</span>
+      <h2 style="font-family: 'Young Serif', serif; font-weight: 400; font-size: 52px; line-height: 1.05; letter-spacing: -0.015em; margin: 0;">Four views. One set of numbers.</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;">
+      <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 12px;"><span style="font-family: 'Young Serif', serif; font-size: 24px; line-height: 1.15;">Ads and sales</span><p style="margin: 0; font-size: 15px; line-height: 1.5; color: #475569;">Spend, clicks, orders and revenue from every platform, your analytics and affiliate networks. Currencies converted, late conversions handled.</p><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #2563EB; margin-top: auto;">/v1/performance</span></div>
+      <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 12px;"><span style="font-family: 'Young Serif', serif; font-size: 24px; line-height: 1.15;">Customer lists</span><p style="margin: 0; font-size: 15px; line-height: 1.5; color: #475569;">Recent buyers to Meta, Google and TikTok as exclusions, or to your email tool as a segment. Consent checked before anything leaves.</p><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #2563EB; margin-top: auto;">/v1/audience</span></div>
+      <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 12px;"><span style="font-family: 'Young Serif', serif; font-size: 24px; line-height: 1.15;">Competitors</span><p style="margin: 0; font-size: 15px; line-height: 1.5; color: #475569;">Prices, app rankings, reviews and the ads they run, tracked next to your own numbers so you see what they did and what it cost you.</p><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #2563EB; margin-top: auto;">/v1/market</span></div>
+      <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 20px; padding: 26px; display: flex; flex-direction: column; gap: 12px;"><span style="font-family: 'Young Serif', serif; font-size: 24px; line-height: 1.15;">Search and AI</span><p style="margin: 0; font-size: 15px; line-height: 1.5; color: #475569;">Where you rank on Google, and whether ChatGPT, Perplexity, Gemini and AI Overviews cite you or a rival when people ask.</p><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #2563EB; margin-top: auto;">/v1/visibility</span></div>
+    </div>
+  </div>
+
+  <!-- DEVELOPERS -->
+  <div style="background: #FFFFFF; border-top: 1px solid #CBD5E1; border-bottom: 1px solid #CBD5E1;">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 96px 40px; display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 64px; align-items: center;">
+      <div style="display: flex; flex-direction: column; gap: 18px; align-items: flex-start;">
+        <span style="font-size: 14px; font-weight: 700; color: #2563EB;">For IT, data teams and AI agents</span>
+        <h2 style="font-family: 'Young Serif', serif; font-weight: 400; font-size: 52px; line-height: 1.05; letter-spacing: -0.015em; margin: 0;">The same answer, as JSON.</h2>
+        <p style="margin: 0; font-size: 18px; line-height: 1.5; color: #475569; text-wrap: pretty;">One key. One response shape for every source, with freshness and revision flags on every row. A hosted MCP server, an agent skill file, and TypeScript and Python SDKs generated from one spec.</p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 12.5px; padding: 8px 12px; border: 1px solid #CBD5E1; border-radius: 999px;">npx @marketplane/mcp</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 12.5px; padding: 8px 12px; border: 1px solid #CBD5E1; border-radius: 999px;">npm i marketplane</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 12.5px; padding: 8px 12px; border: 1px solid #CBD5E1; border-radius: 999px;">pip install marketplane</span>
+        </div>
+        <a style="display: inline-flex; align-items: center; height: 52px; padding: 0 24px; background: #0F172A; color: #FFFFFF; font-size: 16px; font-weight: 700; border-radius: 999px;" style-hover="background: #2563EB; color: #FFFFFF;">Read the docs</a>
+      </div>
+      <div style="background: #0F172A; color: #E2E8F0; border-radius: 20px; padding: 24px 26px; box-shadow: 0 24px 60px rgba(15,23,42,0.12);">
+<pre style="margin: 0; font-family: 'Geist Mono', monospace; font-size: 12.5px; line-height: 1.65; white-space: pre; overflow: auto;"><span style="color: #2563EB;">$</span> curl https://api.marketplane.dev/v1/performance/campaigns \
+    -H <span style="color: #BBF7D0;">"Authorization: Bearer mp_live_…"</span> \
+    -d <span style="color: #BBF7D0;">'source=google_ads&amp;window=28d&amp;group_by=campaign'</span>
+
+{
+  <span style="color: #94A3B8;">"ok"</span>: <span style="color: #2563EB;">true</span>, <span style="color: #94A3B8;">"source"</span>: <span style="color: #BBF7D0;">"google_ads"</span>,
+  <span style="color: #94A3B8;">"data"</span>: [ { <span style="color: #94A3B8;">"entity"</span>: <span style="color: #BBF7D0;">"brand_uk"</span>, <span style="color: #94A3B8;">"spend"</span>: <span style="color: #22C55E;">4210.55</span>,
+            <span style="color: #94A3B8;">"conversions"</span>: <span style="color: #22C55E;">655</span>, <span style="color: #94A3B8;">"revised_from"</span>: <span style="color: #22C55E;">611</span>,
+            <span style="color: #94A3B8;">"attribution_window"</span>: <span style="color: #BBF7D0;">"7d_click"</span> } ],
+  <span style="color: #94A3B8;">"meta"</span>: { <span style="color: #94A3B8;">"credits_used"</span>: <span style="color: #22C55E;">1</span>, <span style="color: #94A3B8;">"as_of"</span>: <span style="color: #BBF7D0;">"2026-09-07"</span>,
+            <span style="color: #94A3B8;">"is_provisional"</span>: <span style="color: #2563EB;">true</span>, <span style="color: #94A3B8;">"restates_until"</span>: <span style="color: #BBF7D0;">"2026-10-05"</span> }
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRICING -->
+  <div style="max-width: 1280px; margin: 0 auto; padding: 96px 40px; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 40px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap;">
+      <div style="display: flex; flex-direction: column; gap: 14px; max-width: 700px;">
+        <span style="font-size: 14px; font-weight: 700; color: #2563EB;">Pricing</span>
+        <h2 style="font-family: 'Young Serif', serif; font-weight: 400; font-size: 52px; line-height: 1.05; letter-spacing: -0.015em; margin: 0;">Pay as you go. Nothing monthly.</h2>
+        <p style="margin: 0; font-size: 18px; line-height: 1.5; color: #475569; text-wrap: pretty;">Credits, like a prepaid phone. A quick look is one credit. A full "why did this happen" is about twelve. They never expire, and questions we cannot answer are free.</p>
+      </div>
+      <span style="font-size: 15px; font-weight: 500; color: #475569; max-width: 320px;">Agencies: one account, all your clients, and a flat monthly plan if you prefer one invoice.</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;">
+      <sc-for list="{{ plans }}" as="p" hint-placeholder-count="4">
+        <div style="padding: 28px; display: flex; flex-direction: column; gap: 8px; border-radius: 20px; border: 1px solid #CBD5E1; background: {{ p.bg }}; color: {{ p.fg }};">
+          <span style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.75;">{{ p.name }}</span>
+          <span style="font-family: 'Young Serif', serif; font-size: 42px; line-height: 1;">{{ p.credits }}</span>
+          <span style="font-size: 14px; opacity: 0.85; line-height: 1.4; min-height: 40px;">{{ p.note }}</span>
+          <span style="font-size: 22px; font-weight: 700; margin-top: 8px;">{{ p.price }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- SECURITY -->
+  <div style="background: #FFFFFF; border-top: 1px solid #CBD5E1;">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 96px 40px; display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 2fr); gap: 56px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <span style="font-size: 14px; font-weight: 700; color: #2563EB;">Security</span>
+        <h2 style="font-family: 'Young Serif', serif; font-weight: 400; font-size: 52px; line-height: 1.05; letter-spacing: -0.015em; margin: 0;">What IT will ask. Answered.</h2>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px;">
+        <div style="padding: 18px 0; border-top: 1px solid #CBD5E1; display: flex; flex-direction: column; gap: 4px;"><span style="font-weight: 700; font-size: 16px;">Read-only OAuth</span><span style="font-size: 14.5px; color: #475569; line-height: 1.45;">We never hold your passwords. Revoke from the platform at any time.</span></div>
+        <div style="padding: 18px 0; border-top: 1px solid #CBD5E1; display: flex; flex-direction: column; gap: 4px;"><span style="font-weight: 700; font-size: 16px;">One tenant per client</span><span style="font-size: 14.5px; color: #475569; line-height: 1.45;">Data, keys and audiences are isolated. Agencies switch, never mix.</span></div>
+        <div style="padding: 18px 0; border-top: 1px solid #E2E8F0; display: flex; flex-direction: column; gap: 4px;"><span style="font-weight: 700; font-size: 16px;">EU hosting, GDPR and UK GDPR</span><span style="font-size: 14.5px; color: #475569; line-height: 1.45;">Frankfurt by default. DPA on request.</span></div>
+        <div style="padding: 18px 0; border-top: 1px solid #E2E8F0; display: flex; flex-direction: column; gap: 4px;"><span style="font-weight: 700; font-size: 16px;">Consent checked before export</span><span style="font-size: 14.5px; color: #475569; line-height: 1.45;">No list leaves without a consent flag on every row.</span></div>
+        <div style="padding: 18px 0; border-top: 1px solid #E2E8F0; display: flex; flex-direction: column; gap: 4px;"><span style="font-weight: 700; font-size: 16px;">Never used to train models</span><span style="font-size: 14.5px; color: #475569; line-height: 1.45;">Your data answers your questions. That is all it does.</span></div>
+        <div style="padding: 18px 0; border-top: 1px solid #E2E8F0; display: flex; flex-direction: column; gap: 4px;"><span style="font-weight: 700; font-size: 16px;">Audit log and SSO</span><span style="font-size: 14.5px; color: #475569; line-height: 1.45;">Every query, export and key logged. SAML SSO on Scale. SOC 2 Type II planned.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div style="background: #2563EB; border-top: 1px solid #CBD5E1;">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 104px 40px; display: flex; flex-direction: column; align-items: center; gap: 24px; text-align: center;">
+      <h2 style="font-family: 'Young Serif', serif; font-weight: 400; font-size: 72px; line-height: 1.0; letter-spacing: -0.02em; margin: 0; max-width: 880px; text-wrap: pretty; color: #FFFFFF;">Stop stitching spreadsheets. Start asking.</h2>
+      <a style="display: inline-flex; align-items: center; height: 58px; padding: 0 30px; background: #0F172A; color: #FFFFFF; font-size: 17px; font-weight: 700; border-radius: 999px;" style-hover="background: #FFFFFF; color: #0F172A;">Start free</a>
+      <span style="font-size: 15px; font-weight: 600; color: #FFFFFF;">1,000 free credits. No card. First account connected in two minutes.</span>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="background: #0F172A; color: #CBD5E1;">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 56px 40px 64px; display: grid; grid-template-columns: 1.4fr repeat(4, minmax(0, 1fr)); gap: 32px; font-size: 14px;">
+      <div style="display: flex; flex-direction: column; gap: 12px;"><span style="font-family: 'Young Serif', serif; font-size: 22px; color: #FFFFFF;">Marketplane</span><span style="max-width: 260px; line-height: 1.5;">Know what changed. And why.</span><span style="font-family: 'Geist Mono', monospace; font-size: 12px;">© 2026 · Frankfurt · London</span></div>
+      <div style="display: flex; flex-direction: column; gap: 10px;"><span style="color: #FFFFFF; font-weight: 700;">Product</span><span>Ask</span><span>Watch</span><span>Ads and sales</span><span>Customer lists</span><span>Competitors</span><span>Search and AI</span></div>
+      <div style="display: flex; flex-direction: column; gap: 10px;"><span style="color: #FFFFFF; font-weight: 700;">Developers</span><span>Docs</span><span>API reference</span><span>MCP server</span><span>SDKs</span><span>Status</span></div>
+      <div style="display: flex; flex-direction: column; gap: 10px;"><span style="color: #FFFFFF; font-weight: 700;">Pricing</span><span>Credits</span><span>Agencies</span><span>Enterprise</span></div>
+      <div style="display: flex; flex-direction: column; gap: 10px;"><span style="color: #FFFFFF; font-weight: 700;">Company</span><span>Security</span><span>Privacy</span><span>Terms</span><span>Contact</span></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;autoplay&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Demo&quot;},&quot;pricing&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;credits&quot;,&quot;monthly&quot;],&quot;default&quot;:&quot;credits&quot;,&quot;tsType&quot;:&quot;'credits'|'monthly'&quot;,&quot;section&quot;:&quot;Pricing&quot;}}">
+class Component extends DCLogic {
+  state = { qi: 0, typed: "", phase: "answer", step: 0 };
+  Q = [
+    { text: "Why did website traffic drop last week?", headline: "Traffic is down 23% on the week before. Three things explain most of it.",
+      causes: [
+        { tag: "Search", share: "60%", text: "You slid from position 3 to 11 on 42 core keywords since 27 Aug." },
+        { tag: "AI answers", share: "25%", text: "Google now shows an AI Overview for 38% of those searches and does not cite you." },
+        { tag: "Competitors", share: "10%", text: "A rival tripled brand ad spend on 21 Aug." } ],
+      ruledOut: "Ruled out: broken tracking, seasonality, a cut to your own ad budget.",
+      next: ["1. Refresh the 12 pages that lost AI citations.", "2. Restore the brand bid cap in Google Ads.", "3. Watch those 42 keywords daily."] },
+    { text: "Do our Meta and GA4 conversions match?", headline: "No. Meta reports 655, GA4 reports 588. The 67 gap has three parts.",
+      causes: [
+        { tag: "Attribution", share: "48", text: "Meta counts 7-day click, GA4 counts last click. Same buyers, different credit." },
+        { tag: "Revisions", share: "14", text: "Meta credited late conversions back on Thursday. Your Monday report used 611." },
+        { tag: "Tracking", share: "5", text: "Checkout tag changed Thursday 14:00. GA4 missed five orders." } ],
+      ruledOut: "Ruled out: currency mismatch, timezone offset, duplicate pixels.",
+      next: ["1. Report Meta on a 1-day click window to compare like with like.", "2. Fix the checkout tag; we will confirm when orders match again."] },
+    { text: "Did a competitor change prices this week?", headline: "Yes. One rival cut Japan 10GB by 12% on Tuesday. It is already costing you clicks.",
+      causes: [
+        { tag: "Price", share: "-12%", text: "€14.90 to €13.10. Seen on their site and Amazon, confirmed twice 40 minutes apart." },
+        { tag: "Search", share: "-9%", text: "Your click share on “eSIM Japan” fell 9 points since the cut." },
+        { tag: "Ads", share: "2x", text: "They doubled Shopping bids on the same keyword the next morning." } ],
+      ruledOut: "No change seen from your other three tracked competitors.",
+      next: ["1. Decide: match on Japan 10GB or hold and add a bundle.", "2. We keep watching and ping you on the next move."] },
+    { text: "Who should we stop paying to reach?", headline: "4,812 people bought in the last 30 days and are still in your prospecting audiences.",
+      causes: [
+        { tag: "Meta", share: "3,100", text: "Still in two lookalike sets. About €820 a week of spend." },
+        { tag: "Google", share: "1,400", text: "In Performance Max with no exclusion list attached. About €340 a week." },
+        { tag: "TikTok", share: "312", text: "New campaign, no exclusions yet. About €80 a week." } ],
+      ruledOut: "Consent checked: all 4,812 rows are eligible for a suppression list.",
+      next: ["1. Push the exclusion list to all three platforms now.", "2. Refresh it nightly."] } ];
+  STEPS = ["Checking Google Analytics, Search Console, Google Ads, Meta", "Comparing against the previous 7 days and same week last year", "Ranking causes by share of the change"];
+  componentDidMount() { if (this.props.autoplay ?? true) this.loop = setInterval(() => this.pick((this.state.qi + 1) % this.Q.length), 11000); }
+  componentWillUnmount() { clearInterval(this.loop); clearInterval(this.t); }
+  pick(i) {
+    clearInterval(this.t);
+    const text = this.Q[i].text; let n = 0;
+    this.setState({ qi: i, typed: "", phase: "typing", step: 0 });
+    this.t = setInterval(() => {
+      n++; this.setState({ typed: text.slice(0, n) });
+      if (n >= text.length) {
+        clearInterval(this.t);
+        this.setState({ phase: "thinking", step: 0 });
+        let s = 0;
+        this.t = setInterval(() => { s++; if (s >= this.STEPS.length) { clearInterval(this.t); this.setState({ phase: "answer" }); } else this.setState({ step: s }); }, 520);
+      }
+    }, 28);
+  }
+  renderVals() {
+    const { qi, typed, phase, step } = this.state;
+    const q = this.Q[qi];
+    const monthly = this.props.pricing === "monthly";
+    return {
+      questions: this.Q.map((x, i) => ({ text: x.text, pick: () => { clearInterval(this.loop); this.pick(i); },
+        bg: i === qi ? "#0F172A" : "#FFFFFF", color: i === qi ? "#FFFFFF" : "#0F172A", border: i === qi ? "#0F172A" : "#CBD5E1" })),
+      typed: phase === "answer" ? q.text : typed,
+      isThinking: phase === "thinking", isAnswer: phase === "answer",
+      thinkingSteps: this.STEPS.map((t, i) => ({ text: t, dot: i < step ? "#2563EB" : i === step ? "#2563EB" : "#CBD5E1" })),
+      statusText: phase === "answer" ? "6 sources · 12 credits · 4.1s" : phase === "thinking" ? "checking sources…" : "listening",
+      answer: q,
+      logoStrip: ["Google Ads", "Meta", "Google Analytics", "Shopify", "HubSpot", "Klaviyo", "Amazon", "ChatGPT"],
+      sourceGroups: [
+        { name: "Ads", items: ["Google Ads", "Meta", "TikTok", "Microsoft Ads", "LinkedIn"] },
+        { name: "Analytics and sales", items: ["Google Analytics", "Mixpanel", "Shopify", "Stripe", "Amplitude"] },
+        { name: "Email and CRM", items: ["Klaviyo", "HubSpot", "Mailchimp", "Braze"] },
+        { name: "Competitors and reviews", items: ["Amazon", "App Store", "Google Play", "Trustpilot"] },
+        { name: "Search and AI", items: ["Google Search", "ChatGPT", "Perplexity", "Gemini"] } ],
+      alerts: [
+        { when: "Today 09:12", kind: "Competitor", title: "A rival cut the price of Japan 10GB by 12%", body: "Seen on their site and Amazon. Confirmed twice, 40 minutes apart." },
+        { when: "Today 07:40", kind: "AI visibility", title: "You lost the AI Overview mention for “best eSIM for Japan”", body: "A competitor is cited instead. Three of your pages are the likely fix." },
+        { when: "Yesterday", kind: "Revision", title: "Meta revised last week: 611 conversions became 655", body: "Late conversions were credited back. Your Monday report is out of date." },
+        { when: "Thu 14:00", kind: "Tracking", title: "Google Analytics stopped matching Shopify orders", body: "Most likely cause: the checkout tag was changed." } ],
+      plans: [
+        { name: "Free", credits: "1,000", note: "to start, 200 more every month", price: "€0", bg: "#FFFFFF", fg: "#0F172A" },
+        { name: "Starter", credits: "4,000", note: monthly ? "credits a month" : "credits, never expire", price: monthly ? "€19 / mo" : "€19", bg: "#FFFFFF", fg: "#0F172A" },
+        { name: "Growth", credits: "20,000", note: monthly ? "credits a month, most popular" : "credits, most popular", price: monthly ? "€79 / mo" : "€79", bg: "#2563EB", fg: "#FFFFFF" },
+        { name: "Scale", credits: "100,000", note: monthly ? "credits a month, SSO included" : "credits, SSO included", price: monthly ? "€299 / mo" : "€299", bg: "#0F172A", fg: "#FFFFFF" } ]
+    };
+  }
+}
+</script>
+</body>
+</html>

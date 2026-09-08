@@ -114,6 +114,96 @@ function sqlMetricColumns(source) {
   return [...block[0].matchAll(/^ {2}(\w+) +numeric\(/gm)].map((m) => m[1]);
 }
 
+/**
+ * Pull `name: { unit: "currency" | "count", ... }` out of the METRICS object, with the unit.
+ *
+ * The key list above is enough to catch a missing COLUMN. It is not enough to catch a missing
+ * mention in a hand-written SQL list, and there are now three of those.
+ */
+function tsMetricUnits(source) {
+  const match = source.match(/METRICS\s*=\s*\{([\s\S]*?)\n\}\s*as const/);
+  if (match === null) return null;
+  return [...match[1].matchAll(/^ {2}(\w+): \{ unit: "(\w+)"/gm)].map((m) => ({
+    name: m[1],
+    unit: m[2],
+  }));
+}
+
+/** The body of a named `constraint <name> check (...)`, comments stripped. */
+function sqlConstraintBody(source, name) {
+  const match = source.match(new RegExp(`constraint ${name} check \\(([\\s\\S]*?)\\n  \\),`));
+  return match === null ? null : match[1].replace(/--[^\n]*/g, "");
+}
+
+/** The `when (...)` condition of the restatement trigger, comments stripped. */
+function sqlTriggerCondition(source) {
+  const match = source.match(
+    /create trigger envelope_rows_restated[\s\S]*?\n  when \(([\s\S]*?)\n  \)\s*\n  execute function/,
+  );
+  return match === null ? null : match[1].replace(/--[^\n]*/g, "");
+}
+
+/**
+ * THE HOLE THIS CLOSES, named in `24-commerce-grain.md` section 1.3 before it could be closed.
+ *
+ * The contract finds currency metrics by ASKING `METRICS` which units are currency, and finds the
+ * restatement-worthy ones by asking for all of them. SQL cannot ask anything, so both lists are
+ * written out by hand -- in the fx constraint, and in the trigger's `when` clause -- and comparing
+ * NAMES alone would pass while either list quietly lost a metric.
+ *
+ * A metric missing from the fx constraint stores a converted amount with no rate to reproduce it.
+ * A metric missing from the trigger restates silently forever. Neither fails any other check.
+ */
+function checkHandWrittenLists(findings, metrics, sql, tsFile) {
+  if (metrics === null) {
+    findings.push({ file: tsFile, line: 1, column: 1, message: "could not parse metric units" });
+    return;
+  }
+
+  const fx = sqlConstraintBody(sql, "envelope_rows_converted_needs_rate");
+  if (fx === null) {
+    findings.push({
+      file: MIGRATION,
+      line: 1,
+      column: 1,
+      message: "could not find the envelope_rows_converted_needs_rate constraint",
+    });
+  } else {
+    for (const { name, unit } of metrics) {
+      if (unit !== "currency") continue;
+      if (!fx.includes(`${name} is null`)) {
+        findings.push({
+          file: MIGRATION,
+          line: 1,
+          column: 1,
+          message: `metric "${name}" is currency but is absent from envelope_rows_converted_needs_rate -- a converted amount could be stored with no rate to reproduce it`,
+        });
+      }
+    }
+  }
+
+  const when = sqlTriggerCondition(sql);
+  if (when === null) {
+    findings.push({
+      file: MIGRATION,
+      line: 1,
+      column: 1,
+      message: "could not find the envelope_rows_restated trigger condition",
+    });
+  } else {
+    for (const { name } of metrics) {
+      if (!when.includes(`old.${name} is distinct from new.${name}`)) {
+        findings.push({
+          file: MIGRATION,
+          line: 1,
+          column: 1,
+          message: `metric "${name}" is absent from the envelope_rows_restated trigger condition -- it would restate silently and no webhook would fire`,
+        });
+      }
+    }
+  }
+}
+
 function compare(findings, label, ts, sql, tsFile) {
   if (ts === null) {
     findings.push({
@@ -204,14 +294,18 @@ compare(
   CONTRACT.metrics,
 );
 
+checkHandWrittenLists(findings, tsMetricUnits(readText(CONTRACT.metrics)), sql, CONTRACT.metrics);
+
 process.exit(
   report({
     name: "dictionary guard",
     findings,
     notes: [
       "the canonical vocabulary lives in packages/contract AND in the schema; neither can import the other",
+      "and every metric is checked against the three hand-written SQL lists: columns, the fx constraint, the restatement trigger",
     ],
     warn,
-    summary: "contract and schema agree on sources, entity types, attribution windows and metrics",
+    summary:
+      "contract and schema agree on sources, entity types, attribution windows, metrics, the fx constraint and the restatement trigger",
   }),
 );

@@ -201,6 +201,198 @@ create table public.envelope_rows (
     (workspace_id, source, account_id, entity_id, date, attribution_window)
 );
 
+-- ---------------------------------------------------------------------------------------------
+-- The restatement outbox
+--
+-- Specification section 4.2: "When Meta restates a 28-day window or Google Ads credits a late
+-- conversion back to its click date, the row changes. A `restated` webhook with the BEFORE AND
+-- AFTER VALUES is the alert every analyst wants and no incumbent sends."
+--
+-- THE HARD PART IS SILENCE, NOT NOISE. The tiered ladder re-pulls every row in the window every
+-- night. Almost all of those re-pulls change nothing, and a webhook that fires on each of them is
+-- worse than no webhook: the customer turns it off in a week, and the one night a number really
+-- moves is buried with the rest.
+--
+-- So detection is a TRIGGER WITH A `when` CLAUSE, not application logic. PostgreSQL evaluates the
+-- condition itself and never calls the function on a re-pull that moved nothing. That property
+-- cannot be forgotten by a future writer, because it does not live in any writer: a row updated by
+-- `app.upsert_envelope_row`, by a migration, or by a hand at a psql prompt is detected identically.
+--
+-- `revised_from` carries ONLY THE METRICS THAT CHANGED. Section 4.2's "before and after" is a diff,
+-- and listing a metric that did not move under a heading that says "revised from" would state that
+-- it moved. The full current metric set travels beside it, so the event is still self-contained.
+-- `00-repo-map.md`: revised_from is "placed in the restatement webhook payload, not on the read
+-- row", which is why it lives here and not in `envelope_rows`.
+-- ---------------------------------------------------------------------------------------------
+
+create table public.restatement_events (
+  id                      uuid primary key default gen_random_uuid(),
+  workspace_id            uuid not null references public.workspaces (id) on delete cascade,
+
+  -- The upsert key of the row that moved, so a consumer can fetch it back.
+  source                  app.envelope_source not null,
+  account_id              text not null check (length(account_id) > 0),
+  entity_id               text not null check (length(entity_id) > 0),
+  entity_type             app.entity_type not null,
+  date                    date not null,
+  attribution_window      app.attribution_window,
+
+  currency                text not null check (currency ~ '^[A-Z]{3}$'),
+
+  -- Metric maps, not columns, and the exception is deliberate. `envelope_rows` keeps metrics as
+  -- columns because the dictionary is small and fixed and a check constraint has to see them. An
+  -- event is an immutable record of a diff whose SHAPE varies per event -- only the metrics that
+  -- moved appear -- and a column per metric would be mostly null on every row.
+  revised_from            jsonb not null check (jsonb_typeof(revised_from) = 'object'),
+  metrics                 jsonb not null check (jsonb_typeof(metrics) = 'object'),
+
+  -- The envelope's clocks as they stood when the change was seen. A consumer must be able to tell a
+  -- restatement inside an open window from one that arrived after it should have closed.
+  fetched_at              timestamptz not null,
+  first_seen_at           timestamptz not null,
+  restates_until          timestamptz,
+  is_provisional          boolean not null,
+
+  occurred_at             timestamptz not null default now(),
+
+  -- Delivery state. Unused until the delivery unit ships; present now so the outbox is written
+  -- correctly from the first event rather than backfilled later with guesses.
+  attempts                integer not null default 0 check (attempts >= 0),
+  delivered_at            timestamptz,
+
+  constraint restatement_events_diff_not_empty check (revised_from <> '{}'::jsonb)
+);
+
+comment on table public.restatement_events is
+  'One row per detected restatement. Written only by the trigger below, never by a tenant: an event '
+  'a customer could forge is an alert nobody can trust.';
+
+comment on column public.restatement_events.revised_from is
+  'ONLY the metrics whose value changed, with their previous values. Naming an unchanged metric '
+  'here would assert that it moved.';
+
+-- Drained in occurrence order, oldest first, per workspace.
+create index restatement_events_pending_idx
+  on public.restatement_events (workspace_id, occurred_at)
+  where delivered_at is null;
+
+-- Record one restatement.
+--
+-- SECURITY DEFINER for the same reason `app.upsert_envelope_row` is: the writer is `app_ingest`,
+-- which has no grant on this table and must not have one. The privilege is the function, not the
+-- role -- and here it is narrower still, because nothing calls this function at all. Only the
+-- trigger does.
+create or replace function app.record_restatement()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_before jsonb := '{}'::jsonb;
+  v_after  jsonb := '{}'::jsonb;
+begin
+  -- Built pair by pair rather than by diffing two whole maps, because `to_jsonb(old)` would carry
+  -- every column -- the clocks, the fx fields, `raw_key` -- and a diff over those would call a
+  -- fresh `fetched_at` a restatement. Only metrics are restatements.
+  if old.spend is distinct from new.spend then
+    v_before := v_before || jsonb_build_object('spend', old.spend);
+  end if;
+  if old.impressions is distinct from new.impressions then
+    v_before := v_before || jsonb_build_object('impressions', old.impressions);
+  end if;
+  if old.clicks is distinct from new.clicks then
+    v_before := v_before || jsonb_build_object('clicks', old.clicks);
+  end if;
+  if old.sessions is distinct from new.sessions then
+    v_before := v_before || jsonb_build_object('sessions', old.sessions);
+  end if;
+  if old.conversions is distinct from new.conversions then
+    v_before := v_before || jsonb_build_object('conversions', old.conversions);
+  end if;
+  if old.conversions_value is distinct from new.conversions_value then
+    v_before := v_before || jsonb_build_object('conversions_value', old.conversions_value);
+  end if;
+  if old.revenue is distinct from new.revenue then
+    v_before := v_before || jsonb_build_object('revenue', old.revenue);
+  end if;
+  if old.orders is distinct from new.orders then
+    v_before := v_before || jsonb_build_object('orders', old.orders);
+  end if;
+  if old.net_revenue is distinct from new.net_revenue then
+    v_before := v_before || jsonb_build_object('net_revenue', old.net_revenue);
+  end if;
+  if old.fees is distinct from new.fees then
+    v_before := v_before || jsonb_build_object('fees', old.fees);
+  end if;
+  if old.commission is distinct from new.commission then
+    v_before := v_before || jsonb_build_object('commission', old.commission);
+  end if;
+
+  -- Nothing moved. The trigger's `when` clause should already have prevented this call, so reaching
+  -- here means the two metric lists have drifted apart -- and writing an event with an empty diff
+  -- would be caught by the check constraint anyway. Return quietly rather than raising: a failed
+  -- trigger would roll back a customer's ingest over a bookkeeping disagreement.
+  if v_before = '{}'::jsonb then
+    return null;
+  end if;
+
+  -- `strip_nulls` so an absent metric is absent, not `null`. A consumer reading `spend: null` would
+  -- reasonably conclude the platform reported zero spend.
+  v_after := jsonb_strip_nulls(jsonb_build_object('spend', new.spend, 'impressions', new.impressions, 'clicks', new.clicks, 'sessions', new.sessions, 'conversions', new.conversions, 'conversions_value', new.conversions_value, 'revenue', new.revenue, 'orders', new.orders, 'net_revenue', new.net_revenue, 'fees', new.fees, 'commission', new.commission));
+
+  insert into public.restatement_events (
+    workspace_id, source, account_id, entity_id, entity_type, date, attribution_window,
+    currency, revised_from, metrics,
+    fetched_at, first_seen_at, restates_until, is_provisional
+  ) values (
+    new.workspace_id, new.source, new.account_id, new.entity_id, new.entity_type, new.date,
+    new.attribution_window, new.currency, v_before, v_after,
+    new.fetched_at, new.first_seen_at, new.restates_until, new.is_provisional
+  );
+  return null;
+end;
+$fn$;
+
+-- THE `when` CLAUSE IS THE FEATURE. Without it the function runs on every re-pull of every row and
+-- decides, in PL/pgSQL, to do nothing -- the same answer at a few hundred times the cost, on the
+-- hottest write path in the system.
+--
+-- EVERY METRIC BELONGS IN THIS LIST. It is the third hand-written metric list in this schema, after
+-- the fx constraint above and the upsert's SET clause, and a metric missing from it restates
+-- silently forever. `scripts/check-dictionary.mjs` compares this list against the dictionary for
+-- exactly that reason.
+create trigger envelope_rows_restated
+  after update on public.envelope_rows
+  for each row
+  when (
+    old.spend is distinct from new.spend
+    or old.impressions is distinct from new.impressions
+    or old.clicks is distinct from new.clicks
+    or old.sessions is distinct from new.sessions
+    or old.conversions is distinct from new.conversions
+    or old.conversions_value is distinct from new.conversions_value
+    or old.revenue is distinct from new.revenue
+    or old.orders is distinct from new.orders
+    or old.net_revenue is distinct from new.net_revenue
+    or old.fees is distinct from new.fees
+    or old.commission is distinct from new.commission
+  )
+  execute function app.record_restatement();
+
+alter table public.restatement_events enable row level security;
+alter table public.restatement_events force row level security;
+
+-- A tenant may READ its own restatements. There is deliberately no insert, update or delete policy
+-- and no write grant: an event a customer could forge is an alert nobody can trust, and the same
+-- argument that keeps tenants out of `envelope_rows` applies with more force to the thing that
+-- announces a change to it.
+create policy restatement_events_select on public.restatement_events
+  for select to authenticated
+  using (app.can_read_workspace(workspace_id));
+
+grant select on public.restatement_events to authenticated;
+
 -- The read path: one workspace, one source, a date range. Ordered by date so a range scan does not
 -- sort.
 create index envelope_rows_read_idx

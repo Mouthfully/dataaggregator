@@ -7,6 +7,15 @@ import {
   payloadKey,
   workspacePrefix,
 } from "./payloads.js";
+import {
+  DECLARED_SOURCES,
+  MAX_REDACTION_DEPTH,
+  PayloadNotRedactableError,
+  PayloadPolicyError,
+  policyFor,
+  redactJsonBytes,
+  redactValue,
+} from "./redaction.js";
 
 const PARTS = {
   workspaceId: "7c000000-0000-0000-0000-000000000001",
@@ -171,5 +180,103 @@ describe("the cost term the specification never counts", () => {
     // A terabyte stored is $15.00; a million writes is $4.50. Both are real.
     expect(e.storageUsd).toBeCloseTo(15, 6);
     expect(e.operationsUsd).toBeCloseTo(4.5, 6);
+  });
+});
+
+describe("the redaction policy table", () => {
+  // The table is what makes this fail closed: an undeclared source cannot store a payload at all,
+  // so the next connector's author has to decide before their bytes go anywhere.
+
+  it("declares a policy for every source in the dictionary", () => {
+    for (const source of DECLARED_SOURCES) {
+      expect(() => policyFor(source)).not.toThrow();
+    }
+  });
+
+  it("refuses a source nobody has decided about, and says where to decide it", () => {
+    expect(() => policyFor("woocommerce")).toThrow(PayloadPolicyError);
+    expect(() => policyFor("woocommerce")).toThrow(/redaction\.ts/);
+  });
+
+  it("refuses a redact policy with no keep-list, which would remove everything", () => {
+    const broken = { bad: { disposition: "redact", reason: "forgot the keep-list" } } as const;
+    expect(() => policyFor("bad", broken)).toThrow(/policy bug/);
+  });
+
+  it("gives every verbatim source a reason a human can read", () => {
+    for (const source of DECLARED_SOURCES) {
+      expect(policyFor(source).reason.length).toBeGreaterThan(10);
+    }
+  });
+});
+
+describe("redactValue: an allow-list, applied at every depth", () => {
+  const keep = new Set(["id", "total", "line_items", "quantity"]);
+
+  it("drops every key not on the list", () => {
+    const { value, removed } = redactValue(
+      { id: 1, total: "1290", billing: { phone: "0812345678" }, customer_note: "leave at door" },
+      keep,
+    );
+    expect(value).toEqual({ id: 1, total: "1290" });
+    expect(removed).toBe(2);
+  });
+
+  it("applies the list inside nested objects, not only at the top", () => {
+    const { value } = redactValue({ line_items: { quantity: 2, sku_owner_email: "a@b.c" } }, keep);
+    expect(value).toEqual({ line_items: { quantity: 2 } });
+  });
+
+  it("preserves array length, because a row count that changed would break the metrics", () => {
+    const { value } = redactValue(
+      { line_items: [{ quantity: 1, note: "x" }, { quantity: 2 }, { note: "y" }] },
+      keep,
+    );
+    expect(value).toEqual({ line_items: [{ quantity: 1 }, { quantity: 2 }, {}] });
+  });
+
+  it("counts removals inside arrays too", () => {
+    const { removed } = redactValue({ line_items: [{ note: "x" }, { note: "y" }] }, keep);
+    expect(removed).toBe(2);
+  });
+
+  it("leaves primitives alone", () => {
+    expect(redactValue("a string", keep).value).toBe("a string");
+    expect(redactValue(null, keep).value).toBe(null);
+    expect(redactValue(7, keep).value).toBe(7);
+  });
+
+  it("filters an object with no prototype, which an earlier version let through untouched", () => {
+    const exotic = Object.create(null) as Record<string, unknown>;
+    exotic.phone = "0812345678";
+    exotic.id = 4;
+    expect(redactValue(exotic, keep).value).toEqual({ id: 4 });
+  });
+
+  it("refuses a payload nested deeper than the cap rather than overflowing the stack", () => {
+    let deep: unknown = { id: 1 };
+    for (let i = 0; i < MAX_REDACTION_DEPTH + 2; i += 1) deep = { id: deep };
+    expect(() => redactValue(deep, keep)).toThrow(/nests deeper/);
+  });
+});
+
+describe("redactJsonBytes", () => {
+  const policy = {
+    disposition: "redact",
+    keep: new Set(["id", "total"]),
+    reason: "test",
+  } as const;
+
+  it("returns bytes carrying only the kept keys", () => {
+    const input = new TextEncoder().encode('{"id":1,"total":"90","email":"a@b.c"}');
+    const { bytes, removed } = redactJsonBytes(input, policy);
+    expect(JSON.parse(new TextDecoder().decode(bytes))).toEqual({ id: 1, total: "90" });
+    expect(removed).toBe(1);
+  });
+
+  it("refuses a body that is not JSON rather than storing it unexamined", () => {
+    const input = new TextEncoder().encode("<html>not json</html>");
+    expect(() => redactJsonBytes(input, policy)).toThrow(PayloadNotRedactableError);
+    expect(() => redactJsonBytes(input, policy)).toThrow(/the leak this policy exists to prevent/);
   });
 });

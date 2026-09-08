@@ -1,6 +1,7 @@
 import {
   MAX_BUFFERED_BYTES,
   PayloadTooLargeError,
+  type PolicyTable,
   type R2Like,
   deleteWorkspacePayloads,
   getPayload,
@@ -85,6 +86,7 @@ describe("streaming, the path every extractor should use", () => {
     const body = '{"rows":[1,2,3]}';
     const ref = await putPayload({
       bucket: bucket(),
+      source: "ga4",
       key,
       body: textStream(body),
       contentLength: body.length,
@@ -103,6 +105,7 @@ describe("streaming, the path every extractor should use", () => {
       '{"dimensionHeaders":[{"name":"date"}],"rows":[{"metricValues":[{"value":"1284"}]}]}';
     await putPayload({
       bucket: bucket(),
+      source: "ga4",
       key,
       body: textStream(body),
       contentLength: body.length,
@@ -124,6 +127,7 @@ describe("streaming, the path every extractor should use", () => {
 
     const ref = await putPayload({
       bucket: bucket(),
+      source: "ga4",
       key,
       body: chunks(1, new Uint8Array(gz)),
       contentLength: gz.byteLength,
@@ -139,6 +143,7 @@ describe("streaming, the path every extractor should use", () => {
     await expect(
       putPayload({
         bucket: bucket(),
+      source: "ga4",
         key: "bad/length/x/2026-08-14/none/t",
         body: textStream("x"),
         contentLength: -1,
@@ -150,6 +155,7 @@ describe("streaming, the path every extractor should use", () => {
     await expect(
       putPayload({
         bucket: bucket(),
+      source: "ga4",
         key: payloadKey({ ...PARTS, date: "2026-08-17" }),
         body: textStream("short"),
         contentLength: 5_000,
@@ -164,6 +170,7 @@ describe("streaming, the path every extractor should use", () => {
     await expect(
       putPayload({
         bucket: bucket(),
+      source: "ga4",
         key: payloadKey({ ...PARTS, date: "2026-08-23" }),
         body: chunks(1, new TextEncoder().encode("x".repeat(1_000))),
         contentLength: 100,
@@ -187,6 +194,7 @@ describe("the 128 MB rule, which is what this module exists for", () => {
 
     const ref = await putPayload({
       bucket: bucket(),
+      source: "ga4",
       key: payloadKey({ ...PARTS, date: "2026-08-18" }),
       body: chunks(count, chunk),
       contentLength: total,
@@ -202,7 +210,12 @@ describe("the 128 MB rule, which is what this module exists for", () => {
 describe("the buffered fallback, bounded so it cannot become the failure it guards", () => {
   it("stores a payload whose length the platform never declared", async () => {
     const key = payloadKey({ ...PARTS, date: "2026-08-19" });
-    await putBufferedPayload({ bucket: bucket(), key, body: textStream('{"chunked":true}') });
+    await putBufferedPayload({
+      bucket: bucket(),
+      source: "ga4",
+      key,
+      body: textStream('{"chunked":true}'),
+    });
     expect(await readAll((await getPayload(bucket(), key)) as ReadableStream, false)).toBe(
       '{"chunked":true}',
     );
@@ -216,6 +229,7 @@ describe("the buffered fallback, bounded so it cannot become the failure it guar
 
     const ref = await putBufferedPayload({
       bucket: bucket(),
+      source: "ga4",
       key,
       body: textStream(body),
       compress: true,
@@ -229,6 +243,7 @@ describe("the buffered fallback, bounded so it cannot become the failure it guar
     const body = "y".repeat(10_000);
     const ref = await putBufferedPayload({
       bucket: bucket(),
+      source: "ga4",
       key: payloadKey({ ...PARTS, date: "2026-08-21" }),
       body: textStream(body),
     });
@@ -242,6 +257,7 @@ describe("the buffered fallback, bounded so it cannot become the failure it guar
     const chunk = new TextEncoder().encode("z".repeat(64 * 1024));
     const error = await putBufferedPayload({
       bucket: bucket(),
+      source: "ga4",
       key: payloadKey({ ...PARTS, date: "2026-08-22" }),
       body: chunks(100, chunk),
       maxBytes: 256 * 1024,
@@ -271,6 +287,7 @@ describe("erasure against a real bucket", () => {
     for (const date of ["2026-08-01", "2026-08-02", "2026-08-03"]) {
       await putPayload({
         bucket: bucket(),
+      source: "ga4",
         key: payloadKey({ ...mine, date }),
         body: textStream("{}"),
         contentLength: 2,
@@ -278,6 +295,7 @@ describe("erasure against a real bucket", () => {
     }
     await putPayload({
       bucket: bucket(),
+      source: "ga4",
       key: payloadKey(theirs),
       body: textStream("{}"),
       contentLength: 2,
@@ -290,5 +308,145 @@ describe("erasure against a real bucket", () => {
 
   it("is idempotent, so a retried erasure is not an error", async () => {
     expect(await deleteWorkspacePayloads(bucket(), "erase-me")).toBe(0);
+  });
+});
+
+/**
+ * A source that must be redacted. No such source is in the dictionary yet -- the commerce
+ * connectors 11A.14 names are not built -- so the table is supplied here, which is what the
+ * `policies` seam exists for. Shaped like a WooCommerce order, because that is the first payload
+ * this will meet.
+ */
+const ORDER_POLICIES = {
+  ga4: { disposition: "verbatim", reason: "aggregate" },
+  shop: {
+    disposition: "redact",
+    keep: new Set(["id", "status", "currency", "total", "total_tax", "line_items", "quantity"]),
+    reason: "an order carries buyer name, email, phone and shipping address",
+  },
+} as const satisfies PolicyTable;
+
+const ORDER = JSON.stringify({
+  id: 10482,
+  status: "completed",
+  currency: "THB",
+  total: "1290.00",
+  total_tax: "84.39",
+  billing: { first_name: "Somchai", phone: "0812345678", email: "s@example.co.th" },
+  shipping: { address_1: "88 Sukhumvit 55", city: "Bangkok" },
+  customer_note: "leave with the guard",
+  line_items: [{ quantity: 2, name: "Latte", meta_data: [{ key: "gift_to", value: "Malee" }] }],
+});
+
+describe("the redaction path, against a real bucket", () => {
+  it("refuses to STREAM a source that must be redacted", async () => {
+    // The constraint the whole module turns on: a streamed body is never parsed, so it can never be
+    // redacted. This is the one place that fact cannot be forgotten.
+    await expect(
+      putPayload({
+        bucket: bucket(),
+        source: "shop" as never,
+        policies: ORDER_POLICIES,
+        key: payloadKey({ ...PARTS, date: "2026-09-01" }),
+        body: textStream(ORDER),
+        contentLength: ORDER.length,
+      }),
+    ).rejects.toThrow(/cannot be redacted/);
+  });
+
+  it("refuses a source nobody has declared a policy for, on both paths", async () => {
+    const key = payloadKey({ ...PARTS, date: "2026-09-02" });
+    await expect(
+      putPayload({
+        bucket: bucket(),
+        source: "woocommerce" as never,
+        key,
+        body: textStream(ORDER),
+        contentLength: ORDER.length,
+      }),
+    ).rejects.toThrow(/no redaction policy declared/);
+
+    const body = textStream(ORDER);
+    await expect(
+      putBufferedPayload({ bucket: bucket(), source: "woocommerce" as never, key, body }),
+    ).rejects.toThrow(/no redaction policy declared/);
+    // AND THE BODY WAS NEVER READ. The policy is resolved before the stream is touched, so an
+    // undeclared source's bytes never enter the isolate at all.
+    expect(body.locked).toBe(false);
+  });
+
+  it("stores only the kept fields, and nothing that identifies the buyer", async () => {
+    const key = payloadKey({ ...PARTS, date: "2026-09-03" });
+    const ref = await putBufferedPayload({
+      bucket: bucket(),
+      source: "shop" as never,
+      policies: ORDER_POLICIES,
+      key,
+      body: textStream(ORDER),
+    });
+
+    const stored = await readAll((await getPayload(bucket(), key)) as ReadableStream, false);
+    expect(JSON.parse(stored)).toEqual({
+      id: 10482,
+      status: "completed",
+      currency: "THB",
+      total: "1290.00",
+      total_tax: "84.39",
+      line_items: [{ quantity: 2 }],
+    });
+
+    // Asserted on the raw text, not the parsed object: a leak could hide in a key as easily as in a
+    // value, and `toEqual` above would not see a stray string.
+    for (const leak of ["Somchai", "0812345678", "s@example.co.th", "Sukhumvit", "Malee", "guard"]) {
+      expect(stored).not.toContain(leak);
+    }
+    expect(ref.redacted?.removed).toBeGreaterThan(0);
+  });
+
+  it("records that redaction happened, in metadata that travels with the object", async () => {
+    const key = payloadKey({ ...PARTS, date: "2026-09-04" });
+    await putBufferedPayload({
+      bucket: bucket(),
+      source: "shop" as never,
+      policies: ORDER_POLICIES,
+      key,
+      body: textStream(ORDER),
+    });
+    const object = await bucket().get(key);
+    expect(object?.customMetadata?.["redaction-source"]).toBe("shop");
+    expect(object?.customMetadata?.["redaction-version"]).toBe("1");
+    expect(Number(object?.customMetadata?.["redaction-removed"])).toBeGreaterThan(0);
+  });
+
+  it("redacts BEFORE compressing, so the stored bytes were never a verbatim order", async () => {
+    const key = payloadKey({ ...PARTS, date: "2026-09-05" });
+    const ref = await putBufferedPayload({
+      bucket: bucket(),
+      source: "shop" as never,
+      policies: ORDER_POLICIES,
+      key,
+      body: textStream(ORDER),
+      compress: true,
+    });
+    expect(ref.compressed).toBe(true);
+    const stored = await readAll((await getPayload(bucket(), key)) as ReadableStream, true);
+    expect(stored).not.toContain("Somchai");
+    expect(JSON.parse(stored).id).toBe(10482);
+  });
+
+  it("distinguishes a verbatim source from a redacted one in the return value", async () => {
+    // `null` is not `{removed: 0}`. "Nothing needed removing" and "nothing was checked" are
+    // different facts and only one of them is safe.
+    const key = payloadKey({ ...PARTS, date: "2026-09-06" });
+    const body = '{"rows":[1,2,3]}';
+    const ref = await putPayload({
+      bucket: bucket(),
+      source: "ga4",
+      key,
+      body: textStream(body),
+      contentLength: body.length,
+    });
+    expect(ref.redacted).toBe(null);
+    expect((await bucket().get(key))?.customMetadata?.["redaction-source"]).toBeUndefined();
   });
 });

@@ -1473,6 +1473,7 @@ by number from the design notes and the findings document.
 | 2026-09-08 | Appendix C added: the action sheet |
 | 2026-09-08 | Appendix D added: consolidated reports |
 | 2026-09-08 | 11A.12 Four Thai sources verified as bring-your-own-credential and self-serve, and recorded as the SME shortlist; the bank leg established as absent from the public portals, narrowing 11A.9.2 |
+| 2026-09-08 | 11A.13 Connectors ranked by who is reviewed and by the customer's plan precondition; POSPOS opens the point-of-sale category and narrows 11A.9.1 to FoodStory; Semrush and Ahrefs recorded as agency-channel, not SME |
 
 ### 11A.12 The verified Thai shortlist, and what the bank portals do not publish (2026-09-08)
 
@@ -1534,6 +1535,55 @@ real first customer.
 or `commission`; `SOURCES` has none of the four. `scripts/check-dictionary.mjs` fails the build until
 TypeScript and SQL move together, which makes the vocabulary a single deliberate change rather than
 four accidental ones.
+
+### 11A.13 Access models, the point-of-sale opening, and the plan precondition (2026-09-08)
+
+11A.12 ranked four sources on verified access. This entry generalises the rule that produced that
+ranking and applies it to the remaining connectors. The full note is
+[`docs/marketplane/22-access-models.md`](marketplane/22-access-models.md).
+
+**Decision. Connectors are ranked on two tests, in this order.**
+
+1. **Who is reviewed.** A **key-paste** source — the customer creates a key in their own account and
+   hands it over — has no reviewer and no calendar. An **OAuth-app** source puts *this company* in
+   front of a platform reviewer, and that review is the schedule. Key paste also satisfies gate 1 by
+   construction, where an OAuth source satisfies it only by design.
+2. **Whether the customer can meet the precondition.** *Easy for us* is not *available to our
+   customer*. A key-paste source whose key exists only on an expensive plan is trivial to build and
+   serves nobody this product sells to.
+
+**The point-of-sale category is open; the dominant vendor is not.** **POSPOS**, a Thai system, issues
+an API key to the merchant — the owner copies a token from its own settings, emails it for review,
+and receives a key — and **every documented endpoint is read-only**. Rate limit 300 calls per 10
+seconds, with key deactivation as the stated penalty for exceeding it.
+
+**11A.9.1 is narrowed accordingly.** It said FoodStory / Wongnai access *"blocks the point-of-sale
+category"*. That conflated a vendor with a category: FoodStory is blocked and remains where the
+volume is, but the category now has a floor. Point of sale is where the after-fees number of 11A.2
+and the covers-and-tickets grain of 11A.5 come from, so this was the largest hole in the SME product.
+
+**Two corrections to 11A.6.**
+
+- Its point-of-sale row reads "FoodStory by Wongnai, Ocha (Shopee), StoreHub, Loyverse, Qashier"
+  under a Thailand-first heading. **StoreHub is Malaysian, Qashier Singaporean and Loyverse
+  Cypriot.** They are *used in* Thailand, which is a different claim, and the founder's
+  local-outreach advantage applies only to the Thai ones. **POSPOS joins the row.**
+- **Semrush and Ahrefs are agency-channel connectors, not SME connectors.** Semrush's API needs a
+  plan at roughly $549 a month plus separately purchased units at an unpublished price; Ahrefs meters
+  in units from Lite upward and sells more only on Enterprise. Both are trivial to integrate and
+  unavailable to the owner-run business of 11A.1. Section 11.2's decision to buy SERP wholesale from
+  DataForSEO under the gate 2 vendor-key exception is what serves that customer, and it stands.
+
+**Two access facts recorded, and one non-fact.** Microsoft Advertising issues a universal developer
+token on request, immediately and without review — cheaper access than Google Ads, which is tiered
+per token. **Microsoft's SOAP freeze and decommission dates remain unverified**: nothing read this
+round sources them, so section 9's deferral keeps its outcome and not its stated reason. **Search
+Console's `webmasters.readonly` sensitivity is still unconfirmed**; it was attempted and could not be
+closed.
+
+**The hash-at-the-edge finding of 11A.12 extends to this leg.** POSPOS returns member data and
+payment records, and Loyverse's token is unscoped by its own documentation. `raw` cannot be stored as
+returned for a point-of-sale source either.
 
 ## 12. Naming candidates
 

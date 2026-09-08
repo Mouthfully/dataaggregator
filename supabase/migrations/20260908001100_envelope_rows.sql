@@ -255,10 +255,26 @@ create table public.restatement_events (
 
   occurred_at             timestamptz not null default now(),
 
-  -- Delivery state. Unused until the delivery unit ships; present now so the outbox is written
-  -- correctly from the first event rather than backfilled later with guesses.
+  -- DELIVERY STATE. The state machine over these columns lives in `app.record_delivery`
+  -- (20260908001200_webhook_delivery.sql), which is the only thing that writes them.
+  --
+  -- Three terminal-ish states, and the difference between them matters to an operator: an event
+  -- with `delivered_at` succeeded; one with `failed_at` exhausted its retries and will never be
+  -- attempted again; one with neither is still in the queue, whatever its attempt count.
   attempts                integer not null default 0 check (attempts >= 0),
   delivered_at            timestamptz,
+  failed_at               timestamptz,
+  next_attempt_at         timestamptz not null default now(),
+  last_error              text,
+
+  -- A lease, so two workers cannot deliver the same event twice. Same shape as the connection lease
+  -- in the scheduler, for the same reason.
+  claimed_at              timestamptz,
+  claimed_by              text,
+
+  constraint restatement_events_not_both_outcomes check (
+    delivered_at is null or failed_at is null
+  ),
 
   constraint restatement_events_diff_not_empty check (revised_from <> '{}'::jsonb)
 );

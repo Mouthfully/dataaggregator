@@ -46,3 +46,6 @@ psql -d "$DB" -q -f "$HERE/03_envelope_store.sql"
 
 echo "==> restatement outbox suite"
 psql -d "$DB" -q -f "$HERE/04_restatement_events.sql"
+
+echo "==> webhook delivery suite"
+psql -d "$DB" -q -f "$HERE/05_webhook_delivery.sql"

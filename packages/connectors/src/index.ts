@@ -1,4 +1,12 @@
 export {
+  GA4_DEFAULT_REPORT,
+  runGa4Backfill,
+  windowToRequest,
+  type Ga4BackfillBatch,
+  type Ga4BackfillOptions,
+  type Ga4ReportDefinition,
+} from "./sources/ga4/backfill.js";
+export {
   GA4_DATA_API_BASE,
   GA4_MAX_PAGE_ROWS,
   GA4_PAGE_ROWS,

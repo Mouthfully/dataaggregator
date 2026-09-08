@@ -141,13 +141,16 @@ export type PolicyTable = Readonly<Record<string, RedactionPolicy>>;
  * table above, and any call site supplying its own is a one-word grep. Shipping untested redaction
  * to avoid a testable parameter would be the worse trade.
  */
-export function policyFor(source: string, policies: PolicyTable = REDACTION_POLICIES): RedactionPolicy {
+export function policyFor(
+  source: string,
+  policies: PolicyTable = REDACTION_POLICIES,
+): RedactionPolicy {
   const policy = (policies as Record<string, RedactionPolicy | undefined>)[source];
   if (policy === undefined) {
     throw new PayloadPolicyError(
       `payloads: no redaction policy declared for source "${source}". Declare one in ` +
         "packages/payloads/src/redaction.ts before storing its payloads. A source whose responses " +
-        "can carry contact data needs `disposition: \"redact\"` and a keep-list; one whose " +
+        'can carry contact data needs `disposition: "redact"` and a keep-list; one whose ' +
         'responses are aggregate needs `disposition: "verbatim"` and a reason saying so.',
       source,
     );
@@ -175,11 +178,7 @@ export interface RedactionResult {
  * redacted individually and the array's length is preserved. A row count that changed under
  * redaction would make the archive disagree with the metrics computed from it.
  */
-export function redactValue(
-  value: unknown,
-  keep: ReadonlySet<string>,
-  depth = 0,
-): RedactionResult {
+export function redactValue(value: unknown, keep: ReadonlySet<string>, depth = 0): RedactionResult {
   if (depth > MAX_REDACTION_DEPTH) {
     throw new PayloadNotRedactableError(
       `payloads: payload nests deeper than ${MAX_REDACTION_DEPTH} levels; refusing to redact it ` +

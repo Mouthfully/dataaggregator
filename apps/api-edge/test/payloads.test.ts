@@ -143,7 +143,7 @@ describe("streaming, the path every extractor should use", () => {
     await expect(
       putPayload({
         bucket: bucket(),
-      source: "ga4",
+        source: "ga4",
         key: "bad/length/x/2026-08-14/none/t",
         body: textStream("x"),
         contentLength: -1,
@@ -155,7 +155,7 @@ describe("streaming, the path every extractor should use", () => {
     await expect(
       putPayload({
         bucket: bucket(),
-      source: "ga4",
+        source: "ga4",
         key: payloadKey({ ...PARTS, date: "2026-08-17" }),
         body: textStream("short"),
         contentLength: 5_000,
@@ -170,7 +170,7 @@ describe("streaming, the path every extractor should use", () => {
     await expect(
       putPayload({
         bucket: bucket(),
-      source: "ga4",
+        source: "ga4",
         key: payloadKey({ ...PARTS, date: "2026-08-23" }),
         body: chunks(1, new TextEncoder().encode("x".repeat(1_000))),
         contentLength: 100,
@@ -287,7 +287,7 @@ describe("erasure against a real bucket", () => {
     for (const date of ["2026-08-01", "2026-08-02", "2026-08-03"]) {
       await putPayload({
         bucket: bucket(),
-      source: "ga4",
+        source: "ga4",
         key: payloadKey({ ...mine, date }),
         body: textStream("{}"),
         contentLength: 2,
@@ -397,7 +397,14 @@ describe("the redaction path, against a real bucket", () => {
 
     // Asserted on the raw text, not the parsed object: a leak could hide in a key as easily as in a
     // value, and `toEqual` above would not see a stray string.
-    for (const leak of ["Somchai", "0812345678", "s@example.co.th", "Sukhumvit", "Malee", "guard"]) {
+    for (const leak of [
+      "Somchai",
+      "0812345678",
+      "s@example.co.th",
+      "Sukhumvit",
+      "Malee",
+      "guard",
+    ]) {
       expect(stored).not.toContain(leak);
     }
     expect(ref.redacted?.removed).toBeGreaterThan(0);

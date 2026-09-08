@@ -65,6 +65,9 @@ importers:
 
   apps/api-edge:
     dependencies:
+      '@repo/oauth':
+        specifier: workspace:*
+        version: link:../../packages/oauth
       '@repo/vault':
         specifier: workspace:*
         version: link:../../packages/vault
@@ -136,6 +139,15 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.5.4
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@22.20.1)(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0))
+
+  packages/oauth:
     devDependencies:
       typescript:
         specifier: 'catalog:'

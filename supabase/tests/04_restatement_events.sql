@@ -312,6 +312,16 @@ begin;
   select app_test.check('yet its write produced an event, because the TRIGGER is the privilege',
     (select count(*) = 1 from public.restatement_events
       where workspace_id = '8c000000-0000-0000-0000-000000000002'));
+
+  -- A METRIC THAT WAS NULL ON BOTH SIDES MUST NOT APPEAR. This row only ever carried `sessions`;
+  -- every other metric is null before and after, which is not a change. The assertion exists
+  -- because a mutation that unconditionally added `conversions` to the diff survived every other
+  -- test in this file: the `when` clause stops the function running when NOTHING moved, so a
+  -- function-internal bug can only show where one metric moved and another did not.
+  select app_test.check('a metric null on both sides is not a change',
+    (select array_agg(k order by k) = array['sessions']
+       from public.restatement_events e, jsonb_object_keys(e.revised_from) k
+      where e.workspace_id = '8c000000-0000-0000-0000-000000000002'));
 commit;
 
 begin;

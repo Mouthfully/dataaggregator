@@ -43,7 +43,8 @@ begin
   execute p_sql;
   perform app_test.check(p_name, false, 'ACCEPTED: the database allowed a row it must refuse');
 exception
-  when check_violation or not_null_violation or invalid_text_representation then
+  when check_violation or not_null_violation or invalid_text_representation
+    or unique_violation then
     perform app_test.check(p_name, true, 'refused: ' || sqlerrm);
   when others then
     perform app_test.check(p_name, false, 'wrong error: ' || sqlerrm);
@@ -134,6 +135,14 @@ commit;
 insert into public.webhook_endpoints (id, workspace_id, url) values
   ('6e000000-0000-0000-0000-000000000001', '6c000000-0000-0000-0000-000000000001', 'https://hooks.example.test/one'),
   ('6e000000-0000-0000-0000-000000000002', '6c000000-0000-0000-0000-000000000002', 'https://hooks.example.test/two');
+
+begin;
+  -- A second active endpoint would be delivered to twice and recorded once, because the outbox
+  -- carries one delivery state per event. Refused until a per-(event, endpoint) row exists.
+  select app_test.check_rejected('a second active endpoint for one workspace is refused',
+    $sql$insert into public.webhook_endpoints (workspace_id, url)
+      values ('6c000000-0000-0000-0000-000000000001', 'https://hooks.example.test/second')$sql$);
+commit;
 
 -- ---------------------------------------------------------------------------------------------
 -- CLAIMING

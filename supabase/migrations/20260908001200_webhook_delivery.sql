@@ -50,10 +50,17 @@ create table public.webhook_endpoints (
   )
 );
 
--- One active endpoint per workspace per URL. A duplicate would deliver everything twice and each
--- copy would retry independently.
-create unique index webhook_endpoints_active_url_idx
-  on public.webhook_endpoints (workspace_id, url)
+-- ONE ACTIVE ENDPOINT PER WORKSPACE, and the constraint is tighter than it looks like it should be.
+--
+-- Fan-out to several endpoints is a reasonable thing to want, and this schema cannot do it
+-- correctly: `restatement_events` carries ONE delivery state per event, so an event for a workspace
+-- with two active endpoints would be claimed once, returned twice by the join below, delivered
+-- twice, and closed by whichever `record_delivery` arrived first -- losing the other outcome
+-- entirely and retrying neither. A per-(event, endpoint) delivery row is what fan-out actually
+-- needs, and until that exists the honest thing is to make the configuration impossible rather than
+-- to allow one that silently half-works.
+create unique index webhook_endpoints_one_active_idx
+  on public.webhook_endpoints (workspace_id)
   where active;
 
 comment on column public.webhook_endpoints.secret_version is

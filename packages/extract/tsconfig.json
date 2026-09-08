@@ -1,7 +1,18 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2022"],
+    // This package uses WHATWG globals that BOTH target runtimes provide -- fetch, Response,
+    // URL, URLSearchParams, TextEncoder, btoa -- but that `lib: ["ES2022"]` alone does not declare.
+    //
+    // "DOM" is the smallest lib that declares them all. It is used HERE ONLY, for this package's
+    // standalone typecheck; it does not leak to consumers, because internal packages ship raw
+    // TypeScript and are compiled under the CONSUMER's tsconfig. apps/web supplies them via DOM and
+    // apps/api-edge via @cloudflare/workers-types.
+    //
+    // That makes the standalone check the weaker of the two, so the real proof is that this package
+    // is imported from apps/api-edge and typechecks there under workers-types with no DOM lib at
+    // all. If that ever breaks, this tsconfig will not tell you -- the Worker typecheck will.
+    "lib": ["ES2022", "DOM"],
     "types": [],
     "noEmit": true
   },

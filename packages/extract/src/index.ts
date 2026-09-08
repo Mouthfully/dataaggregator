@@ -7,3 +7,15 @@ export {
   type PlanInput,
   type StepBudget,
 } from "./backfill.js";
+export {
+  ExtractError,
+  backoffMs,
+  classify,
+  fetchWithRetry,
+  parseMetaThrottle,
+  parseRetryAfter,
+  type Classification,
+  type FailureKind,
+  type FetchOptions,
+  type MetaThrottle,
+} from "./http.js";

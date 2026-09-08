@@ -65,6 +65,9 @@ importers:
 
   apps/api-edge:
     dependencies:
+      '@repo/contract':
+        specifier: workspace:*
+        version: link:../../packages/contract
       '@repo/extract':
         specifier: workspace:*
         version: link:../../packages/extract

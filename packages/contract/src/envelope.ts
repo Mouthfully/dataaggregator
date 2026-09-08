@@ -187,6 +187,21 @@ export const envelopeSchema = z.object({
     credits_used: z.number().int().nonnegative(),
     /** Bitemporal read: the data as the platform reported it on this date (section 2). */
     as_of: isoDate.optional(),
+    /**
+     * A DELIBERATE ADDITION TO SECTION 2's WRAPPER, made under section 13.3 rule 2 rather than
+     * smuggled in.
+     *
+     * The specification prints no pagination at all, and neither section 2 nor section 7 defines a
+     * multi-row response in the first place. But a read endpoint has to bound its result set -- an
+     * unbounded one is a memory limit waiting to be hit on the largest customer -- and a bounded
+     * result with no cursor is an endpoint that cannot return page two. The alternatives were a
+     * `Link` header, which JSON clients ignore, or an unbounded response, which is the failure it
+     * is meant to prevent.
+     *
+     * Absent when there is no further page, rather than null: "no more" and "did not say" are
+     * different, and only one of them should make a client fetch again.
+     */
+    next_cursor: z.string().min(1).optional(),
   }),
 });
 

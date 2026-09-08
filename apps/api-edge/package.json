@@ -19,8 +19,9 @@
     "wrangler": "catalog:"
   },
   "dependencies": {
-    "@repo/vault": "workspace:*",
+    "@repo/contract": "workspace:*",
+    "@repo/extract": "workspace:*",
     "@repo/oauth": "workspace:*",
-    "@repo/extract": "workspace:*"
+    "@repo/vault": "workspace:*"
   }
 }

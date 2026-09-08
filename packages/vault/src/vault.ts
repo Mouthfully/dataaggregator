@@ -92,10 +92,19 @@ export interface CredentialScope {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+/**
+ * The domain separation string is deliberately NOT the product name.
+ *
+ * This value is baked into the authentication tag of every credential ever sealed. Changing it makes
+ * every stored credential unopenable, so it has to outlive anything that might be renamed -- and the
+ * product name is explicitly unsettled (docs/marketplane/01-brand-identity.md). A name in here would
+ * be a latent data migration disguised as a string literal. `vault` is what this is, permanently.
+ *
+ * Purpose is included so a wrapped data key can never be presented as a credential, or the reverse,
+ * even within one row.
+ */
 function aad(scope: CredentialScope, purpose: "credential" | "dek"): Uint8Array {
-  // Purpose is included so a wrapped DEK can never be presented as a credential, or vice versa,
-  // even within the same row.
-  return encoder.encode(`marketplane:v1:${purpose}:${scope.workspaceId}:${scope.connectionId}`);
+  return encoder.encode(`vault:v1:${purpose}:${scope.workspaceId}:${scope.connectionId}`);
 }
 
 async function importKek(crypto: CryptoLike, kek: Uint8Array): Promise<CryptoKeyLike> {

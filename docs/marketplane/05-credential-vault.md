@@ -30,6 +30,13 @@ Worker would open it happily, because the bytes are valid. Different attack, dif
 purpose is in the binding too, so a wrapped data key cannot be presented as a credential even within
 one row.
 
+**The domain separation string is not the product name.** It is baked into the authentication tag of
+every credential ever sealed, so changing it makes every stored credential unopenable. It has to
+outlive anything that might be renamed, and the product name is explicitly unsettled. The brand guard
+caught this on the first commit that tried it, which is the clearest evidence so far that the guard
+earns its place: a product name in that literal would have been a latent data migration disguised as
+a string.
+
 **`crypto` is a parameter, never an ambient global**, for the same reason `siteUrl(env)` takes its
 environment. This package compiles into both the Next app and workerd; the two runtimes type their
 WebCrypto differently, and a package that reaches for a global typechecks under whichever config it

@@ -12,5 +12,17 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true
-  }
+  },
+
+  // Verbatim raw platform payloads (00-repo-map.md section 5). The binding exists here because
+  // @repo/payloads has to be tested against a REAL R2 implementation: the property it guarantees is
+  // that a large payload never enters the isolate, and a fake bucket that accepts a stream cannot
+  // demonstrate that. @cloudflare/vitest-pool-workers gives miniflare's real R2 for this binding.
+  "r2_buckets": [
+    {
+      "binding": "PAYLOADS",
+      "bucket_name": "payloads",
+      "preview_bucket_name": "payloads-preview"
+    }
+  ]
 }

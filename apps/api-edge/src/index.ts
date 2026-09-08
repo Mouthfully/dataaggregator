@@ -15,9 +15,13 @@
 
 import { handlePerformance } from "./performance.js";
 
-export interface Env {
-  readonly ENVIRONMENT?: string;
-}
+/**
+ * The bindings are declared once, in `env.d.ts`, as `Cloudflare.Env` -- the extension point both
+ * `wrangler types` and `cloudflare:test` use. This alias exists so the handler signature reads
+ * normally; adding a binding here instead would reintroduce the split that made the test `env`
+ * silently empty. See the note in `env.d.ts`.
+ */
+export type Env = Cloudflare.Env;
 
 export default {
   fetch(request) {

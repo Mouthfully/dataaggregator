@@ -13,11 +13,18 @@
  * `revenue` is a separate entry, not an alias: it means revenue as the ORDER SOURCE reports it --
  * Shopify, Stripe, an affiliate network -- which is the other side of the reconciliation in section
  * 4.2. Collapsing the two would destroy the discrepancy the product exists to explain.
+ *
+ * `sessions` is an ADDITION to `dbt_ad_reporting`, made deliberately under 13.3 rule 2 rather than
+ * smuggled in by a connector. The upstream package is ad-centric and has no analytics grain at all,
+ * while section 4.1's diagnostic tree asks "Which GA4 channel and landing page lost sessions?" and
+ * section 4.2's reconciliation lines GA4 up against the order source. A connector cannot answer
+ * either question with a dictionary that has no word for it.
  */
 export const METRICS = {
   spend: { unit: "currency", conversion: false },
   impressions: { unit: "count", conversion: false },
   clicks: { unit: "count", conversion: false },
+  sessions: { unit: "count", conversion: false },
   conversions: { unit: "count", conversion: true },
   conversions_value: { unit: "currency", conversion: true },
   revenue: { unit: "currency", conversion: false },

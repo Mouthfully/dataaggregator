@@ -34,6 +34,11 @@ catalog:
   # --- tooling ---
   "@biomejs/biome": 2.5.12
 
+  # The envelope is a runtime contract, not just a type: specification section 2 says the API
+  # "refuses to emit an unlabelled conversion count", and a TypeScript type refuses nothing at
+  # runtime. zod is that refusal, and it runs in workerd.
+  zod: 4.5.4
+
   # NOTE: only add a catalog entry when a package.json references it as "catalog:".
   # An unreferenced pin is worse than no pin: it reads as authoritative while the tree
   # actually resolves that package transitively at some other version.

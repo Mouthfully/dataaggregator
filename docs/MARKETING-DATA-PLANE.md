@@ -1453,7 +1453,10 @@ brand file says it is, and not before.
 
 ### 11A.11 Change log
 
-One line per change, with the date, as the update brief requires.
+One line per change, with the date, as the update brief requires. **This table is a subsection
+like any other, not a footer**: later decisions continue after it as 11A.12, 11A.13 and so on,
+each adding its line here. Numeric order holds; nothing is renumbered, because entries are cited
+by number from the design notes and the findings document.
 
 | Date | Entry |
 |---|---|
@@ -1469,6 +1472,68 @@ One line per change, with the date, as the update brief requires.
 | 2026-09-08 | 11A.10 Product name still unsettled; the name in `design/app/` is a placeholder, not a decision |
 | 2026-09-08 | Appendix C added: the action sheet |
 | 2026-09-08 | Appendix D added: consolidated reports |
+| 2026-09-08 | 11A.12 Four Thai sources verified as bring-your-own-credential and self-serve, and recorded as the SME shortlist; the bank leg established as absent from the public portals, narrowing 11A.9.2 |
+
+### 11A.12 The verified Thai shortlist, and what the bank portals do not publish (2026-09-08)
+
+11A.6 recorded an SME connector set whose API availability was **unverified for every row**. This
+entry verifies four of them and closes one open question in the negative. The full note is
+[`docs/marketplane/21-thai-connector-shortlist.md`](marketplane/21-thai-connector-shortlist.md).
+
+**Decision.** Four Thai sources are the **verified SME shortlist** — the sources known to satisfy
+non-negotiable 4 and platform-terms gate 1, ranked by remaining engineering rather than by market
+share.
+
+| Rank | Source | Credential | Status |
+|---|---|---|---|
+| 1 | **Opn Payments (Omise)** | HTTP Basic; merchant issues its own key from the dashboard, test keys marked `_test_` | Verified |
+| 2 | **ZORT (Zortout)** | `storename` + `apikey` + `apisecret`; merchant generates them in its own settings | Verified |
+| 3 | **Beam Checkout** | HTTP Basic; key self-managed by the merchant, playground and production separate | Verified |
+| 4 | **FlowAccount** | ⚠️ **Access model unconfirmed** — public portal, sandbox, published OpenAPI spec and SDK, but no statement on self-registration | Provisional |
+
+**Ranking on verified access, not on share, is the decision.** 11A.6's set was ordered by size, and
+its first entries all require someone else's permission. Self-serve access removes the long-lead
+approval that dominates connector cost, so it is the ordering that can be acted on. FlowAccount is
+fourth and provisional for one missing sentence; if the answer is "approval required" it leaves the
+shortlist and the set is three.
+
+**Three consequences, each binding.**
+
+- **ZORT rows carry `source: zort`.** ZORT mirrors Shopee, Lazada, TikTok Shop and LINE for the
+  merchant, so an order arriving through it is second-hand. Labelling such a row with the
+  originating marketplace would render a false statement under 11A.4, and `source_updated_at` is
+  the mirror's freshness, not the marketplace's.
+- **`raw` cannot be stored as returned for any of the four.** A charge carries cardholder name and
+  email; a mirrored order carries buyer name, phone and address. Section 3.2's hash-at-the-edge rule
+  was written for a write path; these are read paths that return personal data unbidden. This is
+  settled before the first of them is built, not during.
+- **Nothing here may be claimed before it is built.** None of the four may enter the claims list or
+  a logo strip until it exists, per 11A.10's neighbouring discipline and gate 18.
+
+**11A.9.2 is narrowed, not resolved.** Kasikornbank, SCB and Bangkok Bank all run public developer
+portals. What they publish is QR payment, remittance, slip verification, profile sharing, loans and
+authentication. **No business-account transaction feed appears on any of them** — so the open
+question is no longer "is there an API"; it is "will a bank provide one commercially", which has a
+different owner and a different timescale. Money arriving through a gateway is visible to this
+product; a bare PromptPay transfer into a bank account is not, and no engineering on this side
+changes that.
+
+**11A.9.1 is unchanged.** LINE MAN Wongnai's acquisition of FoodStory is confirmed, and merchant API
+access is described by third parties, but there is no public developer portal and no published
+reference. The point-of-sale category — where the after-fees number of 11A.2 comes from — remains a
+commercial conversation.
+
+**The gate is unchanged.** Tiered restatement backfill and the restatement webhook still precede any
+fifth connector. This entry reorders the queue; it does not move the queue. The ordering is
+convenient rather than costly: payments restate hard — a refund or chargeback rewrites last month's
+net revenue weeks later — and Opn and Beam both publish webhooks, so the restatement webhook gains a
+real first customer.
+
+**None of the four is storable today**, and that is by design working rather than an oversight.
+`ENTITY_TYPES` has no `order`; `METRICS` has a gross `revenue` but no `orders`, `net_revenue`, `fees`
+or `commission`; `SOURCES` has none of the four. `scripts/check-dictionary.mjs` fails the build until
+TypeScript and SQL move together, which makes the vocabulary a single deliberate change rather than
+four accidental ones.
 
 ## 12. Naming candidates
 

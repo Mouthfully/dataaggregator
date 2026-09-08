@@ -1,0 +1,24 @@
+{
+  "name": "@repo/tokens",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens.css": "./src/tokens.css"
+  },
+  "scripts": {
+    "prepare": "node scripts/build-tokens.mjs",
+    "build": "node scripts/build-tokens.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  },
+  "imports": {
+    "#generated": [
+      "./dist/tokens.generated.ts",
+      "./src/generated-fallback.ts"
+    ]
+  }
+}

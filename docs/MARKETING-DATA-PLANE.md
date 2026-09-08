@@ -1264,6 +1264,391 @@ The access lens recommended affiliate networks as the zero-friction flagship, an
 | Docs SEO no longer builds a developer API business | Medium | Zero-click at 68 percent and AI Overviews cutting first-position CTR by 58 percent (10.3) | Framework-default slot, marketplace tenancy, design partners |
 | Retention of low-ARPA prepaid accounts | Medium | Top-quartile NRR of 65 percent under 10 dollars ARPA | Committed tier from 299 dollars a month; scheduled runs above half of usage as a health metric |
 
+---
+
+## 11A. Decisions from the SME repositioning round (2026-09-08)
+
+Sections 11.1 to 11.11 resolved contradictions between the eight research lenses. What
+follows resolves a different kind of disagreement: between this document as written and
+the product design work that came after it. The design is evidence of intent, not a
+decision; the decisions are here.
+
+**These override earlier sections on the same points**, in the same way 11.1 to 11.11 do.
+Where an earlier section describes the agency-and-brand product, read it with 11A.1
+applied. Findings, competitor detail and the unverified connector inventory live in
+[`SME-POSITIONING-AND-FINDINGS.md`](SME-POSITIONING-AND-FINDINGS.md); this section carries
+only what was decided.
+
+### 11A.1 Primary customer and the message (2026-09-08)
+
+The message moves from "verified root cause over ad, analytics and search data, for
+agencies and brands" to **a replacement for a business-intelligence team, for small
+businesses, Thailand first but not Thailand only**.
+
+**Decision.** The primary customer is an **owner-run business with no analyst and no IT
+function** — café, bar, restaurant, guesthouse, online seller, multi-unit venue group.
+Agencies remain a secondary channel, not the design target.
+
+The correctness guarantee, the envelope of section 7 and the diagnostic engine of section
+4.1 are unchanged. They stop being the pitch and become the substance behind it: the
+reason an owner can trust a number they did not compute themselves. 11.9's narrowing —
+"verified root cause and an operated correctness guarantee", not "joins in one call" —
+still stands and is still what the product does.
+
+**What this contradicts, and must be reconciled before launch.** The `positioning` claim
+in `packages/brand/src/claims.ts` still states the agency-and-brand message, and
+`apps/web` renders it under test. That is a code change, deliberately not made in the same
+pass as this decision. See `docs/marketplane/19-sme-repositioning.md`.
+
+### 11A.2 Four product surfaces (2026-09-08)
+
+The design promises four surfaces. Each is decided here as in scope and given a home; none
+is built.
+
+| Surface | What it is | Spec home |
+|---|---|---|
+| **Dashboard** | Numbers **after fees, commission and discounts** — the net figure, not the gross the platform reports | Section 2 read surface; net requires the fee model in 11A.6 |
+| **Weekly action sheet** | Ranked actions with an impact estimate and a verification that runs the following week | Appendix C |
+| **Founder questions** | Unit economics, cohorts, forecast, scenario, pricing, cash | Section 4.1's diagnostic tree, widened past marketing questions |
+| **Consolidated reports** | Across units and channels, including a monthly investor update | Appendix D |
+
+**Decision.** All four are product surfaces, not marketing. "After fees" is the load-bearing
+word in the first row: a dashboard that reports platform-gross revenue to an owner who pays
+30% delivery commission is not a smaller truth, it is the wrong number, and it is the one
+number every incumbent in the findings document already shows.
+
+### 11A.3 LINE is a first-class delivery channel (2026-09-08)
+
+**Decision.** The morning brief, alerts, the action sheet and report summaries are all
+delivered to a **LINE Official Account**, with reply-to-ask. LINE is not a notification
+add-on; for the primary customer it is where the product is used, and email is the
+secondary channel.
+
+This is a delivery decision, not a write decision. 11.4's deferral of `/v1/audience` is
+untouched: nothing is executed on the customer's behalf on any channel.
+
+Cost is an open question — see 11A.9.
+
+### 11A.4 Provenance becomes a visible UI rule (2026-09-08)
+
+The envelope has carried `fetched_at`, `source_updated_at`, `restates_until` and
+`is_provisional` on every row since section 7. Until now that was an API contract.
+
+**Decision.** **Every figure a customer sees shows its source, the time it was fetched, and
+whether it is still provisional.** The data has always been there; showing it is now a rule
+of the design system rather than a choice per screen. A number with no provenance is a bug,
+not a simplification.
+
+### 11A.5 Measurement class and coverage are required (2026-09-08)
+
+This is a **new specification requirement**, and the sharpest one in this round.
+
+For a walk-in business, per-customer channel attribution is only partly possible. A café
+cannot tell you which of today's 180 covers saw the Meta ad. Reporting a channel number as
+though it could is the failure this product exists to refuse — the same failure as an
+unlabelled conversion count in section 2.
+
+**Decision.** Every insight and every founder-question answer carries a **measurement class**
+and a **coverage figure**.
+
+| Class | What it means | Sources |
+|---|---|---|
+| **Observed** | Directly counted | Source-tagged orders (delivery apps, OTAs, reservations, marketplaces), POS covers and tickets, Google Business Profile actions, ad platform reach and clicks |
+| **Matched** | A person linked to a channel | A channel-specific promo code or LINE coupon redeemed at the POS, a LINE OA follow from an ad QR, a loyalty phone number in the POS, a reservation phone, a platform customer id, or an offline-conversion upload to Meta or Google |
+| **Modelled** | Inferred, never claimed as counted | Channel contribution for anonymous walk-ins, from correlating daily spend and Business Profile actions with covers — controlling for weekday, weather and holidays — or from geo or time-split lift tests |
+
+**Coverage is displayed, not implied.** Return rates are measured only on identified covers
+and must say so: *"measured on 41% of covers"*. The design already writes it this way.
+
+**Two rules that follow.**
+
+- Any matched-class identifier is **hashed at the edge and never stored raw**. Section 3.2's
+  rule applies unchanged, and offline-conversion uploads are the case it was written for.
+- **Do not promise Google store-visit conversions.** They need a volume of ad clicks and
+  store visits that a single venue does not have. Offering them to a one-site café would be
+  selling a number that will not arrive.
+
+The design system gains a **"how we know"** element: the class label plus the coverage
+figure, attached to the figure rather than to a footnote.
+
+### 11A.6 The SME connector set is a later phase (2026-09-08)
+
+**Decision.** 11.9's first connectors are **unchanged**: Google Ads, GA4, Search Console,
+Meta, one affiliate network, SERP bought wholesale. The kickoff's gate is also unchanged —
+tiered restatement backfill and the restatement webhook before any fifth connector.
+
+The SME set below is a **later phase**, recorded so it can be planned against. Every one is
+**bring-your-own-credential and read-only**. API availability is **unverified** unless a
+line says otherwise; the inventory, with what must be established per connector, is in the
+findings document.
+
+| Category | Sources |
+|---|---|
+| Point of sale | FoodStory by Wongnai, Ocha (Shopee), StoreHub, Loyverse, Qashier |
+| Delivery | GrabFood, LINE MAN, foodpanda |
+| Marketplaces | Shopee, Lazada, TikTok Shop, Shopify (own site) |
+| Travel | Agoda, Booking.com |
+| Messaging and CRM | LINE OA |
+| Payments and banking | Stripe, PromptPay, K PLUS and SCB business accounts |
+| Accounting | FlowAccount, PEAK, Xero, QuickBooks |
+| Presence | Google Business Profile |
+
+**Two of these block their own category and are named as open questions, not risks.**
+**FoodStory / Wongnai API access** blocks the point-of-sale category, which is where the
+"after fees" number comes from. **Thai bank feed access** blocks payments and banking, and
+is the largest unverified item in this round.
+
+### 11A.7 Consolidated reports and units (2026-09-08)
+
+**Decision.** An organisation may have **units** — kitchens, bars, an event space, outlets —
+and the schema consolidates across them. The specification is Appendix D. Reports carry a
+**restatement note** listing which sources are still provisional, which is the envelope
+surfacing in a PDF.
+
+### 11A.8 Platform terms and PDPA, restated because the new surfaces make drift easier (2026-09-08)
+
+Nothing here is new. It is restated because a founder-question surface that answers "how do
+my margins compare?" is one sentence away from breaking the rule that matters most.
+
+**Decision, unchanged and now harder to violate by accident:**
+
+- **No aggregation or benchmarking across customers**, ever. A founder-question answer
+  compares a business **only with its own history**. There is no peer set, no industry
+  average, no percentile. Meta 3.a.iv and Google's redistribution clause make this a
+  termination risk, and section 15's "no cross-workspace aggregation ever" is the rule.
+- The **Meta client-list obligation** (Platform Terms 5.b.ii.2) and **PDPA** apply to any
+  identified-customer data, which the matched class of 11A.5 now makes routine rather than
+  hypothetical.
+
+### 11A.9 Open questions from this round (2026-09-08)
+
+Recorded, not resolved. None may be built on without being answered first.
+
+1. **API access for FoodStory / Wongnai.** Blocks the point-of-sale category.
+2. **Thai bank feed access** (K PLUS, SCB business accounts). Blocks payments and banking.
+3. **LINE OA messaging cost at scale.** 11A.3 makes LINE the primary channel; a per-message
+   cost across a daily brief plus alerts is a COGS line nobody has priced.
+4. **Whether credit pricing fits an owner-run business at all.** 11.3 decided two units —
+   per connected account per month, plus credits — for agencies. An owner who wants one
+   number a day may need a flat monthly plan.
+5. **Volume thresholds for modelled attribution.** 11A.5 permits the modelled class; below
+   some daily-cover count the correlation is noise, and that floor is unmeasured.
+6. **Which two design partners validate the action-sheet verification loop** (Appendix C).
+7. **Whether the LINE Official Account may be read as a data source**, not only written to.
+   11A.3 decides it as a delivery channel; its Insight API also returns followers, delivery
+   statistics and demographics on a merchant-issued channel access token. Added 2026-09-08 by
+   11A.14.
+
+### 11A.10 The product name remains unsettled (2026-09-08)
+
+**Decision. Unchanged, and restated because this round is the first time a name has appeared
+in a committed file.** The application design in `design/app/` carries a product name and a
+matching MCP hostname. **That is a design placeholder and not a decision.** Founder decision
+2 is still open, `packages/brand` still holds `productNameSettled: false`, and
+`allowedClaims()` still withholds the name from every rendered surface.
+
+The brand guard exempts `design/**` and `docs/**` so a mockup can carry a working name and a
+document can discuss one. Everywhere else the guard fails the build, which is the intended
+behaviour and has already caught the name in a cryptographic AAD and a database role name
+(`docs/marketplane/05-credential-vault.md`, `11-scheduler-entry-point.md`).
+
+**Nothing may read a product name out of the design file.** The name is settled when the
+brand file says it is, and not before.
+
+### 11A.11 Change log
+
+One line per change, with the date, as the update brief requires. **This table is a subsection
+like any other, not a footer**: later decisions continue after it as 11A.12, 11A.13 and so on,
+each adding its line here. Numeric order holds; nothing is renumbered, because entries are cited
+by number from the design notes and the findings document.
+
+| Date | Entry |
+|---|---|
+| 2026-09-08 | 11A.1 Primary customer becomes the owner-run small business; agencies secondary. Correctness guarantee and diagnostic engine retained as substance |
+| 2026-09-08 | 11A.2 Four product surfaces in scope: after-fees dashboard, weekly action sheet, founder questions, consolidated reports |
+| 2026-09-08 | 11A.3 LINE OA is a first-class delivery channel with reply-to-ask; no change to the write deferral |
+| 2026-09-08 | 11A.4 Source, fetch time and provisional state are a visible UI rule on every figure |
+| 2026-09-08 | 11A.5 **New requirement.** Measurement class (observed / matched / modelled) and coverage on every insight and answer; no store-visit promise; matched identifiers hashed at the edge |
+| 2026-09-08 | 11A.6 SME connector set recorded as a later phase; first connectors and the fifth-connector gate unchanged |
+| 2026-09-08 | 11A.7 Units and consolidated reports; reports carry a restatement note |
+| 2026-09-08 | 11A.8 No cross-customer aggregation or benchmarking, restated; Meta client list and PDPA apply to matched data |
+| 2026-09-08 | 11A.9 Six open questions recorded, none resolved |
+| 2026-09-08 | 11A.10 Product name still unsettled; the name in `design/app/` is a placeholder, not a decision |
+| 2026-09-08 | Appendix C added: the action sheet |
+| 2026-09-08 | Appendix D added: consolidated reports |
+| 2026-09-08 | 11A.12 Four Thai sources verified as bring-your-own-credential and self-serve, and recorded as the SME shortlist; the bank leg established as absent from the public portals, narrowing 11A.9.2 |
+| 2026-09-08 | 11A.13 Connectors ranked by who is reviewed and by the customer's plan precondition; POSPOS opens the point-of-sale category and narrows 11A.9.1 to FoodStory; Semrush and Ahrefs recorded as agency-channel, not SME |
+| 2026-09-08 | 11A.14 **Launch connector set substituted.** GA4, WooCommerce, Shopify and a partner-named payments source; Google Ads, Search Console and Meta move behind the fifth-connector gate. Overrides 11.9 and 11A.6 on first connectors. LINE OA as a source added to 11A.9 as question 7 |
+
+### 11A.12 The verified Thai shortlist, and what the bank portals do not publish (2026-09-08)
+
+11A.6 recorded an SME connector set whose API availability was **unverified for every row**. This
+entry verifies four of them and closes one open question in the negative. The full note is
+[`docs/marketplane/21-thai-connector-shortlist.md`](marketplane/21-thai-connector-shortlist.md).
+
+**Decision.** Four Thai sources are the **verified SME shortlist** — the sources known to satisfy
+non-negotiable 4 and platform-terms gate 1, ranked by remaining engineering rather than by market
+share.
+
+| Rank | Source | Credential | Status |
+|---|---|---|---|
+| 1 | **Opn Payments (Omise)** | HTTP Basic; merchant issues its own key from the dashboard, test keys marked `_test_` | Verified |
+| 2 | **ZORT (Zortout)** | `storename` + `apikey` + `apisecret`; merchant generates them in its own settings | Verified |
+| 3 | **Beam Checkout** | HTTP Basic; key self-managed by the merchant, playground and production separate | Verified |
+| 4 | **FlowAccount** | ⚠️ **Access model unconfirmed** — public portal, sandbox, published OpenAPI spec and SDK, but no statement on self-registration | Provisional |
+
+**Ranking on verified access, not on share, is the decision.** 11A.6's set was ordered by size, and
+its first entries all require someone else's permission. Self-serve access removes the long-lead
+approval that dominates connector cost, so it is the ordering that can be acted on. FlowAccount is
+fourth and provisional for one missing sentence; if the answer is "approval required" it leaves the
+shortlist and the set is three.
+
+**Three consequences, each binding.**
+
+- **ZORT rows carry `source: zort`.** ZORT mirrors Shopee, Lazada, TikTok Shop and LINE for the
+  merchant, so an order arriving through it is second-hand. Labelling such a row with the
+  originating marketplace would render a false statement under 11A.4, and `source_updated_at` is
+  the mirror's freshness, not the marketplace's.
+- **`raw` cannot be stored as returned for any of the four.** A charge carries cardholder name and
+  email; a mirrored order carries buyer name, phone and address. Section 3.2's hash-at-the-edge rule
+  was written for a write path; these are read paths that return personal data unbidden. This is
+  settled before the first of them is built, not during.
+- **Nothing here may be claimed before it is built.** None of the four may enter the claims list or
+  a logo strip until it exists, per 11A.10's neighbouring discipline and gate 18.
+
+**11A.9.2 is narrowed, not resolved.** Kasikornbank, SCB and Bangkok Bank all run public developer
+portals. What they publish is QR payment, remittance, slip verification, profile sharing, loans and
+authentication. **No business-account transaction feed appears on any of them** — so the open
+question is no longer "is there an API"; it is "will a bank provide one commercially", which has a
+different owner and a different timescale. Money arriving through a gateway is visible to this
+product; a bare PromptPay transfer into a bank account is not, and no engineering on this side
+changes that.
+
+**11A.9.1 is unchanged.** LINE MAN Wongnai's acquisition of FoodStory is confirmed, and merchant API
+access is described by third parties, but there is no public developer portal and no published
+reference. The point-of-sale category — where the after-fees number of 11A.2 comes from — remains a
+commercial conversation.
+
+**The gate is unchanged.** Tiered restatement backfill and the restatement webhook still precede any
+fifth connector. This entry reorders the queue; it does not move the queue. The ordering is
+convenient rather than costly: payments restate hard — a refund or chargeback rewrites last month's
+net revenue weeks later — and Opn and Beam both publish webhooks, so the restatement webhook gains a
+real first customer.
+
+**None of the four is storable today**, and that is by design working rather than an oversight.
+`ENTITY_TYPES` has no `order`; `METRICS` has a gross `revenue` but no `orders`, `net_revenue`, `fees`
+or `commission`; `SOURCES` has none of the four. `scripts/check-dictionary.mjs` fails the build until
+TypeScript and SQL move together, which makes the vocabulary a single deliberate change rather than
+four accidental ones.
+
+### 11A.13 Access models, the point-of-sale opening, and the plan precondition (2026-09-08)
+
+11A.12 ranked four sources on verified access. This entry generalises the rule that produced that
+ranking and applies it to the remaining connectors. The full note is
+[`docs/marketplane/22-access-models.md`](marketplane/22-access-models.md).
+
+**Decision. Connectors are ranked on two tests, in this order.**
+
+1. **Who is reviewed.** A **key-paste** source — the customer creates a key in their own account and
+   hands it over — has no reviewer and no calendar. An **OAuth-app** source puts *this company* in
+   front of a platform reviewer, and that review is the schedule. Key paste also satisfies gate 1 by
+   construction, where an OAuth source satisfies it only by design.
+2. **Whether the customer can meet the precondition.** *Easy for us* is not *available to our
+   customer*. A key-paste source whose key exists only on an expensive plan is trivial to build and
+   serves nobody this product sells to.
+
+**The point-of-sale category is open; the dominant vendor is not.** **POSPOS**, a Thai system, issues
+an API key to the merchant — the owner copies a token from its own settings, emails it for review,
+and receives a key — and **every documented endpoint is read-only**. Rate limit 300 calls per 10
+seconds, with key deactivation as the stated penalty for exceeding it.
+
+**11A.9.1 is narrowed accordingly.** It said FoodStory / Wongnai access *"blocks the point-of-sale
+category"*. That conflated a vendor with a category: FoodStory is blocked and remains where the
+volume is, but the category now has a floor. Point of sale is where the after-fees number of 11A.2
+and the covers-and-tickets grain of 11A.5 come from, so this was the largest hole in the SME product.
+
+**Two corrections to 11A.6.**
+
+- Its point-of-sale row reads "FoodStory by Wongnai, Ocha (Shopee), StoreHub, Loyverse, Qashier"
+  under a Thailand-first heading. **StoreHub is Malaysian, Qashier Singaporean and Loyverse
+  Cypriot.** They are *used in* Thailand, which is a different claim, and the founder's
+  local-outreach advantage applies only to the Thai ones. **POSPOS joins the row.**
+- **Semrush and Ahrefs are agency-channel connectors, not SME connectors.** Semrush's API needs a
+  plan at roughly $549 a month plus separately purchased units at an unpublished price; Ahrefs meters
+  in units from Lite upward and sells more only on Enterprise. Both are trivial to integrate and
+  unavailable to the owner-run business of 11A.1. Section 11.2's decision to buy SERP wholesale from
+  DataForSEO under the gate 2 vendor-key exception is what serves that customer, and it stands.
+
+**Two access facts recorded, and one non-fact.** Microsoft Advertising issues a universal developer
+token on request, immediately and without review — cheaper access than Google Ads, which is tiered
+per token. **Microsoft's SOAP freeze and decommission dates remain unverified**: nothing read this
+round sources them, so section 9's deferral keeps its outcome and not its stated reason. **Search
+Console's `webmasters.readonly` sensitivity is still unconfirmed**; it was attempted and could not be
+closed.
+
+**The hash-at-the-edge finding of 11A.12 extends to this leg.** POSPOS returns member data and
+payment records, and Loyverse's token is unscoped by its own documentation. `raw` cannot be stored as
+returned for a point-of-sale source either.
+
+### 11A.14 The launch connector set is substituted (2026-09-08)
+
+**This overrides 11.9 and 11A.6 on which connectors ship first.** 11A.6 said 11.9's first connectors
+were unchanged. That was decided before 11A.12 and 11A.13 established what access actually costs, and
+it does not survive them. The full note is
+[`docs/marketplane/23-launch-connector-substitution.md`](marketplane/23-launch-connector-substitution.md).
+
+**Decision. The launch set becomes:**
+
+| Slot | Source | Credential | State |
+|---|---|---|---|
+| 1 | **GA4** | OAuth, our application, Google verification — a cost already sunk | **Built** |
+| 2 | **WooCommerce** | Merchant-issued consumer key and secret, permission `Read` | Not built |
+| 3 | **Shopify** | Merchant-issued custom app, Admin API access token | Not built |
+| 4 | **A payments source — Opn or Stripe** | Merchant-issued key either way | **Reserved for the first design partner to name**, per the rule that the fourth connector is the partners' choice |
+
+**Google Ads, Search Console and Meta move behind the fifth-connector gate.** The gate itself is
+untouched: tiered restatement backfill and the restatement webhook still precede any fifth connector,
+and four is therefore the budget. This decision spends it on commerce rather than on advertising.
+
+**This is a substitution, not an extension**, and the reason is arithmetic before it is strategy. A
+launch set of four is all the gate allows; adding three commerce sources to the existing four would
+have broken the gate by accident. Making the swap explicit is the point of this entry.
+
+**What it buys.** Slots 2, 3 and 4 carry **no reviewer and no approval calendar**. Slot 1's calendar
+is already spent. The set can be built as fast as it can be written, which is true of no other
+combination available.
+
+**What it costs, stated as decisions rather than risks.**
+
+- **No ad spend at launch.** The set computes revenue, revenue after fees, margin and channel mix. It
+  computes **no ROAS, no CAC and no spend-derived figure at all**. For a specification built around
+  ad diagnostics that is a capability loss, accepted deliberately.
+- **Meta's App Review and Business Verification start now, in parallel.** Meta is the largest ad
+  platform for the primary customer and its gate is calendar rather than engineering, so it runs
+  alongside the restatement work rather than after it.
+- **The dictionary change becomes the next piece of code.** `ENTITY_TYPES` has no `order`; `METRICS`
+  has a gross `revenue` and no `orders`, `net_revenue`, `fees` or `commission`. **Slots 2, 3 and 4
+  are each blocked on it**, which promotes it from a recorded gap to the immediate task. It stays one
+  guard-enforced two-file change.
+
+**11A.1 is not changed.** The primary customer remains the owner-run small business. What narrows is
+the **launch beachhead**, to the online-seller subset of it — a beachhead is not an ICP, and the
+distinction is the difference between sequencing and a second repositioning in one week. If the first
+design partners turn out to be walk-in venues, slot 4 becomes POSPOS rather than a payment gateway.
+
+**A standing rule, recorded because it is what produced this entry.** **A competitor's connector
+catalogue is a menu, not evidence of access.** Supermetrics lists Shopee, Lazada and LINE Ads; that
+establishes that Supermetrics holds partner agreements and nothing about whether those platforms are
+open to us. Every source is derived from the platform's own terms, never from the fact that somebody
+else carries it.
+
+**And the corollary, which is the more useful half.** The most Thailand-relevant source that passes
+the access filter — the **LINE Official Account's Insight API**, on a merchant-issued channel access
+token — appears in **neither** aggregator's catalogue. Aggregators carry the commoditised bundle, so
+a competitor's list is a good place to find what is cheap and a poor place to find what is valuable.
+Reading from LINE OA is **not decided here**: 11A.3 makes it a delivery channel, and turning it into
+a source is recorded as open question 11A.9.7.
+
 ## 12. Naming candidates
 
 Method note: I searched each shortlisted name for martech/data conflicts, checked all five TLDs with the Vercel domain tool, and hit `registry.npmjs.org/<name>` for each (404 = available). `.com` is effectively saturated across every candidate I tested — 29 of 30 `.com` variants I checked were registered — so I weighted `.dev` / `.io` / `.ai` instead. Availability below is only what I actually observed; the 25 longlist names were not individually conflict-checked unless noted.
@@ -1511,6 +1896,7 @@ The research treated the product as an API and an MCP server. Four findings forc
 
 **Build stack for this surface** (section 7 covers the data plane): Next.js on Vercel for the marketing site and dashboard, Supabase for Postgres, authentication, row-level security and storage, Cloudflare Workers, Workflows and Queues for the public API edge and scheduled pulls. Brand details live in one brand file and every colour, radius, shadow and type value lives in one tokens stylesheet that the marketing site, the dashboard and generated documents all consume. The kickoff prompt in `docs/MARKETPLANE-KICKOFF-PROMPT.md` makes both of those non-negotiable.
 
+
 ## Appendix A. The research workflow script
 
 This is the exact script that produced sections 3, 10 and 11. It runs in the Claude Code Workflow tool with `args: {"today": "<ISO date>"}`.
@@ -1678,3 +2064,111 @@ return { lenses: good, critic, gaps: gapResults.filter(Boolean) }
 - **Section writers**: 12 Opus-class agents, one per lens and one per gap, each turned a research result (plus its fact-check where one exists) into a section under fixed rules (no invented numbers, checker wins, unverifiable figures marked).
 - **Known limits**: Reddit, G2 and Capterra were unreachable from the research environment, so operator complaints come from Hacker News, GitHub and vendor pages. Several checkers exhausted their search budget before verifying every claim; those are marked "(unverified)". Funding figures are single-source throughout. Everything with a date is as of 2026-09-07.
 
+## Appendix C. The action sheet
+
+Added 2026-09-08 by decision 11A.2. Nothing here is built.
+
+The action sheet is the weekly output an owner acts on. It is the difference between a
+dashboard that reports and a product that is worth paying for, and it is the surface most
+easily made dishonest, because an impact estimate is a claim about the future.
+
+### C.1 What every action carries
+
+| Field | Rule |
+|---|---|
+| **Title** | The action, in the imperative, specific enough to do without interpretation |
+| **Why** | **One line of evidence**, drawn from the customer's own numbers |
+| **When** | When to do it |
+| **Effort** | What it costs the owner to do |
+| **Source systems** | Which connected sources the evidence came from |
+| **Impact estimate** | A point **or a range**, in the customer's currency |
+| **Verification rule** | What will be checked the following week, and against what |
+
+Actions are **ordered by value**, not by confidence, recency or category.
+
+### C.2 The verification loop
+
+**Every action is re-checked the following week, and the result is shown whether it worked
+or not.** This is the load-bearing mechanism of the whole surface.
+
+An impact estimate nobody checks is a marketing number. An impact estimate that is checked
+in public, including when it was wrong, is the operated correctness guarantee of 11.9
+applied to advice rather than to data — and it is the one thing in this product that
+compounds, because a customer who has seen four of five predictions land will act on the
+fifth.
+
+The verification runs on the same envelope as everything else: it reports the outcome with
+its own measurement class and coverage per 11A.5, and it is `is_provisional` until the
+window it measures has closed.
+
+### C.3 Nothing is executed
+
+**No action is carried out on the customer's behalf.** Writes stay deferred per 11.4. The
+sheet tells an owner what to do; the owner does it, in the platform's own console.
+
+This is a constraint, not a limitation to be removed later without a decision: an executed
+action cannot be verified against a counterfactual, and the write path carries the consent
+obligations section 3.2 exists to handle.
+
+### C.4 What is not decided
+
+- How impact is estimated per action type. The design shows both points and ranges; which
+  applies when is unspecified.
+- What the sheet does when last week's verification says an action **did not** work — whether
+  it is retried, suppressed, or fed back into ranking.
+- Who the two design partners are that validate this loop (open question 11A.9.6).
+
+---
+
+## Appendix D. Consolidated reports
+
+Added 2026-09-08 by decision 11A.7. Nothing here is built.
+
+### D.1 Units
+
+An organisation may hold **units** — kitchens, bars, an event space, separate outlets — and
+the schema consolidates across them. A venue group with three kitchens and one bar is one
+workspace with four units, not four workspaces.
+
+This is a schema requirement on the tenancy model, which today has organisations and
+workspaces (`supabase/migrations/…_tenancy.sql`) and no unit below them. **It is not built,
+and the migration is not written.**
+
+The tenant boundary does not move. Consolidation happens **inside one workspace, across its
+own units** — never across workspaces, which 11A.8 and section 15 forbid absolutely.
+
+### D.2 Report types
+
+| Report | For |
+|---|---|
+| Weekly owner brief | The owner |
+| Monthly investor update | Investors |
+| P&L by unit and channel | The owner and the accountant |
+| Bank loan pack | A lender |
+| Board deck | A board |
+| Accountant export | The accountant's own system |
+
+### D.3 Delivery
+
+PDF and email **on the 1st**; a LINE summary; a live web version with a **scoped investor
+view**; Google Sheets; Xero; QuickBooks; FlowAccount; the API.
+
+The scoped investor view is a permission question, not a rendering one: an investor sees a
+report, never the workspace. It has no design and no schema yet.
+
+### D.4 The restatement note
+
+**Every report carries a note listing which sources are still provisional.**
+
+This is the envelope surfacing in a document. A monthly investor update sent on the 1st is
+reporting a month whose Meta conversions have not finished restating (section 7's 28-day
+clock), and a report that presents those figures as final is wrong in exactly the way this
+product refuses to be wrong. The note is not a disclaimer; it is the same
+`is_provisional` and `restates_until` the API returns, rendered for a reader.
+
+### D.5 What is not decided
+
+- The unit schema, its RLS, and how a unit relates to a connection.
+- Whether a report is generated from the envelope store directly or from a separate
+  reporting model.
+- The scoped investor view's permission model.

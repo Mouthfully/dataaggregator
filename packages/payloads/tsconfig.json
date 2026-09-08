@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // This package uses WHATWG streams -- ReadableStream, CompressionStream -- which both target
+    // runtimes provide but `lib: ["ES2022"]` alone does not declare. Same note and same caveat as
+    // packages/connections: the standalone check is the weaker one, and the real proof is that this
+    // package is imported from apps/api-edge and typechecks there under @cloudflare/workers-types
+    // with no DOM lib at all. It is also TESTED there against a real R2 binding, because a fake
+    // bucket cannot demonstrate the 128 MB property this module exists to guarantee.
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}

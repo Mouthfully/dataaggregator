@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+/* The single source of truth for design tokens. Resolved through the workspace package
+   export map (@repo/tokens -> "./tokens.css"), not a relative path, so the dependency is
+   declared and Vercel's skip-unaffected build detection can see it. */
+@import "@repo/tokens/tokens.css";
+
+/* Tailwind v4 is CSS-first: there is no tailwind.config.js.
+   `@theme inline` maps Tailwind's theme onto the custom properties defined by the imported
+   token file rather than re-declaring their values here -- utilities emit
+   `var(--mp-ground)` and the token file stays the only place a value is written.
+
+   EVERY ENTRY BELOW IS A `var()`, NEVER A LITERAL. That is what makes kickoff non-negotiable 2
+   ("nothing hard-codes a hex value outside this file") true of the app as well as of the token
+   file, and it is what the tokens guard checks. Adding a colour here by writing its value would
+   pass every test and quietly create a second source of truth. */
+@theme inline {
+  /* surfaces */
+  --color-ground: var(--mp-ground);
+  --color-surface: var(--mp-surface);
+  --color-surface-subtle: var(--mp-surface-subtle);
+  --color-surface-inset: var(--mp-surface-inset);
+  --color-surface-inverse: var(--mp-surface-inverse);
+
+  /* ink */
+  --color-ink: var(--mp-ink);
+  --color-ink-muted: var(--mp-ink-muted);
+  --color-ink-subtle: var(--mp-ink-subtle);
+  --color-ink-faint: var(--mp-ink-faint);
+  --color-ink-on-inverse: var(--mp-ink-on-inverse);
+  --color-ink-inverse-strong: var(--mp-ink-inverse-strong);
+  --color-ink-on-accent: var(--mp-ink-on-accent);
+
+  /* lines */
+  --color-line: var(--mp-line);
+  --color-line-soft: var(--mp-line-soft);
+
+  /* accent */
+  --color-accent: var(--mp-accent);
+  --color-accent-hover: var(--mp-accent-hover);
+  --color-accent-on-dark: var(--mp-accent-on-dark);
+
+  /* type -- the artboard's pairing, chosen by the founder over section 14's inverted one */
+  --font-display: var(--mp-font-display);
+  --font-body: var(--mp-font-body);
+  --font-mono: var(--mp-font-mono);
+
+  /* radii */
+  --radius-xl: var(--mp-radius-xl);
+  --radius-pill: var(--mp-radius-pill);
+}

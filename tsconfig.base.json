@@ -1,0 +1,43 @@
+{
+  // Shared compiler options only.
+  //
+  // This file deliberately declares NO "lib" and NO "types". apps/web needs the DOM lib and
+  // apps/api-edge needs @cloudflare/workers-types.
+  //
+  // Be precise about why, because the obvious test misleads: with skipLibCheck (set below) a
+  // single tsconfig loading BOTH does compile. The failure is not a declaration clash, it is
+  // silent wrongness at the use site -- whichever declaration wins, code typechecks against the
+  // wrong runtime's shape for fetch, Request, Response and caches, and `caches.default` (a
+  // Workers API with no DOM equivalent) is the one that surfaces it, as TS2339. A green run
+  // from merging them proves nothing; the split is what makes each app typecheck against the
+  // runtime it actually executes in.
+  //
+  // Shared packages must typecheck under both and therefore must not reference either runtime's
+  // globals.
+  //
+  // No "composite" / project references: Next.js does not understand them
+  // (vercel/next.js#67372), which is also why internal packages ship raw TypeScript.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    // Internal packages ship raw TypeScript and are compiled by the CONSUMER, so a relative
+    // import has to name a file that exists on disk: `./claims.ts`, not `./claims.js`. A `.js`
+    // specifier resolves fine under tsc, vitest and esbuild and fails only `next build`, which is
+    // the last step before deploy -- so the extension that is true is the one to allow.
+    // Safe here because every project in this workspace sets noEmit.
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  }
+}

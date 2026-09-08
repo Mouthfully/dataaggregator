@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // NO DOM lib. @cloudflare/workers-types redeclares fetch, Request, Response and caches,
+  // and the two type sets cannot coexist in one program -- which is the whole reason this
+  // app has its own tsconfig rather than sharing one with apps/web.
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["@cloudflare/workers-types"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "env.d.ts", "vitest.config.ts"]
+}

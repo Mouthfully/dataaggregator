@@ -1,0 +1,394 @@
+/*
+ * tokens.css -- the single source of truth for every design value in the product.
+ *
+ * Nothing outside this file may hard-code a colour, radius, shadow, spacing step, type
+ * size or font family. Consumers:
+ *   - apps/web        @import "@repo/tokens/tokens.css" -> Tailwind v4 `@theme inline`
+ *   - Workers/Deno    ../scripts/build-tokens.mjs parses THIS FILE into a TS map for the
+ *                     surfaces that cannot use a stylesheet (rendered emails, PDF exports)
+ * The generator parses this file textually, so keep one `--token: value;` declaration per
+ * line inside the three :root blocks. Comments and blank lines are ignored.
+ *
+ * Provenance: every value is extracted verbatim from design/marketplane/Main.dc.html
+ * (the artboard, as shipped and founder-confirmed). See docs/marketplane/00-repo-map.md
+ * section 3 and docs/marketplane/00-recon-reports.md section 2 for usage counts per value.
+ * Three carve-outs, each labelled inline below:
+ *   1. The three semantic status hues, which the artboard leaves undefined -- taken from
+ *      specification section 14, which is the only place in the corpus that binds a
+ *      semantic to a colour.
+ *   2. Two dark-mode values with no source anywhere. Both marked INVENTED.
+ *   3. One artboard accessibility defect fixed rather than copied (--mp-code-punct).
+ *
+ * Contrast ratios quoted in comments are computed, not asserted. They differ from the
+ * recon report in the second decimal (e.g. accent on white is 5.17:1 here, 5.12:1 there);
+ * no pass/fail verdict changes, so no decision moves.
+ */
+
+:root {
+  /* ---------------------------------------------------------------------------------
+   * TYPEFACES -- the one block to edit if the brand register is ever reversed.
+   *
+   * These three faces are the artboard as shipped, CONFIRMED BY THE FOUNDER: Young Serif
+   * for display (weight 400, on 21 elements -- every h1 and h2, the wordmark, the pricing
+   * numerals), Figtree for body, Geist Mono for code and metadata.
+   *
+   * Specification section 14 proposed something else and is now overruled: it claimed
+   * "the serif display moment from the first draft was dropped in favour of one
+   * consistent bold voice" and specified extra-bold Geist (800) for display, Geist for
+   * body, with Inter Tight and JetBrains Mono as fallbacks. The artboard falsifies that
+   * claim -- the serif is the entire display voice -- and section 14's 800 weight is not
+   * even loadable from the artboard's own font link, which tops out at 700.
+   *
+   * The names are SEMANTIC (display / body / mono), never the face name, so reversing the
+   * register is a change to these three lines plus the Google Fonts <link>, and no
+   * consumer file changes. The required link is:
+   *   https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap
+   * --------------------------------------------------------------------------------- */
+  --mp-font-display: "Young Serif", Georgia, serif;
+  --mp-font-body: "Figtree", "Helvetica Neue", Arial, sans-serif;
+  --mp-font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* ---------------------------------------------------------------------------------
+   * GROUND AND SURFACES
+   * The artboard is a cool system: the ground is blue-leaning (R244 G246 B250). Section
+   * 14's warm #FBFBF8 ground is NOT used -- grafting it onto cool slate hairlines is a
+   * visible temperature clash.
+   * --------------------------------------------------------------------------------- */
+  --mp-ground: #f4f6fa; /* page background */
+  --mp-surface: #ffffff; /* cards, white bands */
+  --mp-surface-subtle: #f9fafc; /* inset rail on a card, e.g. the demo chip row */
+  --mp-surface-inset: #f4f6fa; /* assistant bubble, placeholder fill; == ground by design */
+  --mp-surface-inverse: #0f172a; /* dark bands: alerts section, footer, the dark card */
+  --mp-surface-placeholder: #e2e8f0; /* dashed logo-tile fill */
+
+  /* ---------------------------------------------------------------------------------
+   * INK RAMP
+   * Four steps on light plus the pair that sits on an inverse surface.
+   * --------------------------------------------------------------------------------- */
+  --mp-ink: #0f172a; /* primary. 17.85:1 on white */
+  --mp-ink-muted: #475569; /* body/secondary. 7.58:1 on white */
+  /* Tertiary. 4.76:1 on white, but only 4.40:1 on --mp-ground, which misses AA -- so for
+     body text put it on a card, not directly on the page ground. */
+  --mp-ink-subtle: #64748b;
+  /* 2.56:1 on white: NEVER text on a light surface. Dark-surface ink and dashed rules only. */
+  --mp-ink-faint: #94a3b8;
+  --mp-ink-on-inverse: #cbd5e1; /* body ink on --mp-surface-inverse. 12.02:1 */
+  --mp-ink-inverse-strong: #ffffff; /* headings on --mp-surface-inverse. 17.85:1 */
+  --mp-ink-on-accent: #ffffff; /* the only ink that goes on --mp-accent */
+
+  /* ---------------------------------------------------------------------------------
+   * HAIRLINES -- a deliberate two-step hierarchy, not one line colour.
+   * --------------------------------------------------------------------------------- */
+  --mp-line: #cbd5e1; /* structural: card border, section rule */
+  --mp-line-soft: #e2e8f0; /* interior: list-row dividers inside a card */
+  --mp-line-dashed: #94a3b8; /* the 1px dashed placeholder outline */
+
+  /* ---------------------------------------------------------------------------------
+   * ACCENT -- exactly one, and there is deliberately no sibling.
+   *
+   * This colour and only this colour fills a button, a CTA panel or the wordmark. The
+   * rule comes from specification section 14; the hex comes from the artboard, where
+   * #2563EB already does exactly that job (10 background uses, all CTA-adjacent).
+   * Section 14's #4F46FF is not used.
+   *
+   * --mp-accent does NOT change between themes: the brand colour is the brand colour on
+   * any ground. On a dark ground it is only 3.45:1, so accent TEXT AND MARKS on any dark
+   * surface -- in either theme, including the always-dark code panel -- use
+   * --mp-accent-on-dark. Filled controls keep --mp-accent + --mp-ink-on-accent everywhere.
+   * --------------------------------------------------------------------------------- */
+  --mp-accent: #2563eb; /* 5.17:1 on white -- passes AA as text */
+  --mp-accent-hover: #1d4ed8; /* 6.70:1 on white */
+  --mp-accent-on-dark: #93c5fd; /* 9.90:1 on #0F172A */
+
+  /* ---------------------------------------------------------------------------------
+   * STATUS HUES -- CARVE-OUT 1. Source: specification section 14, not the artboard.
+   *
+   * The artboard is silent here rather than contradictory: it is a marketing page with no
+   * product state to express. The product needs the distinction on day one (provisional
+   * vs final numbers, restatement markers, suppression pushes), and section 14 is the only
+   * place in the corpus that binds a semantic to a colour.
+   *
+   * HARD CONSTRAINTS:
+   *   - Status marks only: dots, left rules, icon tiles, badges on a tinted ground, chart
+   *     series. NEVER a button, never a CTA panel, never the brand. That role belongs to
+   *     --mp-accent alone.
+   *   - All three fail AA as text on white, so every label uses the paired -ink token.
+   *   - There is no competitor colour. Section 11.5 drops the market module, so section
+   *     14's "coral for competitor alerts" and "amber for competitors" halves are dead.
+   *     Coral's surviving role is writes; amber's is restatements.
+   * --------------------------------------------------------------------------------- */
+  --mp-read: #0fb5a0; /* reads: connection health, ingest, final-not-provisional. 2.58:1 on white */
+  --mp-read-ink: #0b7f72; /* the label pair. 4.89:1 on white */
+  --mp-write: #ff5a5f; /* writes: audience push, suppression export. 3.05:1 on white */
+  --mp-write-ink: #c7373b; /* the label pair. 5.20:1 on white */
+  --mp-restate: #ffb020; /* restatements: is_provisional, revised_from, restates_until. 1.83:1 on white */
+  --mp-restate-ink: #8a5a00; /* the label pair. 5.93:1 on white */
+
+  /* ---------------------------------------------------------------------------------
+   * CODE PANEL
+   * --mp-code-surface is theme-invariant: the code panel is dark in BOTH themes, so it
+   * cannot ride on --mp-surface-inverse (which flips to a light band under dark mode and
+   * would take every colour below with it).
+   *
+   * CARVE-OUT 3, a real artboard defect fixed rather than copied: the artboard sets code
+   * punctuation -- the shell `$` and boolean literals -- in #2563EB on #0F172A, which is
+   * 3.45:1 and fails AA. The fix pattern is already in the artboard (it uses #93C5FD for
+   * the "Watch" eyebrow on the same ground), so the token takes #93C5FD at 9.90:1.
+   * --------------------------------------------------------------------------------- */
+  --mp-code-surface: #0f172a; /* dark in both themes */
+  --mp-code-ink: #e2e8f0; /* base code text. 14.48:1 */
+  --mp-code-key: #94a3b8; /* JSON keys. 6.96:1 */
+  --mp-code-string: #bbf7d0; /* string literals. 14.73:1 */
+  --mp-code-number: #22c55e; /* numeric literals. 7.83:1 */
+  --mp-code-punct: #93c5fd; /* shell $ and booleans. 9.90:1 -- NOT the artboard's #2563EB */
+
+  /* ---------------------------------------------------------------------------------
+   * RADII -- eight distinct values, all from the artboard.
+   * --------------------------------------------------------------------------------- */
+  --mp-radius-xs: 6px; /* the 22px logo-strip tile */
+  --mp-radius-sm: 8px; /* the 26px integration logo tile */
+  --mp-radius-md: 12px; /* cause rows inside the answer */
+  --mp-radius-lg: 16px; /* alert rows */
+  --mp-radius-xl: 20px; /* THE card radius -- 12 uses: cards, panels, code block */
+  --mp-radius-pill: 999px; /* 20 uses: every button, chip, dot and numbered circle */
+  --mp-radius-bubble-user: 18px 18px 4px 18px; /* user chat bubble */
+  --mp-radius-bubble-agent: 4px 18px 18px 18px; /* thinking and answer bubbles */
+
+  /* ---------------------------------------------------------------------------------
+   * ELEVATION -- there is exactly ONE shadow in the artboard and it is used twice: the
+   * hero demo card and the developer code panel. Every other card is border-only. Do not
+   * blanket-shadow cards; that flattens the hierarchy where the hero demo is the only
+   * lifted object above the fold. Section 14's "white cards with ... a soft shadow"
+   * overstates what the artboard does.
+   * --------------------------------------------------------------------------------- */
+  --mp-shadow-lift: 0 24px 60px rgba(15, 23, 42, 0.12);
+
+  /* ---------------------------------------------------------------------------------
+   * TYPE SCALE -- 21 sizes. The comment on each names the artboard element it came from,
+   * because a few of the inherited names read wider than their real role.
+   * --------------------------------------------------------------------------------- */
+  --mp-text-hero: clamp(48px, 6.5vw, 78px); /* h1 -- the only fluid value in the system */
+  --mp-text-cta: 72px; /* the final CTA band h2 */
+  --mp-text-h2: 52px; /* all eight section h2 */
+  --mp-text-numeral: 42px; /* plan credit numeral */
+  --mp-text-h3: 28px; /* three-people card title */
+  --mp-text-h4: 24px; /* four-views card title */
+  --mp-text-wordmark: 22px; /* wordmark, footer wordmark, plan price */
+  --mp-text-lead: 20px; /* hero subhead and cause-share numeral */
+  --mp-text-subhead: 19px; /* how-it-works step title */
+  --mp-text-lg: 18px; /* section lead paragraphs */
+  --mp-text-btn-lg: 17px; /* 56px and 58px button labels */
+  --mp-text-base: 16px; /* card body, alert title, answer headline, 52px button */
+  --mp-text-bubble: 15.5px; /* user chat bubble */
+  --mp-text-md: 15px; /* nav links, 44/48px button labels, step body */
+  --mp-text-body-sm: 14.5px; /* security-item body */
+  --mp-text-sm: 14px; /* section eyebrows, alert body, cause text, footer body */
+  --mp-text-chip: 13.5px; /* question chip */
+  --mp-text-caps: 13px; /* uppercase eyebrow caps */
+  --mp-text-mono-sm: 12.5px; /* install chips, thinking steps, code pre */
+  --mp-text-xs: 12px; /* micro-caps, /v1/* paths, demo status, copyright */
+  --mp-text-mono-xs: 11.5px; /* alert timestamp and kind */
+
+  /* ---------------------------------------------------------------------------------
+   * LEADING
+   * --------------------------------------------------------------------------------- */
+  --mp-leading-none: 1; /* plan credit numeral */
+  --mp-leading-hero: 1; /* h1 and the 72px CTA h2 (numerically == none) */
+  --mp-leading-h2: 1.05; /* all eight 52px h2 */
+  --mp-leading-h3: 1.15; /* card titles */
+  --mp-leading-tight: 1.2; /* cause-share numeral */
+  --mp-leading-snug: 1.35; /* alert title */
+  --mp-leading-bubble: 1.4; /* chat bubbles, plan note */
+  --mp-leading-body: 1.45; /* dense body */
+  --mp-leading-relaxed: 1.5; /* default body -- the most used leading in the file */
+  --mp-leading-code: 1.65; /* the code <pre> */
+
+  /* ---------------------------------------------------------------------------------
+   * TRACKING -- negative on display type, positive on uppercase caps. This is the one
+   * typographic instruction section 14 and the artboard agree on.
+   * --------------------------------------------------------------------------------- */
+  --mp-tracking-hero: -0.02em; /* h1 and the 72px CTA h2 */
+  --mp-tracking-h2: -0.015em; /* all eight 52px h2 */
+  --mp-tracking-caps: 0.04em; /* uppercase eyebrows */
+
+  /* ---------------------------------------------------------------------------------
+   * WEIGHTS -- four, and no 800. Display type is set at 400, not bold: every Young Serif
+   * headline in the artboard is explicitly font-weight 400. Do not add an 800 without
+   * also changing the Google Fonts link, which does not request one.
+   * --------------------------------------------------------------------------------- */
+  --mp-weight-regular: 400; /* all display type */
+  --mp-weight-medium: 500;
+  --mp-weight-semibold: 600;
+  --mp-weight-bold: 700; /* the most used weight: buttons, eyebrows, titles */
+
+  /* ---------------------------------------------------------------------------------
+   * SPACING -- a 2px-based scale. Named by pixel value, because the artboard's steps are
+   * not a geometric ramp and renaming them to t-shirt sizes would lose the mapping.
+   * --------------------------------------------------------------------------------- */
+  --mp-space-2: 2px;
+  --mp-space-3: 3px;
+  --mp-space-4: 4px; /* most frequent gap in the file */
+  --mp-space-6: 6px;
+  --mp-space-8: 8px;
+  --mp-space-10: 10px;
+  --mp-space-12: 12px;
+  /* Question-chip x-padding. Present in the artboard, absent from the recon summary's
+     step list -- added so the chip does not have to hard-code a pixel value. */
+  --mp-space-13: 13px;
+  --mp-space-14: 14px;
+  --mp-space-16: 16px;
+  --mp-space-18: 18px;
+  --mp-space-20: 20px;
+  --mp-space-22: 22px;
+  --mp-space-24: 24px;
+  --mp-space-26: 26px; /* also the hero secondary button's x-padding */
+  --mp-space-28: 28px;
+  --mp-space-30: 30px;
+  --mp-space-32: 32px;
+  --mp-space-40: 40px;
+  --mp-space-56: 56px;
+  --mp-space-64: 64px;
+  --mp-space-72: 72px;
+  --mp-space-96: 96px;
+  --mp-space-104: 104px;
+
+  /* ---------------------------------------------------------------------------------
+   * PAGE RHYTHM
+   * --------------------------------------------------------------------------------- */
+  --mp-container: 1280px; /* 13 uses, always with --mp-gutter horizontally */
+  --mp-gutter: 40px; /* every full-width section's x-padding */
+  --mp-section-y: 96px; /* 8 uses -- the section rhythm */
+  --mp-section-y-cta: 104px; /* the final CTA band, the one section that breaks it */
+
+  /* ---------------------------------------------------------------------------------
+   * CONTROLS -- a five-step height scale. All controls are --mp-radius-pill.
+   * --------------------------------------------------------------------------------- */
+  --mp-control-sm: 44px; /* nav "Start free" */
+  --mp-control-md: 48px; /* "All 22 integrations" */
+  --mp-control-lg: 52px; /* "Set your first watch", "Read the docs" */
+  --mp-control-xl: 56px; /* hero CTAs */
+  --mp-control-2xl: 58px; /* the final CTA button */
+  --mp-control-pad-sm: 0 20px;
+  --mp-control-pad-md: 0 22px;
+  --mp-control-pad-lg: 0 24px;
+  --mp-control-pad-xl: 0 28px; /* hero primary; the hero secondary uses --mp-space-26 */
+  --mp-control-pad-2xl: 0 30px;
+
+  /* ---------------------------------------------------------------------------------
+   * MOTION -- both keyframes are reproduced verbatim below the theme blocks.
+   * --------------------------------------------------------------------------------- */
+  --mp-motion-blink: mp-blink 1s steps(1) infinite; /* the 2x16px caret */
+  --mp-motion-rise: mp-rise 0.4s ease-out; /* the answer bubble */
+}
+
+/*
+ * DARK THEME
+ *
+ * Derived from the inverse surfaces the artboard already ships across its alerts section,
+ * code panel, footer and dark card: #0F172A ground, #CBD5E1 body ink, #FFFFFF headings,
+ * #93C5FD accent. Every value below is an artboard hex reused in a new role, EXCEPT the
+ * two marked INVENTED, which have no source anywhere in the corpus.
+ *
+ * Only changed tokens are redefined. Anything absent here is theme-invariant on purpose:
+ * the accent trio, the code panel, all radii, type, spacing, rhythm and motion.
+ *
+ * The two blocks below are byte-identical by design -- the media query so the OS default
+ * wins, the attribute selector so an explicit toggle wins in both directions. The
+ * generator asserts they stay identical and fails the build if they drift.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* Surfaces */
+    --mp-ground: #0f172a;
+    /* INVENTED -- no artboard source. Tailwind slate-800, the in-family continuation of
+       the ramp the artboard already uses for eleven of its thirteen hexes. */
+    --mp-surface: #1e293b;
+    --mp-surface-subtle: #0f172a; /* an inset rail recedes on dark, so it takes the ground */
+    --mp-surface-inset: #0f172a; /* == ground, as in light */
+    --mp-surface-inverse: #f4f6fa; /* the inverse of dark is the light ground */
+    --mp-surface-placeholder: #334155;
+
+    /* Ink */
+    --mp-ink: #ffffff; /* 14.63:1 on --mp-surface */
+    --mp-ink-muted: #cbd5e1; /* 9.85:1 on --mp-surface */
+    --mp-ink-subtle: #94a3b8; /* 5.71:1 on --mp-surface */
+    --mp-ink-faint: #64748b; /* 3.07:1 -- still never body text, as in light */
+    --mp-ink-on-inverse: #475569; /* the inverse surface is light here, so ink flips */
+    --mp-ink-inverse-strong: #0f172a;
+    /* --mp-ink-on-accent stays #FFFFFF: the accent fill does not change. */
+
+    /* Hairlines */
+    --mp-line: #334155; /* INVENTED -- no artboard source. Tailwind slate-700. */
+    --mp-line-soft: #1e293b; /* the invented surface value, reused */
+    --mp-line-dashed: #475569;
+
+    /* Status: the hues themselves are unchanged, but the darkened label pairs are built
+       for white and collapse on dark (#0B7F72 is 3.65:1 on the ground). On a dark ground
+       the base hue IS the readable label -- 6.92:1, 5.85:1 and 9.76:1 -- so each -ink
+       token resolves to its own hue. No new value is introduced. */
+    --mp-read-ink: #0fb5a0;
+    --mp-write-ink: #ff5a5f;
+    --mp-restate-ink: #ffb020;
+  }
+}
+
+:root[data-theme="dark"] {
+  /* Surfaces */
+  --mp-ground: #0f172a;
+  /* INVENTED -- no artboard source. Tailwind slate-800, the in-family continuation of
+     the ramp the artboard already uses for eleven of its thirteen hexes. */
+  --mp-surface: #1e293b;
+  --mp-surface-subtle: #0f172a; /* an inset rail recedes on dark, so it takes the ground */
+  --mp-surface-inset: #0f172a; /* == ground, as in light */
+  --mp-surface-inverse: #f4f6fa; /* the inverse of dark is the light ground */
+  --mp-surface-placeholder: #334155;
+
+  /* Ink */
+  --mp-ink: #ffffff; /* 14.63:1 on --mp-surface */
+  --mp-ink-muted: #cbd5e1; /* 9.85:1 on --mp-surface */
+  --mp-ink-subtle: #94a3b8; /* 5.71:1 on --mp-surface */
+  --mp-ink-faint: #64748b; /* 3.07:1 -- still never body text, as in light */
+  --mp-ink-on-inverse: #475569; /* the inverse surface is light here, so ink flips */
+  --mp-ink-inverse-strong: #0f172a;
+  /* --mp-ink-on-accent stays #FFFFFF: the accent fill does not change. */
+
+  /* Hairlines */
+  --mp-line: #334155; /* INVENTED -- no artboard source. Tailwind slate-700. */
+  --mp-line-soft: #1e293b; /* the invented surface value, reused */
+  --mp-line-dashed: #475569;
+
+  /* Status: the hues themselves are unchanged, but the darkened label pairs are built
+     for white and collapse on dark (#0B7F72 is 3.65:1 on the ground). On a dark ground
+     the base hue IS the readable label -- 6.92:1, 5.85:1 and 9.76:1 -- so each -ink
+     token resolves to its own hue. No new value is introduced. */
+  --mp-read-ink: #0fb5a0;
+  --mp-write-ink: #ff5a5f;
+  --mp-restate-ink: #ffb020;
+}
+
+/*
+ * KEYFRAMES -- both reproduced verbatim from the artboard's <style> block. Referenced
+ * through --mp-motion-blink and --mp-motion-rise; the names are part of the token values,
+ * so they cannot be renamed independently.
+ */
+@keyframes mp-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes mp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

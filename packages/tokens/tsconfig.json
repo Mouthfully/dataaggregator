@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // No DOM lib and no @cloudflare/workers-types, on purpose. This package is consumed by
+  // apps/web (DOM) and apps/api-edge (workerd), so it must typecheck with neither runtime's
+  // globals in scope. That is the constraint the monorepo layout exists to enforce.
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["src/**/*.ts"]
+}

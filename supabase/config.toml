@@ -1,0 +1,38 @@
+# Supabase project configuration.
+#
+# `project_id` is the local project name the CLI uses; it is NOT the hosted project ref, which is
+# supplied by `supabase link` and lives outside the repository. It is deliberately neutral rather
+# than named after the product, because the product name is not settled -- see
+# docs/marketplane/01-brand-identity.md. Renaming it later is a one-line change with no data
+# consequence, unlike the hosted ref.
+project_id = "marketplane"
+
+[db]
+port = 54322
+major_version = 16
+
+[db.migrations]
+schema_paths = []
+
+[auth]
+enable_signup = true
+enable_confirmations = true
+
+# No site_url or additional_redirect_urls here. Both need the domain, which is unresolved, and both
+# are read at runtime from the environment (see packages/brand's siteUrl). Committing a guess would
+# put a wrong redirect URI in front of Google's OAuth verification, which specification section 3.5
+# records as unbounded -- documented at 3-5 days, observed at over ten weeks. Restarting it is the
+# most expensive avoidable mistake in the plan.
+
+[api]
+enabled = true
+port = 54321
+# `app` is deliberately absent: PostgREST exposes only what is listed here, and the tenancy helpers
+# in `app` are a privilege boundary, not an API. The two functions the edge needs are in `public`.
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[studio]
+enabled = true
+port = 54323

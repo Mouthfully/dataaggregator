@@ -31,6 +31,11 @@ catalog:
   # Do not bump it without bumping the pool first.
   vitest: 4.1.11
 
+  # apps/web renders its page with renderToStaticMarkup and asserts on the text, so the tests need
+  # JSX transformed. This is the smallest thing that does it; no jsdom, because the assertions are
+  # about strings and a DOM would be a dependency bought for nothing.
+  "@vitejs/plugin-react": 5.1.2
+
   # --- tooling ---
   "@biomejs/biome": 2.5.12
 

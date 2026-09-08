@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { apiUrl, brand, formatAddress, siteUrl } from "./brand.js";
-import { CLAIMS, FORBIDDEN_CLAIMS, allowedClaims, withheldClaims } from "./claims.js";
+import { apiUrl, brand, formatAddress, siteUrl } from "./brand.ts";
+import { CLAIMS, FORBIDDEN_CLAIMS, allowedClaims, withheldClaims } from "./claims.ts";
 
 describe("the brand file", () => {
   it("has every field a page, email or invoice needs to render", () => {

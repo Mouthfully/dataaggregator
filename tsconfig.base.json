@@ -32,6 +32,12 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    // Internal packages ship raw TypeScript and are compiled by the CONSUMER, so a relative
+    // import has to name a file that exists on disk: `./claims.ts`, not `./claims.js`. A `.js`
+    // specifier resolves fine under tsc, vitest and esbuild and fails only `next build`, which is
+    // the last step before deploy -- so the extension that is true is the one to allow.
+    // Safe here because every project in this workspace sets noEmit.
+    "allowImportingTsExtensions": true,
     "noEmit": true
   }
 }

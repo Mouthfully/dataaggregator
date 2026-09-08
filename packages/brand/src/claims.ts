@@ -17,7 +17,7 @@
  * memory.
  */
 
-import { type Brand, brand } from "./brand.js";
+import { type Brand, brand } from "./brand.ts";
 
 type BrandField = keyof Brand;
 

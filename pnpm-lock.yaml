@@ -64,6 +64,10 @@ importers:
         version: 7.0.2
 
   apps/api-edge:
+    dependencies:
+      '@repo/vault':
+        specifier: workspace:*
+        version: link:../../packages/vault
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
@@ -145,6 +149,18 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
+
+  packages/vault:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.1
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@22.20.1)(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0))
 
 packages:
 

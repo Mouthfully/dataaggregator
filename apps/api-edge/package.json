@@ -17,5 +17,8 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"
+  },
+  "dependencies": {
+    "@repo/vault": "workspace:*"
   }
 }

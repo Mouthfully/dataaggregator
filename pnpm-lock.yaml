@@ -158,6 +158,9 @@ importers:
       '@repo/contract':
         specifier: workspace:*
         version: link:../contract
+      '@repo/extract':
+        specifier: workspace:*
+        version: link:../extract
     devDependencies:
       typescript:
         specifier: 'catalog:'

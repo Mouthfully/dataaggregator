@@ -1,7 +1,13 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2022"],
+    // The client half uses WHATWG globals that both target runtimes provide -- fetch, Response,
+    // RequestInit, URL -- but that `lib: ["ES2022"]` alone does not declare. "DOM" is the smallest
+    // lib declaring them, and it is used HERE ONLY: internal packages ship raw TypeScript and are
+    // compiled under the CONSUMER's tsconfig, so this does not leak. The same note and the same
+    // caveat as packages/connections/tsconfig.json -- the real proof is that this package
+    // typechecks from apps/api-edge under @cloudflare/workers-types with no DOM lib at all.
+    "lib": ["ES2022", "DOM"],
     "types": [],
     "noEmit": true
   },

@@ -1434,6 +1434,10 @@ Recorded, not resolved. None may be built on without being answered first.
 5. **Volume thresholds for modelled attribution.** 11A.5 permits the modelled class; below
    some daily-cover count the correlation is noise, and that floor is unmeasured.
 6. **Which two design partners validate the action-sheet verification loop** (Appendix C).
+7. **Whether the LINE Official Account may be read as a data source**, not only written to.
+   11A.3 decides it as a delivery channel; its Insight API also returns followers, delivery
+   statistics and demographics on a merchant-issued channel access token. Added 2026-09-08 by
+   11A.14.
 
 ### 11A.10 The product name remains unsettled (2026-09-08)
 
@@ -1474,6 +1478,7 @@ by number from the design notes and the findings document.
 | 2026-09-08 | Appendix D added: consolidated reports |
 | 2026-09-08 | 11A.12 Four Thai sources verified as bring-your-own-credential and self-serve, and recorded as the SME shortlist; the bank leg established as absent from the public portals, narrowing 11A.9.2 |
 | 2026-09-08 | 11A.13 Connectors ranked by who is reviewed and by the customer's plan precondition; POSPOS opens the point-of-sale category and narrows 11A.9.1 to FoodStory; Semrush and Ahrefs recorded as agency-channel, not SME |
+| 2026-09-08 | 11A.14 **Launch connector set substituted.** GA4, WooCommerce, Shopify and a partner-named payments source; Google Ads, Search Console and Meta move behind the fifth-connector gate. Overrides 11.9 and 11A.6 on first connectors. LINE OA as a source added to 11A.9 as question 7 |
 
 ### 11A.12 The verified Thai shortlist, and what the bank portals do not publish (2026-09-08)
 
@@ -1584,6 +1589,65 @@ closed.
 **The hash-at-the-edge finding of 11A.12 extends to this leg.** POSPOS returns member data and
 payment records, and Loyverse's token is unscoped by its own documentation. `raw` cannot be stored as
 returned for a point-of-sale source either.
+
+### 11A.14 The launch connector set is substituted (2026-09-08)
+
+**This overrides 11.9 and 11A.6 on which connectors ship first.** 11A.6 said 11.9's first connectors
+were unchanged. That was decided before 11A.12 and 11A.13 established what access actually costs, and
+it does not survive them. The full note is
+[`docs/marketplane/23-launch-connector-substitution.md`](marketplane/23-launch-connector-substitution.md).
+
+**Decision. The launch set becomes:**
+
+| Slot | Source | Credential | State |
+|---|---|---|---|
+| 1 | **GA4** | OAuth, our application, Google verification — a cost already sunk | **Built** |
+| 2 | **WooCommerce** | Merchant-issued consumer key and secret, permission `Read` | Not built |
+| 3 | **Shopify** | Merchant-issued custom app, Admin API access token | Not built |
+| 4 | **A payments source — Opn or Stripe** | Merchant-issued key either way | **Reserved for the first design partner to name**, per the rule that the fourth connector is the partners' choice |
+
+**Google Ads, Search Console and Meta move behind the fifth-connector gate.** The gate itself is
+untouched: tiered restatement backfill and the restatement webhook still precede any fifth connector,
+and four is therefore the budget. This decision spends it on commerce rather than on advertising.
+
+**This is a substitution, not an extension**, and the reason is arithmetic before it is strategy. A
+launch set of four is all the gate allows; adding three commerce sources to the existing four would
+have broken the gate by accident. Making the swap explicit is the point of this entry.
+
+**What it buys.** Slots 2, 3 and 4 carry **no reviewer and no approval calendar**. Slot 1's calendar
+is already spent. The set can be built as fast as it can be written, which is true of no other
+combination available.
+
+**What it costs, stated as decisions rather than risks.**
+
+- **No ad spend at launch.** The set computes revenue, revenue after fees, margin and channel mix. It
+  computes **no ROAS, no CAC and no spend-derived figure at all**. For a specification built around
+  ad diagnostics that is a capability loss, accepted deliberately.
+- **Meta's App Review and Business Verification start now, in parallel.** Meta is the largest ad
+  platform for the primary customer and its gate is calendar rather than engineering, so it runs
+  alongside the restatement work rather than after it.
+- **The dictionary change becomes the next piece of code.** `ENTITY_TYPES` has no `order`; `METRICS`
+  has a gross `revenue` and no `orders`, `net_revenue`, `fees` or `commission`. **Slots 2, 3 and 4
+  are each blocked on it**, which promotes it from a recorded gap to the immediate task. It stays one
+  guard-enforced two-file change.
+
+**11A.1 is not changed.** The primary customer remains the owner-run small business. What narrows is
+the **launch beachhead**, to the online-seller subset of it — a beachhead is not an ICP, and the
+distinction is the difference between sequencing and a second repositioning in one week. If the first
+design partners turn out to be walk-in venues, slot 4 becomes POSPOS rather than a payment gateway.
+
+**A standing rule, recorded because it is what produced this entry.** **A competitor's connector
+catalogue is a menu, not evidence of access.** Supermetrics lists Shopee, Lazada and LINE Ads; that
+establishes that Supermetrics holds partner agreements and nothing about whether those platforms are
+open to us. Every source is derived from the platform's own terms, never from the fact that somebody
+else carries it.
+
+**And the corollary, which is the more useful half.** The most Thailand-relevant source that passes
+the access filter — the **LINE Official Account's Insight API**, on a merchant-issued channel access
+token — appears in **neither** aggregator's catalogue. Aggregators carry the commoditised bundle, so
+a competitor's list is a good place to find what is cheap and a poor place to find what is valuable.
+Reading from LINE OA is **not decided here**: 11A.3 makes it a delivery channel, and turning it into
+a source is recorded as open question 11A.9.7.
 
 ## 12. Naming candidates
 

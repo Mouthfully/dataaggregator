@@ -1479,6 +1479,7 @@ by number from the design notes and the findings document.
 | 2026-09-08 | 11A.12 Four Thai sources verified as bring-your-own-credential and self-serve, and recorded as the SME shortlist; the bank leg established as absent from the public portals, narrowing 11A.9.2 |
 | 2026-09-08 | 11A.13 Connectors ranked by who is reviewed and by the customer's plan precondition; POSPOS opens the point-of-sale category and narrows 11A.9.1 to FoodStory; Semrush and Ahrefs recorded as agency-channel, not SME |
 | 2026-09-08 | 11A.14 **Launch connector set substituted.** GA4, WooCommerce, Shopify and a partner-named payments source; Google Ads, Search Console and Meta move behind the fifth-connector gate. Overrides 11.9 and 11A.6 on first connectors. LINE OA as a source added to 11A.9 as question 7 |
+| 2026-09-08 | 11A.15 The payload archive **drops** contact data rather than hashing it; an allow-list per source, fail closed on an undeclared source; a source needing redaction may not use the streaming path |
 
 ### 11A.12 The verified Thai shortlist, and what the bank portals do not publish (2026-09-08)
 
@@ -1648,6 +1649,42 @@ token — appears in **neither** aggregator's catalogue. Aggregators carry the c
 a competitor's list is a good place to find what is cheap and a poor place to find what is valuable.
 Reading from LINE OA is **not decided here**: 11A.3 makes it a delivery channel, and turning it into
 a source is recorded as open question 11A.9.7.
+
+### 11A.15 What the payload archive may keep (2026-09-08)
+
+Section 3.2 and the kickoff both say contact data is *"hashed at the edge and never stored raw"*.
+Until 11A.14 that cost nothing, because every source in the dictionary returns aggregate data and
+the payload archive of `17-payload-store.md` could keep platform responses verbatim. The launch
+connector set returns **orders**, and verbatim became a leak. The note is
+[`docs/marketplane/25-payload-redaction.md`](marketplane/25-payload-redaction.md).
+
+**Decision, in four parts.**
+
+- **Every source declares a policy, and an undeclared source cannot store a payload at all.** The
+  store refuses rather than defaulting. This is what makes the rule fail closed, and it puts the
+  decision in front of the next connector's author before their bytes go anywhere.
+- **Redaction is an allow-list.** Only declared keys survive, at any depth. A deny-list has to
+  predict what a platform calls a phone number — WooCommerce says `billing.phone`, Stripe says
+  `billing_details.phone` — and the first field a platform adds ships unredacted. An allow-list
+  makes a new field go **missing** instead: a bug report rather than a notification to a regulator.
+- **The archive DROPS, it does not hash.** *"Hashed at the edge"* governs the **write** path — the
+  offline-conversion upload of section 3.2, deferred by 11.4 — where the platform dictates an
+  unsalted SHA-256 of a normalised value so its hashing matches ours. Storing that same hash in the
+  archive would build a database of pseudonyms with no consumer, and an unsalted hash of an email
+  address is reversible by anyone holding a list of email addresses. Where a person-level join is
+  needed later, for 11A.5's matched class, the identifier is hashed on the **row** path when that
+  path is designed — never preserved in the archive as a side effect of having once been fetched.
+- **A source that needs redaction may not use the streaming path.** Redaction requires parsing;
+  streaming exists so the isolate never holds the payload. Both cannot be true, so such a source
+  buffers under the existing cap or stores nothing. Enforced at the call, not documented.
+
+**The limit of the rule, recorded because it is easy to over-read.** This removes **fields by key
+name**. It does not inspect **values**. A source whose personal data sits inside a value under a
+legitimately kept key is not protected by it — **Search Console's query strings are exactly that
+shape**, free text a person typed, under a key no keep-list could drop without losing the row. That
+source is declared verbatim and relies on Google's own anonymity threshold upstream, which is a
+dependency on someone else's behaviour rather than a property of this system. A value-level rule is
+separate work and is not claimed here.
 
 ## 12. Naming candidates
 

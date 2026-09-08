@@ -1480,6 +1480,7 @@ by number from the design notes and the findings document.
 | 2026-09-08 | 11A.13 Connectors ranked by who is reviewed and by the customer's plan precondition; POSPOS opens the point-of-sale category and narrows 11A.9.1 to FoodStory; Semrush and Ahrefs recorded as agency-channel, not SME |
 | 2026-09-08 | 11A.14 **Launch connector set substituted.** GA4, WooCommerce, Shopify and a partner-named payments source; Google Ads, Search Console and Meta move behind the fifth-connector gate. Overrides 11.9 and 11A.6 on first connectors. LINE OA as a source added to 11A.9 as question 7 |
 | 2026-09-08 | 11A.15 The payload archive **drops** contact data rather than hashing it; an allow-list per source, fail closed on an undeclared source; a source needing redaction may not use the streaming path |
+| 2026-09-08 | 11A.16 Webhook egress: platform data leaves a workspace only to an endpoint that workspace's own operator configured; signing secrets are derived and never stored; delivery is at-least-once with the event id as the idempotency key |
 
 ### 11A.12 The verified Thai shortlist, and what the bank portals do not publish (2026-09-08)
 
@@ -1685,6 +1686,40 @@ shape**, free text a person typed, under a key no keep-list could drop without l
 source is declared verbatim and relies on Google's own anonymity threshold upstream, which is a
 dependency on someone else's behaviour rather than a property of this system. A value-level rule is
 separate work and is not claimed here.
+
+### 11A.16 Webhook egress, and what may leave a workspace (2026-09-08)
+
+The restatement webhook of section 4.2 is **the first thing in this system that sends platform data
+somewhere rather than answering a request for it.** Section 15's "no cross-workspace aggregation
+ever" and platform-terms gate 10 were both written for reads, and inheriting their answer rather
+than giving one would be the drift 11A.8 exists to prevent. The note is
+[`docs/marketplane/27-webhook-delivery.md`](marketplane/27-webhook-delivery.md).
+
+**Decision, in four parts.**
+
+- **Egress is to the workspace's own endpoint and nowhere else.** A delivery carries one workspace's
+  rows to a URL configured for that workspace by an operator of it. There is no path by which one
+  workspace's data reaches another's endpoint, and a tenant cannot create or repoint an endpoint
+  itself — minting a signing secret is an account-management action under section 15, not a row a
+  tenant writes. **HTTPS only**: a signature proves origin, not confidentiality.
+- **Signing secrets are derived, never stored.** An endpoint's secret is computed from a service key
+  plus the endpoint's id and its `secret_version`, so a database dump — a backup, a read replica, a
+  support export — contains no signing material. The service key therefore lives only where the
+  delivery worker runs, and per-endpoint versions mean one customer's endpoint rotates without
+  rotating everyone's.
+- **Delivery is at-least-once, and the event id is the idempotency key.** A worker that delivers and
+  dies before recording will deliver again. The alternative loses events instead of duplicating
+  them, and a receiver dedupes on an id far more easily than it notices an absence.
+- **A malformed event is never delivered.** A payload that fails `restatementEventSchema` is refused
+  before it is sent, because a false statement about a customer's data delivered to their systems is
+  worse than one that never arrives.
+
+**One limitation is recorded rather than hidden.** A workspace may have **one active endpoint**. The
+outbox carries one delivery state per event, so several endpoints would mean an event delivered
+twice and recorded once — losing an outcome and retrying neither. Fan-out needs a per-(event,
+endpoint) delivery row, which is not built; the configuration is made impossible rather than allowed
+to half-work. Section 4.2 promises a webhook, not fan-out, so nothing in the specification is
+narrowed by this.
 
 ## 12. Naming candidates
 

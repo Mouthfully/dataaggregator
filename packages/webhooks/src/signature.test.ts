@@ -66,6 +66,23 @@ describe("signing and verifying a delivery", () => {
     expect(await verifySignature({ secret, body: BODY, header, now: later })).toBe(false);
   });
 
+  it("rejects a captured delivery whose timestamp was swapped for a fresh one", async () => {
+    // THE ASSERTION THAT PROVES THE TIMESTAMP IS INSIDE THE SIGNATURE. Rejecting an old timestamp
+    // only shows the tolerance check runs. If the signature covered the body alone, an attacker
+    // would simply replace `t` with now and replay forever -- the tolerance would pass and the
+    // signature would still verify. A mutation that signed the body alone survived every other
+    // test in this file, which is why this one exists.
+    const secret = await deriveSecret(KEY, ENDPOINT, 1);
+    const captured = await signPayload({
+      secret,
+      body: BODY,
+      timestamp: new Date(NOW.getTime() - 3_600_000),
+    });
+    const v1 = captured.split(",")[1] as string;
+    const refreshed = `t=${Math.floor(NOW.getTime() / 1000)},${v1}`;
+    expect(await verifySignature({ secret, body: BODY, header: refreshed, now: NOW })).toBe(false);
+  });
+
   it("rejects a timestamp from the future by the same margin", async () => {
     const secret = await deriveSecret(KEY, ENDPOINT, 1);
     const ahead = new Date(NOW.getTime() + (SIGNATURE_TOLERANCE_SECONDS + 1) * 1000);

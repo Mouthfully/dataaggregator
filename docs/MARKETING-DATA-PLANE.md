@@ -1264,6 +1264,212 @@ The access lens recommended affiliate networks as the zero-friction flagship, an
 | Docs SEO no longer builds a developer API business | Medium | Zero-click at 68 percent and AI Overviews cutting first-position CTR by 58 percent (10.3) | Framework-default slot, marketplace tenancy, design partners |
 | Retention of low-ARPA prepaid accounts | Medium | Top-quartile NRR of 65 percent under 10 dollars ARPA | Committed tier from 299 dollars a month; scheduled runs above half of usage as a health metric |
 
+---
+
+## 11A. Decisions from the SME repositioning round (2026-09-08)
+
+Sections 11.1 to 11.11 resolved contradictions between the eight research lenses. What
+follows resolves a different kind of disagreement: between this document as written and
+the product design work that came after it. The design is evidence of intent, not a
+decision; the decisions are here.
+
+**These override earlier sections on the same points**, in the same way 11.1 to 11.11 do.
+Where an earlier section describes the agency-and-brand product, read it with 11A.1
+applied. Findings, competitor detail and the unverified connector inventory live in
+[`SME-POSITIONING-AND-FINDINGS.md`](SME-POSITIONING-AND-FINDINGS.md); this section carries
+only what was decided.
+
+### 11A.1 Primary customer and the message (2026-09-08)
+
+The message moves from "verified root cause over ad, analytics and search data, for
+agencies and brands" to **a replacement for a business-intelligence team, for small
+businesses, Thailand first but not Thailand only**.
+
+**Decision.** The primary customer is an **owner-run business with no analyst and no IT
+function** — café, bar, restaurant, guesthouse, online seller, multi-unit venue group.
+Agencies remain a secondary channel, not the design target.
+
+The correctness guarantee, the envelope of section 7 and the diagnostic engine of section
+4.1 are unchanged. They stop being the pitch and become the substance behind it: the
+reason an owner can trust a number they did not compute themselves. 11.9's narrowing —
+"verified root cause and an operated correctness guarantee", not "joins in one call" —
+still stands and is still what the product does.
+
+**What this contradicts, and must be reconciled before launch.** The `positioning` claim
+in `packages/brand/src/claims.ts` still states the agency-and-brand message, and
+`apps/web` renders it under test. That is a code change, deliberately not made in the same
+pass as this decision. See `docs/marketplane/19-sme-repositioning.md`.
+
+### 11A.2 Four product surfaces (2026-09-08)
+
+The design promises four surfaces. Each is decided here as in scope and given a home; none
+is built.
+
+| Surface | What it is | Spec home |
+|---|---|---|
+| **Dashboard** | Numbers **after fees, commission and discounts** — the net figure, not the gross the platform reports | Section 2 read surface; net requires the fee model in 11A.6 |
+| **Weekly action sheet** | Ranked actions with an impact estimate and a verification that runs the following week | Appendix C |
+| **Founder questions** | Unit economics, cohorts, forecast, scenario, pricing, cash | Section 4.1's diagnostic tree, widened past marketing questions |
+| **Consolidated reports** | Across units and channels, including a monthly investor update | Appendix D |
+
+**Decision.** All four are product surfaces, not marketing. "After fees" is the load-bearing
+word in the first row: a dashboard that reports platform-gross revenue to an owner who pays
+30% delivery commission is not a smaller truth, it is the wrong number, and it is the one
+number every incumbent in the findings document already shows.
+
+### 11A.3 LINE is a first-class delivery channel (2026-09-08)
+
+**Decision.** The morning brief, alerts, the action sheet and report summaries are all
+delivered to a **LINE Official Account**, with reply-to-ask. LINE is not a notification
+add-on; for the primary customer it is where the product is used, and email is the
+secondary channel.
+
+This is a delivery decision, not a write decision. 11.4's deferral of `/v1/audience` is
+untouched: nothing is executed on the customer's behalf on any channel.
+
+Cost is an open question — see 11A.9.
+
+### 11A.4 Provenance becomes a visible UI rule (2026-09-08)
+
+The envelope has carried `fetched_at`, `source_updated_at`, `restates_until` and
+`is_provisional` on every row since section 7. Until now that was an API contract.
+
+**Decision.** **Every figure a customer sees shows its source, the time it was fetched, and
+whether it is still provisional.** The data has always been there; showing it is now a rule
+of the design system rather than a choice per screen. A number with no provenance is a bug,
+not a simplification.
+
+### 11A.5 Measurement class and coverage are required (2026-09-08)
+
+This is a **new specification requirement**, and the sharpest one in this round.
+
+For a walk-in business, per-customer channel attribution is only partly possible. A café
+cannot tell you which of today's 180 covers saw the Meta ad. Reporting a channel number as
+though it could is the failure this product exists to refuse — the same failure as an
+unlabelled conversion count in section 2.
+
+**Decision.** Every insight and every founder-question answer carries a **measurement class**
+and a **coverage figure**.
+
+| Class | What it means | Sources |
+|---|---|---|
+| **Observed** | Directly counted | Source-tagged orders (delivery apps, OTAs, reservations, marketplaces), POS covers and tickets, Google Business Profile actions, ad platform reach and clicks |
+| **Matched** | A person linked to a channel | A channel-specific promo code or LINE coupon redeemed at the POS, a LINE OA follow from an ad QR, a loyalty phone number in the POS, a reservation phone, a platform customer id, or an offline-conversion upload to Meta or Google |
+| **Modelled** | Inferred, never claimed as counted | Channel contribution for anonymous walk-ins, from correlating daily spend and Business Profile actions with covers — controlling for weekday, weather and holidays — or from geo or time-split lift tests |
+
+**Coverage is displayed, not implied.** Return rates are measured only on identified covers
+and must say so: *"measured on 41% of covers"*. The design already writes it this way.
+
+**Two rules that follow.**
+
+- Any matched-class identifier is **hashed at the edge and never stored raw**. Section 3.2's
+  rule applies unchanged, and offline-conversion uploads are the case it was written for.
+- **Do not promise Google store-visit conversions.** They need a volume of ad clicks and
+  store visits that a single venue does not have. Offering them to a one-site café would be
+  selling a number that will not arrive.
+
+The design system gains a **"how we know"** element: the class label plus the coverage
+figure, attached to the figure rather than to a footnote.
+
+### 11A.6 The SME connector set is a later phase (2026-09-08)
+
+**Decision.** 11.9's first connectors are **unchanged**: Google Ads, GA4, Search Console,
+Meta, one affiliate network, SERP bought wholesale. The kickoff's gate is also unchanged —
+tiered restatement backfill and the restatement webhook before any fifth connector.
+
+The SME set below is a **later phase**, recorded so it can be planned against. Every one is
+**bring-your-own-credential and read-only**. API availability is **unverified** unless a
+line says otherwise; the inventory, with what must be established per connector, is in the
+findings document.
+
+| Category | Sources |
+|---|---|
+| Point of sale | FoodStory by Wongnai, Ocha (Shopee), StoreHub, Loyverse, Qashier |
+| Delivery | GrabFood, LINE MAN, foodpanda |
+| Marketplaces | Shopee, Lazada, TikTok Shop, Shopify (own site) |
+| Travel | Agoda, Booking.com |
+| Messaging and CRM | LINE OA |
+| Payments and banking | Stripe, PromptPay, K PLUS and SCB business accounts |
+| Accounting | FlowAccount, PEAK, Xero, QuickBooks |
+| Presence | Google Business Profile |
+
+**Two of these block their own category and are named as open questions, not risks.**
+**FoodStory / Wongnai API access** blocks the point-of-sale category, which is where the
+"after fees" number comes from. **Thai bank feed access** blocks payments and banking, and
+is the largest unverified item in this round.
+
+### 11A.7 Consolidated reports and units (2026-09-08)
+
+**Decision.** An organisation may have **units** — kitchens, bars, an event space, outlets —
+and the schema consolidates across them. The specification is Appendix D. Reports carry a
+**restatement note** listing which sources are still provisional, which is the envelope
+surfacing in a PDF.
+
+### 11A.8 Platform terms and PDPA, restated because the new surfaces make drift easier (2026-09-08)
+
+Nothing here is new. It is restated because a founder-question surface that answers "how do
+my margins compare?" is one sentence away from breaking the rule that matters most.
+
+**Decision, unchanged and now harder to violate by accident:**
+
+- **No aggregation or benchmarking across customers**, ever. A founder-question answer
+  compares a business **only with its own history**. There is no peer set, no industry
+  average, no percentile. Meta 3.a.iv and Google's redistribution clause make this a
+  termination risk, and section 15's "no cross-workspace aggregation ever" is the rule.
+- The **Meta client-list obligation** (Platform Terms 5.b.ii.2) and **PDPA** apply to any
+  identified-customer data, which the matched class of 11A.5 now makes routine rather than
+  hypothetical.
+
+### 11A.9 Open questions from this round (2026-09-08)
+
+Recorded, not resolved. None may be built on without being answered first.
+
+1. **API access for FoodStory / Wongnai.** Blocks the point-of-sale category.
+2. **Thai bank feed access** (K PLUS, SCB business accounts). Blocks payments and banking.
+3. **LINE OA messaging cost at scale.** 11A.3 makes LINE the primary channel; a per-message
+   cost across a daily brief plus alerts is a COGS line nobody has priced.
+4. **Whether credit pricing fits an owner-run business at all.** 11.3 decided two units —
+   per connected account per month, plus credits — for agencies. An owner who wants one
+   number a day may need a flat monthly plan.
+5. **Volume thresholds for modelled attribution.** 11A.5 permits the modelled class; below
+   some daily-cover count the correlation is noise, and that floor is unmeasured.
+6. **Which two design partners validate the action-sheet verification loop** (Appendix C).
+
+### 11A.10 The product name remains unsettled (2026-09-08)
+
+**Decision. Unchanged, and restated because this round is the first time a name has appeared
+in a committed file.** The application design in `design/app/` carries a product name and a
+matching MCP hostname. **That is a design placeholder and not a decision.** Founder decision
+2 is still open, `packages/brand` still holds `productNameSettled: false`, and
+`allowedClaims()` still withholds the name from every rendered surface.
+
+The brand guard exempts `design/**` and `docs/**` so a mockup can carry a working name and a
+document can discuss one. Everywhere else the guard fails the build, which is the intended
+behaviour and has already caught the name in a cryptographic AAD and a database role name
+(`docs/marketplane/05-credential-vault.md`, `11-scheduler-entry-point.md`).
+
+**Nothing may read a product name out of the design file.** The name is settled when the
+brand file says it is, and not before.
+
+### 11A.11 Change log
+
+One line per change, with the date, as the update brief requires.
+
+| Date | Entry |
+|---|---|
+| 2026-09-08 | 11A.1 Primary customer becomes the owner-run small business; agencies secondary. Correctness guarantee and diagnostic engine retained as substance |
+| 2026-09-08 | 11A.2 Four product surfaces in scope: after-fees dashboard, weekly action sheet, founder questions, consolidated reports |
+| 2026-09-08 | 11A.3 LINE OA is a first-class delivery channel with reply-to-ask; no change to the write deferral |
+| 2026-09-08 | 11A.4 Source, fetch time and provisional state are a visible UI rule on every figure |
+| 2026-09-08 | 11A.5 **New requirement.** Measurement class (observed / matched / modelled) and coverage on every insight and answer; no store-visit promise; matched identifiers hashed at the edge |
+| 2026-09-08 | 11A.6 SME connector set recorded as a later phase; first connectors and the fifth-connector gate unchanged |
+| 2026-09-08 | 11A.7 Units and consolidated reports; reports carry a restatement note |
+| 2026-09-08 | 11A.8 No cross-customer aggregation or benchmarking, restated; Meta client list and PDPA apply to matched data |
+| 2026-09-08 | 11A.9 Six open questions recorded, none resolved |
+| 2026-09-08 | 11A.10 Product name still unsettled; the name in `design/app/` is a placeholder, not a decision |
+| 2026-09-08 | Appendix C added: the action sheet |
+| 2026-09-08 | Appendix D added: consolidated reports |
+
 ## 12. Naming candidates
 
 Method note: I searched each shortlisted name for martech/data conflicts, checked all five TLDs with the Vercel domain tool, and hit `registry.npmjs.org/<name>` for each (404 = available). `.com` is effectively saturated across every candidate I tested — 29 of 30 `.com` variants I checked were registered — so I weighted `.dev` / `.io` / `.ai` instead. Availability below is only what I actually observed; the 25 longlist names were not individually conflict-checked unless noted.
@@ -1511,6 +1717,7 @@ The research treated the product as an API and an MCP server. Four findings forc
 
 **Build stack for this surface** (section 7 covers the data plane): Next.js on Vercel for the marketing site and dashboard, Supabase for Postgres, authentication, row-level security and storage, Cloudflare Workers, Workflows and Queues for the public API edge and scheduled pulls. Brand details live in one brand file and every colour, radius, shadow and type value lives in one tokens stylesheet that the marketing site, the dashboard and generated documents all consume. The kickoff prompt in `docs/MARKETPLANE-KICKOFF-PROMPT.md` makes both of those non-negotiable.
 
+
 ## Appendix A. The research workflow script
 
 This is the exact script that produced sections 3, 10 and 11. It runs in the Claude Code Workflow tool with `args: {"today": "<ISO date>"}`.
@@ -1678,3 +1885,111 @@ return { lenses: good, critic, gaps: gapResults.filter(Boolean) }
 - **Section writers**: 12 Opus-class agents, one per lens and one per gap, each turned a research result (plus its fact-check where one exists) into a section under fixed rules (no invented numbers, checker wins, unverifiable figures marked).
 - **Known limits**: Reddit, G2 and Capterra were unreachable from the research environment, so operator complaints come from Hacker News, GitHub and vendor pages. Several checkers exhausted their search budget before verifying every claim; those are marked "(unverified)". Funding figures are single-source throughout. Everything with a date is as of 2026-09-07.
 
+## Appendix C. The action sheet
+
+Added 2026-09-08 by decision 11A.2. Nothing here is built.
+
+The action sheet is the weekly output an owner acts on. It is the difference between a
+dashboard that reports and a product that is worth paying for, and it is the surface most
+easily made dishonest, because an impact estimate is a claim about the future.
+
+### C.1 What every action carries
+
+| Field | Rule |
+|---|---|
+| **Title** | The action, in the imperative, specific enough to do without interpretation |
+| **Why** | **One line of evidence**, drawn from the customer's own numbers |
+| **When** | When to do it |
+| **Effort** | What it costs the owner to do |
+| **Source systems** | Which connected sources the evidence came from |
+| **Impact estimate** | A point **or a range**, in the customer's currency |
+| **Verification rule** | What will be checked the following week, and against what |
+
+Actions are **ordered by value**, not by confidence, recency or category.
+
+### C.2 The verification loop
+
+**Every action is re-checked the following week, and the result is shown whether it worked
+or not.** This is the load-bearing mechanism of the whole surface.
+
+An impact estimate nobody checks is a marketing number. An impact estimate that is checked
+in public, including when it was wrong, is the operated correctness guarantee of 11.9
+applied to advice rather than to data — and it is the one thing in this product that
+compounds, because a customer who has seen four of five predictions land will act on the
+fifth.
+
+The verification runs on the same envelope as everything else: it reports the outcome with
+its own measurement class and coverage per 11A.5, and it is `is_provisional` until the
+window it measures has closed.
+
+### C.3 Nothing is executed
+
+**No action is carried out on the customer's behalf.** Writes stay deferred per 11.4. The
+sheet tells an owner what to do; the owner does it, in the platform's own console.
+
+This is a constraint, not a limitation to be removed later without a decision: an executed
+action cannot be verified against a counterfactual, and the write path carries the consent
+obligations section 3.2 exists to handle.
+
+### C.4 What is not decided
+
+- How impact is estimated per action type. The design shows both points and ranges; which
+  applies when is unspecified.
+- What the sheet does when last week's verification says an action **did not** work — whether
+  it is retried, suppressed, or fed back into ranking.
+- Who the two design partners are that validate this loop (open question 11A.9.6).
+
+---
+
+## Appendix D. Consolidated reports
+
+Added 2026-09-08 by decision 11A.7. Nothing here is built.
+
+### D.1 Units
+
+An organisation may hold **units** — kitchens, bars, an event space, separate outlets — and
+the schema consolidates across them. A venue group with three kitchens and one bar is one
+workspace with four units, not four workspaces.
+
+This is a schema requirement on the tenancy model, which today has organisations and
+workspaces (`supabase/migrations/…_tenancy.sql`) and no unit below them. **It is not built,
+and the migration is not written.**
+
+The tenant boundary does not move. Consolidation happens **inside one workspace, across its
+own units** — never across workspaces, which 11A.8 and section 15 forbid absolutely.
+
+### D.2 Report types
+
+| Report | For |
+|---|---|
+| Weekly owner brief | The owner |
+| Monthly investor update | Investors |
+| P&L by unit and channel | The owner and the accountant |
+| Bank loan pack | A lender |
+| Board deck | A board |
+| Accountant export | The accountant's own system |
+
+### D.3 Delivery
+
+PDF and email **on the 1st**; a LINE summary; a live web version with a **scoped investor
+view**; Google Sheets; Xero; QuickBooks; FlowAccount; the API.
+
+The scoped investor view is a permission question, not a rendering one: an investor sees a
+report, never the workspace. It has no design and no schema yet.
+
+### D.4 The restatement note
+
+**Every report carries a note listing which sources are still provisional.**
+
+This is the envelope surfacing in a document. A monthly investor update sent on the 1st is
+reporting a month whose Meta conversions have not finished restating (section 7's 28-day
+clock), and a report that presents those figures as final is wrong in exactly the way this
+product refuses to be wrong. The note is not a disclaimer; it is the same
+`is_provisional` and `restates_until` the API returns, rendered for a reader.
+
+### D.5 What is not decided
+
+- The unit schema, its RLS, and how a unit relates to a connection.
+- Whether a report is generated from the envelope store directly or from a separate
+  reporting model.
+- The scoped investor view's permission model.

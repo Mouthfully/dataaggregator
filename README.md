@@ -87,7 +87,8 @@ cases where a literal is the point. Use it with a reason; do not widen an exempt
 |---|---|
 | [`docs/MARKETING-DATA-PLANE.md`](docs/MARKETING-DATA-PLANE.md) | The binding specification. Section 11 records the decisions that override earlier sections. |
 | [`docs/MARKETPLANE-KICKOFF-PROMPT.md`](docs/MARKETPLANE-KICKOFF-PROMPT.md) | The build brief and its non-negotiables. |
+| [`docs/SME-POSITIONING-AND-FINDINGS.md`](docs/SME-POSITIONING-AND-FINDINGS.md) | The small-business repositioning: competitive landscape, the unverified SME connector inventory, and how attribution works for a business people walk into. Findings, not decisions — section 11A of the specification holds those. |
 | [`docs/marketplane/00-repo-map.md`](docs/marketplane/00-repo-map.md) | Phase 0: the layout decision, the contract, and what is built on open questions. |
 | [`docs/marketplane/01-brand-identity.md`](docs/marketplane/01-brand-identity.md) | Identity values and the two constraints they create. |
 
-Build status: foundation. Scaffold, brand file and tokens landed; Supabase schema, auth and RLS next.
+Build status: data plane foundations. Scaffold, brand file, tokens, Supabase schema and RLS, the envelope contract, vault, OAuth, connections, the GA4 connector, the envelope store, `GET /v1/performance`, the R2 payload store and the marketing site have landed. Next: the restatement webhook, which the kickoff gates the fifth connector behind.

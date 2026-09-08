@@ -37,3 +37,6 @@ done
 
 echo "==> rls suite"
 psql -d "$DB" -q -f "$HERE/01_rls_isolation.sql"
+
+echo "==> scheduler suite"
+psql -d "$DB" -q -f "$HERE/02_scheduler.sql"

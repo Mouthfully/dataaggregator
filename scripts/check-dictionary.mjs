@@ -23,6 +23,8 @@
  * Usage: node scripts/check-dictionary.mjs [--warn]
  */
 
+import { readdirSync } from "node:fs";
+
 import { parseArgs, readText, report } from "./lib/scan.mjs";
 
 const CONTRACT = {
@@ -31,7 +33,43 @@ const CONTRACT = {
   metrics: "packages/contract/src/metrics.ts",
   entities: "packages/contract/src/envelope.ts",
 };
-const MIGRATION = "supabase/migrations/20260908001100_envelope_rows.sql";
+const MIGRATIONS_DIR = "supabase/migrations";
+const MIGRATION = `${MIGRATIONS_DIR}/20260908001100_envelope_rows.sql`;
+
+/**
+ * THE SINGLE-FILE ASSUMPTION, AND THE TRIPWIRE THAT PROTECTS IT.
+ *
+ * Everything below compares the contract against ONE migration. That is true today because the
+ * dictionary is declared in one file and no database has ever applied these migrations, so the
+ * declarations are still edited in place. The day a later migration alters an enum or adds a metric
+ * column, this guard keeps comparing the old file, keeps passing, and stops meaning anything --
+ * silently, which is the failure mode the guard exists to prevent in the first place.
+ *
+ * So: fail loudly the moment another migration touches the dictionary, and say what to do about it.
+ */
+const DICTIONARY_MUTATIONS = [
+  /alter\s+type\s+app\.(envelope_source|entity_type|attribution_window)\b/i,
+  /alter\s+table\s+(public\.)?envelope_rows\b[\s\S]{0,400}?\b(add|drop)\s+column\b/i,
+];
+
+function checkSingleFileAssumption(findings) {
+  for (const name of readdirSync(MIGRATIONS_DIR).sort()) {
+    const file = `${MIGRATIONS_DIR}/${name}`;
+    if (!name.endsWith(".sql") || file === MIGRATION) continue;
+    const body = readText(file).replace(/--[^\n]*/g, "");
+    if (DICTIONARY_MUTATIONS.some((re) => re.test(body))) {
+      findings.push({
+        file,
+        line: 1,
+        column: 1,
+        message:
+          "this migration changes the dictionary, but the guard only reads " +
+          `${MIGRATION}. Teach it to fold later migrations in before merging, or the guard passes ` +
+          "while the contract and the schema drift apart.",
+      });
+    }
+  }
+}
 
 /** Pull a `const X = [ "a", "b" ] as const` list out of a TypeScript source. */
 function tsList(source, name) {
@@ -134,6 +172,8 @@ if (unknown.length > 0) {
 
 const sql = readText(MIGRATION);
 const findings = [];
+
+checkSingleFileAssumption(findings);
 
 compare(
   findings,

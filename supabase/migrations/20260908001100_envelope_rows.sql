@@ -48,9 +48,13 @@ create type app.envelope_source as enum (
   'dataforseo_serp', 'ai_answers'
 );
 
+-- `order` is an addition to the ad-centric `dbt_ad_reporting` grain, made under 13.3 rule 2 by
+-- decision 11A.14: the launch connector set is three commerce sources and a WooCommerce or Shopify
+-- feed has no grain in this list to land on. Appended, never inserted -- PostgreSQL sorts an enum
+-- by definition order, so placing it mid-list would silently rewrite every ORDER BY on the column.
 create type app.entity_type as enum (
   'account', 'campaign', 'ad_group', 'ad', 'keyword', 'search_term',
-  'url', 'geo', 'property', 'page', 'query'
+  'url', 'geo', 'property', 'page', 'query', 'order'
 );
 
 -- `account_default` and `model` are labels for what a platform actually did, not absences. There is
@@ -112,6 +116,15 @@ create table public.envelope_rows (
   conversions             numeric(20, 6) check (conversions is null or conversions >= 0),
   conversions_value       numeric(20, 6) check (conversions_value is null or conversions_value >= 0),
   revenue                 numeric(20, 6) check (revenue is null or revenue >= 0),
+  -- THE COMMERCE GRAIN (11A.14). `revenue` above is gross as the order source reports it; these
+  -- four are what an owner actually keeps and what the platform took to get there.
+  orders                  numeric(20, 6) check (orders is null or orders >= 0),
+  -- NO NON-NEGATIVE CHECK, AND THE OMISSION IS DELIBERATE. A day whose refunds and chargebacks
+  -- exceed its sales has a genuinely negative net. A `>= 0` check here would reject a true row and
+  -- leave a connector two choices, both lies: write a floor of zero, or drop the day.
+  net_revenue             numeric(20, 6),
+  fees                    numeric(20, 6) check (fees is null or fees >= 0),
+  commission              numeric(20, 6) check (commission is null or commission >= 0),
 
   -- The four clocks, flat. Section 7, line 762: "A single `freshness` timestamp cannot express three
   -- clocks, which is why the field set splits into fetched_at, source_updated_at, restates_until and
@@ -145,10 +158,31 @@ create table public.envelope_rows (
   -- A converted amount must carry the rate that produced it, not only its provenance. Section 13.3
   -- requires "the rate and source recorded on the row"; a source and a date cannot reproduce a
   -- number when ECB publishes on business days only.
+  -- EVERY currency metric belongs in this list. The contract finds them by asking METRICS for the
+  -- ones whose unit is currency; SQL cannot, so the list is written out and a new currency metric
+  -- must be added here by hand. The dictionary guard compares names, not constraints, and would
+  -- not catch the omission -- `03_envelope_store.sql` asserts it instead.
   constraint envelope_rows_converted_needs_rate check (
     fx_source is null
-    or (spend is null and conversions_value is null and revenue is null)
+    or (
+      spend is null and conversions_value is null and revenue is null
+      and net_revenue is null and fees is null and commission is null
+    )
     or fx_rate is not null
+  ),
+
+  -- THE SECOND REFUSAL (11A.14), the first one applied to the commerce grain. A shop's own orders
+  -- and money are unattributed -- until they appear on a campaign, ad group, ad, keyword or search
+  -- term, where a platform can only have produced them by attributing. A marketplace ad platform
+  -- reporting "orders from this campaign" is reporting a conversion, and letting it through under a
+  -- name the first refusal does not cover would lose the guarantee to a synonym.
+  constraint envelope_rows_commerce_on_ad_entity_needs_window check (
+    entity_type not in ('campaign', 'ad_group', 'ad', 'keyword', 'search_term')
+    or (
+      orders is null and revenue is null and net_revenue is null
+      and fees is null and commission is null
+    )
+    or attribution_window is not null
   ),
 
   -- A guard against the one mistake that would quietly cost the most: storing the payload in the
@@ -236,6 +270,10 @@ create or replace function app.upsert_envelope_row(
   p_conversions        numeric default null,
   p_conversions_value  numeric default null,
   p_revenue            numeric default null,
+  p_orders             numeric default null,
+  p_net_revenue        numeric default null,
+  p_fees               numeric default null,
+  p_commission         numeric default null,
   p_fx_source          text default null,
   p_fx_rate_date       date default null,
   p_fx_rate            numeric default null,
@@ -253,6 +291,7 @@ as $$
     native_entity_type, native_id, entity_name, parent_id,
     date, currency, timezone, attribution_window,
     spend, impressions, clicks, sessions, conversions, conversions_value, revenue,
+    orders, net_revenue, fees, commission,
     fetched_at, source_updated_at, restates_until, is_provisional, first_seen_at,
     fx_source, fx_rate_date, fx_rate, fx_base, raw_key
   ) values (
@@ -260,6 +299,7 @@ as $$
     p_native_entity_type, p_native_id, p_entity_name, p_parent_id,
     p_date, p_currency, p_timezone, p_attribution_window,
     p_spend, p_impressions, p_clicks, p_sessions, p_conversions, p_conversions_value, p_revenue,
+    p_orders, p_net_revenue, p_fees, p_commission,
     p_fetched_at, p_source_updated_at, p_restates_until,
     -- An unknown window is treated as still open. Assuming a finality we cannot demonstrate is the
     -- failure the whole envelope exists to prevent.
@@ -284,6 +324,10 @@ as $$
     conversions        = excluded.conversions,
     conversions_value  = excluded.conversions_value,
     revenue            = excluded.revenue,
+    orders             = excluded.orders,
+    net_revenue        = excluded.net_revenue,
+    fees               = excluded.fees,
+    commission         = excluded.commission,
     fetched_at         = excluded.fetched_at,
     source_updated_at  = excluded.source_updated_at,
     fx_source          = excluded.fx_source,
@@ -309,6 +353,7 @@ revoke all on function app.upsert_envelope_row(
   uuid, uuid, app.envelope_source, text, text, app.entity_type, text, text, date, text, text,
   app.attribution_window, timestamptz, timestamptz, timestamptz, timestamptz, text, text,
   numeric, numeric, numeric, numeric, numeric, numeric, numeric,
+  numeric, numeric, numeric, numeric,
   text, date, numeric, text, text
 ) from public, anon, authenticated;
 
@@ -316,6 +361,7 @@ grant execute on function app.upsert_envelope_row(
   uuid, uuid, app.envelope_source, text, text, app.entity_type, text, text, date, text, text,
   app.attribution_window, timestamptz, timestamptz, timestamptz, timestamptz, text, text,
   numeric, numeric, numeric, numeric, numeric, numeric, numeric,
+  numeric, numeric, numeric, numeric,
   text, date, numeric, text, text
 ) to app_ingest;
 

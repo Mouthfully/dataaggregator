@@ -83,6 +83,9 @@ importers:
       '@repo/vault':
         specifier: workspace:*
         version: link:../../packages/vault
+      '@repo/webhooks':
+        specifier: workspace:*
+        version: link:../../packages/webhooks
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'

@@ -333,6 +333,57 @@ begin;
         and not has_function_privilege('authenticated', 'app.record_delivery(uuid, boolean, integer, text, timestamptz)', 'execute')));
 commit;
 
+-- ---------------------------------------------------------------------------------------------
+-- RETENTION
+--
+-- State at this point: ev_one delivered at 2026-09-08T12:06Z, ev_two dead-lettered at 17:00Z, and
+-- the `ag_3` event never delivered at all.
+-- ---------------------------------------------------------------------------------------------
+
+begin;
+  set local role app_webhook;
+  select app_test.check('nothing is pruned inside the window',
+    (select app.prune_restatement_events(5000, '2026-09-20T00:00:00Z') = 0));
+
+  select app_test.check('a limit of zero prunes nothing, however overdue',
+    (select app.prune_restatement_events(0, '2027-06-01T00:00:00Z') = 0));
+
+  -- Past the 30-day delivered window, inside the 90-day failed one.
+  select app_test.check('a delivered event past its window is pruned',
+    (select app.prune_restatement_events(5000, '2026-10-15T00:00:00Z') = 1));
+  reset role;
+
+  select app_test.check('and it is the delivered one that went',
+    (select count(*) = 0 from public.restatement_events where id = :'ev_one'::uuid));
+
+  select app_test.check('a dead-lettered event is kept three times as long',
+    (select count(*) = 1 from public.restatement_events where id = :'ev_two'::uuid));
+
+  -- THE LOAD-BEARING ONE. An event still in the queue after nine months is not garbage, it is a
+  -- bug -- a workspace with no endpoint, a worker that stopped, a lease nobody released. Pruning it
+  -- would erase the evidence and the customer's alert in one statement, and leave a healthy-looking
+  -- table behind.
+  set local role app_webhook;
+  select app_test.check('an undelivered event is never pruned, at any age',
+    (select app.prune_restatement_events(5000, '2027-06-01T00:00:00Z') = 1));
+  reset role;
+
+  select app_test.check('the undelivered event is still there',
+    (select count(*) = 1 from public.restatement_events where entity_id = 'ag_3'));
+
+  select app_test.check('and the dead-lettered one is gone once its own window passed',
+    (select count(*) = 0 from public.restatement_events where id = :'ev_two'::uuid));
+commit;
+
+begin;
+  set local role authenticated;
+  select set_config('request.jwt.claim.sub', '61111111-1111-1111-1111-111111111111', true);
+  select app_test.check('a tenant cannot prune',
+    (select not has_function_privilege('authenticated',
+      'app.prune_restatement_events(integer, timestamptz)', 'execute')));
+  reset role;
+commit;
+
 begin;
   delete from public.workspaces where id = '6c000000-0000-0000-0000-000000000002';
   select app_test.check('deleting a workspace takes its endpoints with it',

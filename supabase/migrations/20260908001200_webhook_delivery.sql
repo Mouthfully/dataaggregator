@@ -270,6 +270,78 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------------------------------------
+-- Retention
+--
+-- `26-restatement-outbox.md` section 6 named the unbounded outbox as a real risk and did not solve
+-- it. Delivery bounded it in one direction -- a delivered or dead-lettered event stops costing
+-- requests -- and in the other it made it worse, because now nothing ever leaves the table.
+--
+-- AN UNDELIVERED EVENT IS NEVER PRUNED, AT ANY AGE. That is the load-bearing line. An event still
+-- in the queue after a month is not garbage, it is a bug: a workspace with no endpoint, a worker
+-- that stopped running, a lease nobody released. Deleting it would erase the evidence and the
+-- customer's alert in one statement, and the table would look healthy afterwards.
+--
+-- Failed events are kept three times as long as delivered ones. A delivered event has done its job;
+-- a dead-lettered one is the record of an endpoint that was broken for thirty hours, which is the
+-- thing an operator goes looking for weeks later.
+-- ---------------------------------------------------------------------------------------------
+
+create or replace function app.retention_delivered()
+returns interval language sql immutable as $$ select interval '30 days' $$;
+
+create or replace function app.retention_failed()
+returns interval language sql immutable as $$ select interval '90 days' $$;
+
+-- Two partial indexes rather than one over both columns: the prune matches on whichever outcome an
+-- event reached, and a single index on `occurred_at` would scan the queue as well as the settled
+-- rows -- the queue being the part that must stay fast.
+create index restatement_events_delivered_idx
+  on public.restatement_events (delivered_at)
+  where delivered_at is not null;
+
+create index restatement_events_failed_idx
+  on public.restatement_events (failed_at)
+  where failed_at is not null;
+
+/*
+ * Delete settled events past their retention window. Returns how many went.
+ *
+ * BOUNDED, and deliberately unordered. A prune is garbage collection: which five thousand rows go
+ * first does not matter, and an `order by` would make every run sort a table that only grows.
+ * `skip locked` so a prune never blocks a delivery mid-flight.
+ */
+create or replace function app.prune_restatement_events(
+  p_limit integer default 5000,
+  p_now timestamptz default now()
+)
+returns integer
+language sql
+volatile
+security definer
+set search_path = public, pg_temp
+as $$
+  with victims as (
+    select id
+      from public.restatement_events
+     where (delivered_at is not null and delivered_at < p_now - app.retention_delivered())
+        or (failed_at is not null and failed_at < p_now - app.retention_failed())
+     limit greatest(p_limit, 0)
+     for update skip locked
+  ),
+  gone as (
+    delete from public.restatement_events e
+     using victims v
+     where e.id = v.id
+    returning 1
+  )
+  select count(*)::integer from gone;
+$$;
+
+revoke all on function app.prune_restatement_events(integer, timestamptz)
+  from public, anon, authenticated;
+grant execute on function app.prune_restatement_events(integer, timestamptz) to app_webhook;
+
 revoke all on function app.due_restatement_events(text, integer, timestamptz)
   from public, anon, authenticated;
 revoke all on function app.record_delivery(uuid, boolean, integer, text, timestamptz)

@@ -14,6 +14,18 @@
     "enabled": true
   },
 
+  // The scheduled half (docs/marketplane/28-cron-and-retention.md). Delivery every minute, because
+  // a restatement detected during a nightly backfill should not wait for morning; the prune daily,
+  // at an arbitrary minute rather than on the hour.
+  //
+  // BOTH STRINGS ARE DUPLICATED IN src/webhooks.ts, and that duplication is checked rather than
+  // trusted: the handler refuses a cron it does not recognise, and a test asserts the two lists
+  // agree. Wrangler cannot import a TypeScript constant and this file is the only place Cloudflare
+  // reads.
+  "triggers": {
+    "crons": ["* * * * *", "17 3 * * *"]
+  },
+
   // Verbatim raw platform payloads (00-repo-map.md section 5). The binding exists here because
   // @repo/payloads has to be tested against a REAL R2 implementation: the property it guarantees is
   // that a large payload never enters the isolate, and a fake bucket that accepts a stream cannot

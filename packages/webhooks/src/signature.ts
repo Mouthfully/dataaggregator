@@ -39,6 +39,8 @@ export interface CryptoLike {
   subtle: Pick<SubtleCrypto, "importKey" | "sign">;
 }
 
+const webCrypto: CryptoLike = crypto;
+
 function toHex(buffer: ArrayBuffer): string {
   return [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -64,7 +66,7 @@ export async function deriveSecret(
   serviceKey: string,
   endpointId: string,
   secretVersion: number,
-  crypto: CryptoLike = globalThis.crypto,
+  crypto: CryptoLike = webCrypto,
 ): Promise<string> {
   if (serviceKey.length === 0) {
     throw new Error("webhooks: refusing to derive a signing secret from an empty service key");
@@ -83,11 +85,7 @@ export async function signPayload(options: {
   crypto?: CryptoLike;
 }): Promise<string> {
   const t = Math.floor(options.timestamp.getTime() / 1000);
-  const signature = await hmac(
-    options.secret,
-    `${t}.${options.body}`,
-    options.crypto ?? globalThis.crypto,
-  );
+  const signature = await hmac(options.secret, `${t}.${options.body}`, options.crypto ?? webCrypto);
   return `t=${t},v1=${signature}`;
 }
 
@@ -136,10 +134,6 @@ export async function verifySignature(options: {
   const skew = Math.abs(Math.floor(options.now.getTime() / 1000) - seconds);
   if (skew > tolerance) return false;
 
-  const expected = await hmac(
-    options.secret,
-    `${t}.${options.body}`,
-    options.crypto ?? globalThis.crypto,
-  );
+  const expected = await hmac(options.secret, `${t}.${options.body}`, options.crypto ?? webCrypto);
   return timingSafeEqual(expected, v1);
 }

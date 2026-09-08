@@ -40,3 +40,6 @@ psql -d "$DB" -q -f "$HERE/01_rls_isolation.sql"
 
 echo "==> scheduler suite"
 psql -d "$DB" -q -f "$HERE/02_scheduler.sql"
+
+echo "==> envelope store suite"
+psql -d "$DB" -q -f "$HERE/03_envelope_store.sql"

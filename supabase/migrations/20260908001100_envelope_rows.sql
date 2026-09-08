@@ -354,9 +354,16 @@ begin
 end;
 $fn$;
 
--- THE `when` CLAUSE IS THE FEATURE. Without it the function runs on every re-pull of every row and
--- decides, in PL/pgSQL, to do nothing -- the same answer at a few hundred times the cost, on the
--- hottest write path in the system.
+-- WHAT THIS CLAUSE IS AND IS NOT. It is the COST guarantee, not the correctness one, and the
+-- distinction was established by breaking it: deleting the clause entirely leaves every assertion
+-- in `04_restatement_events.sql` passing, because the function above declines on its own when
+-- nothing moved. What changes is that PL/pgSQL is then entered for every re-pull of every row --
+-- the same answer at a few hundred times the cost, on the hottest write path in the system.
+--
+-- Correctness rests on `v_before = '{}'` in the function; cost rests on this clause; and the two
+-- staying in step rests on `scripts/check-dictionary.mjs`, which is the only thing that fails when
+-- a metric is missing from one and present in the other. A comment here previously claimed this
+-- clause was the feature. It is not, and the mutation that survived is why the claim is gone.
 --
 -- EVERY METRIC BELONGS IN THIS LIST. It is the third hand-written metric list in this schema, after
 -- the fx constraint above and the upsert's SET clause, and a metric missing from it restates

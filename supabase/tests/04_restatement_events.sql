@@ -213,10 +213,14 @@ begin;
       where workspace_id = '8c000000-0000-0000-0000-000000000001'));
 
   -- Naming an unchanged metric under a heading that says "revised from" would state that it moved.
-  select app_test.check('revised_from names ONLY what moved',
-    (select revised_from ? 'conversions' and not (revised_from ? 'spend')
-       from public.restatement_events
-      where workspace_id = '8c000000-0000-0000-0000-000000000001'));
+  --
+  -- Asserted as the EXACT key set, not as the presence of one key and the absence of another. An
+  -- earlier version checked `has conversions and not spend`, and a mutation that unconditionally
+  -- included a metric survived it: the metric it included was the one the test already expected.
+  select app_test.check('revised_from names ONLY what moved, and nothing else',
+    (select array_agg(k order by k) = array['conversions']
+       from public.restatement_events e, jsonb_object_keys(e.revised_from) k
+      where e.workspace_id = '8c000000-0000-0000-0000-000000000001'));
 
   select app_test.check('metrics carries the full current set, moved or not',
     (select metrics ? 'conversions' and metrics ? 'spend' from public.restatement_events

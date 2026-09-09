@@ -51,6 +51,21 @@ describe("the claims gate", () => {
     expect(allowed).toContain("attribution-required");
   });
 
+  // §11A.1 moved the primary customer from agencies and brands to an owner-run business with no
+  // analyst and no IT function, and recorded in the specification that the claim contradicting it
+  // could not be changed in the same pass. It sat contradicted for four rounds. This is the pin
+  // that stops it drifting back the next time someone writes copy from the old pitch.
+  it("positions on the primary customer 11A.1 names, not the one it replaced", () => {
+    const positioning = CLAIMS.find((c) => c.id === "positioning");
+    expect(positioning, "the positioning claim was removed rather than reconciled").toBeDefined();
+    expect(positioning?.source, "positioning must cite the decision that set it").toContain(
+      "11A.1",
+    );
+    // The superseded text sold the audience inside the sentence: "for agencies and brands".
+    // Agencies survive as a secondary channel -- see the `agency-mode` claim -- not as the pitch.
+    expect(positioning?.text).not.toMatch(/\bagenc(y|ies)\b|\bbrands\b/i);
+  });
+
   it("names the field that would turn each withheld claim on", () => {
     const withheld = withheldClaims();
     expect(withheld.length).toBeGreaterThan(0);

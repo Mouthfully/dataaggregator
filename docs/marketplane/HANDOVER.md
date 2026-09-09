@@ -187,19 +187,16 @@ pessimistic case survives rather than only the base case.
 ## 7. What is owed, in order
 
 1. **`docs/marketplane/20-marketing-site.md`.** Still missing — notes jump 19 → 21.
-2. **`packages/brand/src/claims.ts` still carries the agency-and-brand `positioning` claim**,
-   which contradicts spec §11A.1 (the SME repositioning). 24 site assertions in `apps/web`
-   depend on it. This is a real inconsistency sitting in `main`'s path.
-3. **WooCommerce as the first commerce connector.** Needs a `SOURCES` entry *and* a redaction
+2. **WooCommerce as the first commerce connector.** Needs a `SOURCES` entry *and* a redaction
    keep-list, both shipping in the same PR — the redaction policy is `verbatim` until then, by
    design.
-4. **The routing classifier** (§03 of the financial model). Highest financial return of any
+3. **The routing classifier** (§03 of the financial model). Highest financial return of any
    engineering work here; also required by the Ask surface.
-5. **A design note for adding Google as a model vendor**, if the Gemini prep-layer saving is
+4. **A design note for adding Google as a model vendor**, if the Gemini prep-layer saving is
    taken. The stack rule requires a written reason. Three checks first: a DPA with zero
    retention; a subprocessor disclosure; and a read of the advertising platforms' terms on
    transferring platform data to third parties.
-6. **Register on the DEPA Thailand Digital Catalog** before the 2027 window closes.
+5. **Register on the DEPA Thailand Digital Catalog** before the 2027 window closes.
 
 ---
 
@@ -256,5 +253,5 @@ Read in this order:
 4. The three or four most recent design notes (`26`, `27`, `28`) for the house style — a design
    note states the cost, the platform-terms check, and **what was deliberately left out**.
 
-Then pick from §7. Item 4 (the routing classifier) is worth more than the rest combined in cash
+Then pick from §7. Item 3 (the routing classifier) is worth more than the rest combined in cash
 terms; item 2 (the contradictory brand claim) is the one actually sitting wrong in the tree.

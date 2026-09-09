@@ -89,6 +89,18 @@ describe("the three claims a European buyer would rely on, and why none of them 
 });
 
 describe("every promise on the page comes from the claims list", () => {
+  it("uses the SME positioning decided by section 11A.1", () => {
+    const positioning = CLAIMS.find((candidate) => candidate.id === "positioning");
+
+    expect(positioning?.source).toEqual(["11A.1"]);
+    expect(text).toContain(
+      "A replacement for a business-intelligence team, built for owner-run businesses with no analyst or IT function — Thailand first, but not Thailand only.",
+    );
+    expect(text).not.toContain(
+      "Verified root cause and an operated correctness guarantee over your own ad, analytics and search data.",
+    );
+  });
+
   it("renders each claim it declares it uses", () => {
     const allowed = new Map(allowedClaims().map((c) => [c.id, c]));
     for (const id of USED_CLAIMS) {

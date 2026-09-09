@@ -22,8 +22,8 @@
  *
  * THE PRODUCT NAME IS NOT SETTLED, so it appears nowhere. `brand.productNameSettled` is false, and
  * a name printed across a marketing site is expensive to take back -- so the site leads with the
- * tagline and the positioning claim, both of which are true regardless of what the thing ends up
- * being called. `productName()` returns null until that changes.
+ * tagline and the SME positioning claim, both of which are true regardless of what the thing ends
+ * up being called. `productName()` returns null until that changes.
  */
 
 import { type Claim, allowedClaims, brand } from "@repo/brand";

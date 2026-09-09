@@ -34,8 +34,8 @@ export const CLAIMS: readonly Claim[] = [
   // --- What the product is -------------------------------------------------------------------
   {
     id: "positioning",
-    text: "Verified root cause and an operated correctness guarantee over your own ad, analytics and search data.",
-    source: ["0", "11.9"],
+    text: "A replacement for a business-intelligence team, built for owner-run businesses with no analyst or IT function — Thailand first, but not Thailand only.",
+    source: ["11A.1"],
   },
   { id: "tagline", text: "Know what changed. And why.", source: ["11.9", "14"] },
 

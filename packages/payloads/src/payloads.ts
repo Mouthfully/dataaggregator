@@ -56,6 +56,16 @@
  * imported from apps/api-edge and typechecks there under workers-types with no DOM lib at all --
  * and is TESTED there against a real R2, which is the only place the constraint is observable.
  */
+import type { Source } from "@repo/contract";
+
+import {
+  PayloadNotRedactableError,
+  type PolicyTable,
+  REDACTION_POLICY_VERSION,
+  policyFor,
+  redactJsonBytes,
+} from "./redaction.js";
+
 declare const FixedLengthStream: {
   new (expectedLength: number): { readable: ReadableStream; writable: WritableStream };
 };
@@ -65,9 +75,19 @@ export interface R2Like {
   put(
     key: string,
     value: ReadableStream | ArrayBuffer | string | null,
-    options?: { httpMetadata?: { contentType?: string; contentEncoding?: string } },
+    options?: {
+      httpMetadata?: { contentType?: string; contentEncoding?: string };
+      /**
+       * Where the redaction record lives. It travels WITH the object rather than in a table
+       * beside it, because an archive whose "was this redacted?" answer is in another system is an
+       * archive nobody can audit after that system is restored from a backup.
+       */
+      customMetadata?: Record<string, string>;
+    },
   ): Promise<{ key: string; size: number } | null>;
-  get(key: string): Promise<{ body: ReadableStream } | null>;
+  get(
+    key: string,
+  ): Promise<{ body: ReadableStream; customMetadata?: Record<string, string> } | null>;
   delete(keys: string | string[]): Promise<void>;
   list(options?: { prefix?: string; cursor?: string; limit?: number }): Promise<{
     objects: Array<{ key: string; size: number }>;
@@ -184,16 +204,39 @@ export function workspacePrefix(workspaceId: string): string {
  */
 export const MAX_BUFFERED_BYTES = 16 * 1024 * 1024;
 
+export interface RedactionRecord {
+  readonly source: string;
+  readonly version: number;
+  /** Keys removed. A count, never names -- see the header of `redaction.ts`. */
+  readonly removed: number;
+}
+
 export interface PayloadRef {
   readonly key: string;
   /** Bytes STORED, which after compression is not the bytes fetched. */
   readonly size: number;
   readonly compressed: boolean;
+  /**
+   * `null` when the source's declared policy is `verbatim`, so a caller can tell "nothing needed
+   * removing" from "nothing was checked". They are not the same fact and only one of them is safe.
+   */
+  readonly redacted: RedactionRecord | null;
 }
 
 export interface PutOptions {
   readonly bucket: R2Like;
   readonly key: string;
+  /**
+   * REQUIRED, and the reason is not bookkeeping. The source selects the redaction policy, and an
+   * undeclared source is refused rather than defaulted (`redaction.ts`). Without this parameter the
+   * store has no way to know whether the bytes it is about to keep contain a buyer's address.
+   */
+  readonly source: Source;
+  /**
+   * The policy table. Omit it: the default is the declared one. See `policyFor` for why this is a
+   * parameter at all, and note that a production call site passing its own is a defect.
+   */
+  readonly policies?: PolicyTable;
   /** The platform response body. Never a parsed object -- that is the whole point. */
   readonly body: ReadableStream;
   /**
@@ -223,6 +266,20 @@ export interface PutOptions {
  * isolate never holds the payload.
  */
 export async function putPayload(options: PutOptions): Promise<PayloadRef> {
+  // THE REFUSAL THIS PATH EXISTS TO MAKE. Redaction requires parsing; streaming exists so the
+  // isolate never holds the payload. Both cannot be true, so a source whose responses can carry
+  // contact data cannot stream -- and finding that out here, at the call, is the only place it
+  // cannot be forgotten.
+  const policy = policyFor(options.source, options.policies);
+  if (policy.disposition !== "verbatim") {
+    throw new PayloadNotRedactableError(
+      `payloads: "${options.source}" is declared as needing redaction, and a streamed payload is ` +
+        "never parsed, so it cannot be redacted. Use putBufferedPayload, which holds the body " +
+        "under a cap and can. This is not a setting to relax: streaming it would store the " +
+        "platform's response verbatim, contact data included.",
+    );
+  }
+
   if (!Number.isInteger(options.contentLength) || options.contentLength < 0) {
     throw new TypeError(
       `payloads: contentLength must be a non-negative integer, got ${options.contentLength}. ` +
@@ -262,12 +319,20 @@ export async function putPayload(options: PutOptions): Promise<PayloadRef> {
     key: result.key,
     size: result.size,
     compressed: options.contentEncoding === "gzip",
+    redacted: null,
   };
 }
 
 export interface BufferedPutOptions {
   readonly bucket: R2Like;
   readonly key: string;
+  /** See `PutOptions.source`. This path is the only one that can redact. */
+  readonly source: Source;
+  /**
+   * The policy table. Omit it: the default is the declared one. See `policyFor` for why this is a
+   * parameter at all, and note that a production call site passing its own is a defect.
+   */
+  readonly policies?: PolicyTable;
   readonly body: ReadableStream;
   readonly contentType?: string;
   /**
@@ -295,6 +360,10 @@ export interface BufferedPutOptions {
  * the key, the cap, and how far it got.
  */
 export async function putBufferedPayload(options: BufferedPutOptions): Promise<PayloadRef> {
+  // Read BEFORE the body, so an undeclared source is refused without the payload ever entering the
+  // isolate. Reading first and checking after would mean the bytes existed in memory of a source
+  // nobody had decided anything about.
+  const policy = policyFor(options.source, options.policies);
   const cap = options.maxBytes ?? MAX_BUFFERED_BYTES;
   const reader = options.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -317,11 +386,27 @@ export async function putBufferedPayload(options: BufferedPutOptions): Promise<P
     chunks.push(value);
   }
 
-  const joined = new Uint8Array(total);
+  const assembled = new Uint8Array(total);
   let offset = 0;
   for (const chunk of chunks) {
-    joined.set(chunk, offset);
+    assembled.set(chunk, offset);
     offset += chunk.byteLength;
+  }
+
+  // REDACTION HAPPENS HERE, between holding the bytes and storing them, and nowhere else. It is
+  // deliberately before compression: gzipping first would mean redacting a payload we would have to
+  // decompress to read, and the order that lets a mistake through is the one where the store is
+  // asked to look inside something it has already sealed.
+  let redacted: RedactionRecord | null = null;
+  let joined: Uint8Array<ArrayBufferLike> = assembled;
+  if (policy.disposition === "redact") {
+    const result = redactJsonBytes(assembled, policy);
+    joined = result.bytes;
+    redacted = {
+      source: options.source,
+      version: REDACTION_POLICY_VERSION,
+      removed: result.removed,
+    };
   }
 
   const compress = options.compress ?? false;
@@ -350,13 +435,22 @@ export async function putBufferedPayload(options: BufferedPutOptions): Promise<P
       contentType: options.contentType ?? "application/json",
       ...(compress ? { contentEncoding: "gzip" } : {}),
     },
+    ...(redacted === null
+      ? {}
+      : {
+          customMetadata: {
+            "redaction-source": redacted.source,
+            "redaction-version": String(redacted.version),
+            "redaction-removed": String(redacted.removed),
+          },
+        }),
   });
   if (result === null) {
     throw new Error(
       `payloads: R2 returned no result for ${options.key}; the object was not stored`,
     );
   }
-  return { key: result.key, size: result.size, compressed: compress };
+  return { key: result.key, size: result.size, compressed: compress, redacted };
 }
 
 /** Read a payload back as a stream. Never as a string: the same 128 MB rule applies on the way out. */

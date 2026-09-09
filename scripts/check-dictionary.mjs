@@ -23,6 +23,8 @@
  * Usage: node scripts/check-dictionary.mjs [--warn]
  */
 
+import { readdirSync } from "node:fs";
+
 import { parseArgs, readText, report } from "./lib/scan.mjs";
 
 const CONTRACT = {
@@ -31,7 +33,43 @@ const CONTRACT = {
   metrics: "packages/contract/src/metrics.ts",
   entities: "packages/contract/src/envelope.ts",
 };
-const MIGRATION = "supabase/migrations/20260908001100_envelope_rows.sql";
+const MIGRATIONS_DIR = "supabase/migrations";
+const MIGRATION = `${MIGRATIONS_DIR}/20260908001100_envelope_rows.sql`;
+
+/**
+ * THE SINGLE-FILE ASSUMPTION, AND THE TRIPWIRE THAT PROTECTS IT.
+ *
+ * Everything below compares the contract against ONE migration. That is true today because the
+ * dictionary is declared in one file and no database has ever applied these migrations, so the
+ * declarations are still edited in place. The day a later migration alters an enum or adds a metric
+ * column, this guard keeps comparing the old file, keeps passing, and stops meaning anything --
+ * silently, which is the failure mode the guard exists to prevent in the first place.
+ *
+ * So: fail loudly the moment another migration touches the dictionary, and say what to do about it.
+ */
+const DICTIONARY_MUTATIONS = [
+  /alter\s+type\s+app\.(envelope_source|entity_type|attribution_window)\b/i,
+  /alter\s+table\s+(public\.)?envelope_rows\b[\s\S]{0,400}?\b(add|drop)\s+column\b/i,
+];
+
+function checkSingleFileAssumption(findings) {
+  for (const name of readdirSync(MIGRATIONS_DIR).sort()) {
+    const file = `${MIGRATIONS_DIR}/${name}`;
+    if (!name.endsWith(".sql") || file === MIGRATION) continue;
+    const body = readText(file).replace(/--[^\n]*/g, "");
+    if (DICTIONARY_MUTATIONS.some((re) => re.test(body))) {
+      findings.push({
+        file,
+        line: 1,
+        column: 1,
+        message:
+          "this migration changes the dictionary, but the guard only reads " +
+          `${MIGRATION}. Teach it to fold later migrations in before merging, or the guard passes ` +
+          "while the contract and the schema drift apart.",
+      });
+    }
+  }
+}
 
 /** Pull a `const X = [ "a", "b" ] as const` list out of a TypeScript source. */
 function tsList(source, name) {
@@ -74,6 +112,96 @@ function sqlMetricColumns(source) {
   const block = source.match(/-- METRICS ARE COLUMNS[\s\S]*?\n\n/);
   if (block === null) return null;
   return [...block[0].matchAll(/^ {2}(\w+) +numeric\(/gm)].map((m) => m[1]);
+}
+
+/**
+ * Pull `name: { unit: "currency" | "count", ... }` out of the METRICS object, with the unit.
+ *
+ * The key list above is enough to catch a missing COLUMN. It is not enough to catch a missing
+ * mention in a hand-written SQL list, and there are now three of those.
+ */
+function tsMetricUnits(source) {
+  const match = source.match(/METRICS\s*=\s*\{([\s\S]*?)\n\}\s*as const/);
+  if (match === null) return null;
+  return [...match[1].matchAll(/^ {2}(\w+): \{ unit: "(\w+)"/gm)].map((m) => ({
+    name: m[1],
+    unit: m[2],
+  }));
+}
+
+/** The body of a named `constraint <name> check (...)`, comments stripped. */
+function sqlConstraintBody(source, name) {
+  const match = source.match(new RegExp(`constraint ${name} check \\(([\\s\\S]*?)\\n  \\),`));
+  return match === null ? null : match[1].replace(/--[^\n]*/g, "");
+}
+
+/** The `when (...)` condition of the restatement trigger, comments stripped. */
+function sqlTriggerCondition(source) {
+  const match = source.match(
+    /create trigger envelope_rows_restated[\s\S]*?\n  when \(([\s\S]*?)\n  \)\s*\n  execute function/,
+  );
+  return match === null ? null : match[1].replace(/--[^\n]*/g, "");
+}
+
+/**
+ * THE HOLE THIS CLOSES, named in `24-commerce-grain.md` section 1.3 before it could be closed.
+ *
+ * The contract finds currency metrics by ASKING `METRICS` which units are currency, and finds the
+ * restatement-worthy ones by asking for all of them. SQL cannot ask anything, so both lists are
+ * written out by hand -- in the fx constraint, and in the trigger's `when` clause -- and comparing
+ * NAMES alone would pass while either list quietly lost a metric.
+ *
+ * A metric missing from the fx constraint stores a converted amount with no rate to reproduce it.
+ * A metric missing from the trigger restates silently forever. Neither fails any other check.
+ */
+function checkHandWrittenLists(findings, metrics, sql, tsFile) {
+  if (metrics === null) {
+    findings.push({ file: tsFile, line: 1, column: 1, message: "could not parse metric units" });
+    return;
+  }
+
+  const fx = sqlConstraintBody(sql, "envelope_rows_converted_needs_rate");
+  if (fx === null) {
+    findings.push({
+      file: MIGRATION,
+      line: 1,
+      column: 1,
+      message: "could not find the envelope_rows_converted_needs_rate constraint",
+    });
+  } else {
+    for (const { name, unit } of metrics) {
+      if (unit !== "currency") continue;
+      if (!fx.includes(`${name} is null`)) {
+        findings.push({
+          file: MIGRATION,
+          line: 1,
+          column: 1,
+          message: `metric "${name}" is currency but is absent from envelope_rows_converted_needs_rate -- a converted amount could be stored with no rate to reproduce it`,
+        });
+      }
+    }
+  }
+
+  const when = sqlTriggerCondition(sql);
+  if (when === null) {
+    findings.push({
+      file: MIGRATION,
+      line: 1,
+      column: 1,
+      message: "could not find the envelope_rows_restated trigger condition",
+    });
+  } else {
+    for (const { name } of metrics) {
+      if (!when.includes(`old.${name} is distinct from new.${name}`)) {
+        findings.push({
+          file: MIGRATION,
+          line: 1,
+          column: 1,
+          message: `metric "${name}" is absent from the envelope_rows_restated trigger condition -- it would restate silently and no webhook would fire`,
+        });
+      }
+    }
+  }
 }
 
 function compare(findings, label, ts, sql, tsFile) {
@@ -135,6 +263,8 @@ if (unknown.length > 0) {
 const sql = readText(MIGRATION);
 const findings = [];
 
+checkSingleFileAssumption(findings);
+
 compare(
   findings,
   "sources",
@@ -164,14 +294,18 @@ compare(
   CONTRACT.metrics,
 );
 
+checkHandWrittenLists(findings, tsMetricUnits(readText(CONTRACT.metrics)), sql, CONTRACT.metrics);
+
 process.exit(
   report({
     name: "dictionary guard",
     findings,
     notes: [
       "the canonical vocabulary lives in packages/contract AND in the schema; neither can import the other",
+      "and every metric is checked against the three hand-written SQL lists: columns, the fx constraint, the restatement trigger",
     ],
     warn,
-    summary: "contract and schema agree on sources, entity types, attribution windows and metrics",
+    summary:
+      "contract and schema agree on sources, entity types, attribution windows, metrics, the fx constraint and the restatement trigger",
   }),
 );

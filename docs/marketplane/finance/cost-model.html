@@ -1,0 +1,1660 @@
+<title>SME BI Cost Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Mono:wght@400;500;600&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Sans:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --paper:      #F3F5F4;
+    --surface:    #FFFFFF;
+    --surface-2:  #EAEEEC;
+    --ink:        #131A18;
+    --ink-2:      #4A5754;
+    --ink-3:      #5F6A66;
+    --rule:       #DCE3E0;
+    --rule-firm:  #B9C5C1;
+    --accent:     #0E6E57;
+    --accent-bg:  #E2EEE9;
+    --cost:       #9A4A2C;
+    --cost-bg:    #F3E6DF;
+    --risk:       #8A2E38;
+    --risk-bg:    #F5E3E4;
+
+    --display: "Newsreader", Georgia, "Times New Roman", serif;
+    --body: "Atkinson Hyperlegible", "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    --measure: 66ch;
+    --wide: 1080px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0E1413;
+      --surface:    #161E1C;
+      --surface-2:  #1D2726;
+      --ink:        #E4EAE7;
+      --ink-2:      #A3B0AC;
+      --ink-3:      #97A5A1;
+      --rule:       #263331;
+      --rule-firm:  #3A4A47;
+      --accent:     #45C39A;
+      --accent-bg:  #143029;
+      --cost:       #D9865E;
+      --cost-bg:    #33211A;
+      --risk:       #E0707C;
+      --risk-bg:    #351E22;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #0E1413;
+    --surface:    #161E1C;
+    --surface-2:  #1D2726;
+    --ink:        #E4EAE7;
+    --ink-2:      #A3B0AC;
+    --ink-3:      #97A5A1;
+    --rule:       #263331;
+    --rule-firm:  #3A4A47;
+    --accent:     #45C39A;
+    --accent-bg:  #143029;
+    --cost:       #D9865E;
+    --cost-bg:    #33211A;
+    --risk:       #E0707C;
+    --risk-bg:    #351E22;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+    padding: 0 24px 96px;
+  }
+
+  .col { max-width: var(--measure); margin-inline: auto; }
+  .wide { max-width: var(--wide); margin-inline: auto; }
+
+  /* ---------- masthead ---------- */
+
+  header.masthead {
+    max-width: var(--wide);
+    margin: 0 auto;
+    padding: 72px 0 40px;
+    border-bottom: 2px solid var(--ink);
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(2.6rem, 6vw, 4.1rem);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    margin: 0 0 20px;
+    text-wrap: balance;
+    max-width: 16ch;
+  }
+  .standfirst {
+    font-family: var(--display);
+    font-size: clamp(1.05rem, 2.2vw, 1.32rem);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 58ch;
+    margin: 0;
+  }
+  .masthead-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    margin-top: 32px;
+    font-size: 13.5px;
+    color: var(--ink-3);
+  }
+  .masthead-meta b { color: var(--ink-2); font-weight: 700; }
+
+  /* ---------- provenance chips ---------- */
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 3px 6px;
+    border-radius: 2px;
+    white-space: nowrap;
+    vertical-align: 1.5px;
+    font-weight: 500;
+  }
+  .t-v { background: var(--accent-bg); color: var(--accent); }
+  .t-m { background: var(--surface-2); color: var(--ink-2); }
+  .t-a { background: var(--cost-bg); color: var(--cost); }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 26px;
+    padding: 18px 22px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    margin: 28px auto 0;
+    max-width: var(--wide);
+    font-size: 14.5px;
+    color: var(--ink-2);
+  }
+  .legend > div { display: flex; align-items: baseline; gap: 8px; }
+
+  /* ---------- sections ---------- */
+
+  section { padding-top: 84px; }
+  h2 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(1.7rem, 3.4vw, 2.2rem);
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+  .sec-no {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 14px;
+    font-weight: 500;
+  }
+  h3 {
+    font-family: var(--body);
+    font-weight: 700;
+    font-size: 1.09rem;
+    letter-spacing: 0.005em;
+    margin: 42px 0 12px;
+  }
+  p { margin: 0 0 20px; }
+  .col p, .col ul { max-width: var(--measure); }
+  ul { padding-left: 22px; margin: 0 0 20px; }
+  li { margin-bottom: 11px; }
+  strong { font-weight: 700; }
+  code, .num {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    font-variant-numeric: tabular-nums;
+  }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede {
+    font-family: var(--display);
+    font-size: 1.26rem;
+    line-height: 1.62;
+    color: var(--ink-2);
+    margin-bottom: 30px;
+  }
+
+  /* ---------- tables ---------- */
+
+  .tw { overflow-x: auto; margin: 22px auto 8px; max-width: var(--wide); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+    line-height: 1.55;
+    min-width: 760px;
+  }
+  caption {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding-bottom: 13px;
+  }
+  th {
+    text-align: left;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    padding: 0 16px 11px 0;
+    border-bottom: 1px solid var(--rule-firm);
+    vertical-align: bottom;
+  }
+  td {
+    padding: 14px 16px 14px 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  th.r, td.r { text-align: right; }
+  th:last-child, td:last-child { padding-right: 0; }
+  td.r, td .fig { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  tbody tr.total td {
+    border-top: 1px solid var(--rule-firm);
+    border-bottom: none;
+    font-weight: 600;
+    padding-top: 13px;
+  }
+  td .sub { display: block; color: var(--ink-2); font-size: 13.5px; line-height: 1.55; margin-top: 4px; max-width: 62ch; }
+  .good { color: var(--accent); font-weight: 600; }
+  .warn { color: var(--cost); font-weight: 600; }
+  .bad  { color: var(--risk); font-weight: 600; }
+
+  /* ---------- callout ---------- */
+
+  .finding {
+    max-width: var(--wide);
+    margin: 34px auto;
+    padding: 34px 38px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 3px;
+  }
+  .finding h3 { margin-top: 0; font-family: var(--display); font-size: 1.42rem; font-weight: 500; letter-spacing: -0.005em; }
+  .finding p:last-child { margin-bottom: 0; }
+
+  .note {
+    max-width: var(--wide);
+    margin: 22px auto;
+    padding: 22px 26px;
+    background: var(--cost-bg);
+    border-radius: 3px;
+    font-size: 15.5px;
+    line-height: 1.7;
+    color: var(--ink);
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note strong { color: var(--cost); }
+
+  /* ---------- tier cards ---------- */
+
+  .tiers {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+    gap: 16px;
+    max-width: var(--wide);
+    margin: 26px auto;
+  }
+  .tier {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 24px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .tier.headline { border-color: var(--accent); background: var(--accent-bg); }
+  .tier-name {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .tier.headline .tier-name { color: var(--accent); }
+  .tier-price {
+    font-family: var(--display);
+    font-size: 1.9rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .tier-price small { font-size: 0.5em; color: var(--ink-3); font-family: var(--mono); display: block; margin-top: 6px; letter-spacing: 0.04em; }
+  .tier ul { padding-left: 18px; margin: 0; font-size: 14.5px; line-height: 1.5; color: var(--ink-2); }
+  .tier li { margin-bottom: 8px; }
+  .tier-margin {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-2);
+  }
+  .tier.headline .tier-margin { border-top-color: var(--rule-firm); }
+
+  /* ---------- chart ---------- */
+
+  figure { margin: 30px auto; max-width: var(--wide); }
+  .chart-frame {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 24px 20px 12px;
+    overflow-x: auto;
+  }
+  figcaption {
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--ink-2);
+    margin-top: 18px;
+    max-width: 66ch;
+  }
+  .key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 26px;
+    margin-top: 16px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-2);
+  }
+  .key span { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 16px; height: 2.5px; border-radius: 2px; display: inline-block; }
+
+  svg text { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ---------- footer ---------- */
+
+  footer {
+    max-width: var(--wide);
+    margin: 80px auto 0;
+    padding-top: 26px;
+    border-top: 2px solid var(--ink);
+    font-size: 14.5px;
+    line-height: 1.65;
+    color: var(--ink-3);
+  }
+  footer p { max-width: none; }
+
+  @media (max-width: 640px) {
+    body { padding: 0 16px 64px; }
+    header.masthead { padding-top: 48px; }
+    .finding { padding: 22px 20px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+
+  /* ---------- summary band ---------- */
+
+  .kpis {
+    max-width: var(--wide);
+    margin: 34px auto 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+    border: 1px solid var(--rule-firm);
+    border-radius: 3px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .kpi {
+    padding: 20px 20px 18px;
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .kpi-v {
+    font-family: var(--display);
+    font-size: 1.72rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    display: block;
+  }
+  .kpi-l {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    display: block;
+    margin-top: 10px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+  .kpi-n { font-size: 13.5px; color: var(--ink-2); display: block; margin-top: 7px; line-height: 1.45; }
+
+  /* ---------- pull statistic ---------- */
+
+  .pull {
+    max-width: var(--wide);
+    margin: 30px auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px 44px;
+    align-items: baseline;
+    padding: 24px 26px;
+    background: var(--accent-bg);
+    border-radius: 3px;
+  }
+  .pull-fig {
+    font-family: var(--display);
+    font-size: clamp(2.1rem, 5vw, 3rem);
+    line-height: 1;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .pull p { margin: 0; flex: 1 1 340px; min-width: 0; color: var(--ink); font-size: 16.5px; line-height: 1.65; }
+
+  table.compact td { padding: 10px 16px 10px 0; }
+  td.mono, th.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  tr.rule-top td { border-top: 1px solid var(--rule-firm); }
+
+  /* ---------- currency rule ---------- */
+  .fx-note {
+    max-width: var(--wide);
+    margin: 26px auto 0;
+    padding: 18px 24px;
+    background: var(--surface-2);
+    border-left: 3px solid var(--ink-2);
+    border-radius: 3px;
+    font-size: 15px;
+    line-height: 1.68;
+    color: var(--ink-2);
+  }
+  .fx-note b { color: var(--ink); font-weight: 600; }
+  .usd { color: var(--ink-3); font-family: var(--mono); font-size: 0.85em; white-space: nowrap; }
+</style>
+
+<header class="masthead">
+  <p class="eyebrow">Operating and financial model · v9 · five-year · 9 September 2026</p>
+  <h1>What this costs, what it earns, and when it pays</h1>
+  <p class="standfirst">A business-intelligence data plane for Thai SMEs. Serving a customer's data costs about one baht sixty-five a month; answering their questions costs ninety times that. That single asymmetry decides the packaging, the pricing, the hiring plan and the shape of the P&amp;L — and it is the reason the entire data plane can be given away without it being a loss leader.</p>
+  <div class="masthead-meta">
+    <span><b>Entity</b> BOI-promoted, VAT-registered Thai company</span>
+    <span><b>Horizon</b> 60 months from build start</span>
+    <span><b>Basis</b> Bottom-up from verified vendor rates</span>
+  </div>
+</header>
+
+<div class="fx-note">
+  <b>All money in this document is Thai baht (฿).</b> Vendor prices appear in US dollars only where the vendor bills in dollars — every model, every cloud service, every SaaS line is a USD invoice, and §05 prices the tax and currency cost of paying them. Converted at <b>฿32.9 = $1.00</b> (7 September 2026). Where a dollar figure is useful for comparison it is shown small and grey, like this: <span class="usd">$1,000</span>.
+</div>
+
+<div class="kpis">
+  <div class="kpi"><span class="kpi-v">78%</span><span class="kpi-l">Gross margin</span><span class="kpi-n">Year 3; rises with scale</span></div>
+  <div class="kpi"><span class="kpi-v">M28</span><span class="kpi-l">EBITDA positive</span><span class="kpi-n">Cash positive M39</span></div>
+  <div class="kpi"><span class="kpi-v">฿19.3M</span><span class="kpi-l">Peak cash need</span><span class="kpi-n"><span class="usd">$586k</span> · trough M24</span></div>
+  <div class="kpi"><span class="kpi-v">฿249M</span><span class="kpi-l">ARR at month 60</span><span class="kpi-n">฿92M at M36 · 5,047 SME + 78 ent.</span></div>
+  <div class="kpi"><span class="kpi-v">0%</span><span class="kpi-l">Corporate tax</span><span class="kpi-n">BOI 8.1, up to 8 years</span></div>
+  <div class="kpi"><span class="kpi-v">฿38M</span><span class="kpi-l">Routing engine</span><span class="kpi-n">extra cumulative cash by M60</span></div>
+</div>
+
+<div class="legend">
+  <div><span class="tag t-v">verified</span> price or benchmark read from source</div>
+  <div><span class="tag t-m">modelled</span> arithmetic from verified inputs</div>
+  <div><span class="tag t-a">assumed</span> a judgement you should replace with evidence</div>
+</div>
+
+<section class="col">
+  <span class="sec-no">01 — The finding</span>
+  <h2>Give away the plumbing. Charge for the advice.</h2>
+  <p class="lede">Every piece of infrastructure this product runs on is priced per request, per gigabyte or per million operations — and at SME volumes those units round to nothing. The language model does not.</p>
+
+  <p>A customer with four connectors, nightly restatement pulls, a year of history in Postgres and every raw payload archived in object storage costs about <span class="num">฿1.65</span> a month to serve. The same customer asking fifteen questions of the advice surface costs <span class="num">฿148</span>.</p>
+</section>
+
+<div class="pull">
+  <span class="pull-fig">90:1</span>
+  <p>The ratio between what a customer's judgement costs and what their data costs. It does not improve with scale, because neither side has a fixed component worth amortising — which means packaging, not engineering, is what decides the margin.</p>
+</div>
+
+<section class="col">
+  <p>That has one clean consequence. The dashboard, the connectors, the after-fees number, the full history, the exports — all of it is nearly free to serve, so it can be genuinely free to use. What costs money is the model reading your numbers and telling you what to do about them. Meter that, and only that.</p>
+
+  <div class="finding">
+    <h3>The generous tier is the honest tier</h3>
+    <p>A free plan that hands over the entire data plane — every connector, unlimited history, the whole after-fees dashboard — costs <span class="num">฿1.65</span> per user per month and never feels mean, because nothing is being withheld to manufacture pressure. The paid tiers start where the real cost starts: the weekly action sheet, the daily brief, and the questions.</p>
+    <p style="margin-top:14px">A Starter customer who asks fifteen questions a month against a hundred-question allowance will never once see a limit. That is what generous means operationally: the cap exists to stop abuse, not to shape behaviour. It is also the distribution strategy — §07 shows the free base reaching <strong>34,800 users</strong> against 1,995 paying ones, at a serving cost of ฿57,000 a month — less than one and a half customer-success salaries.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <span class="sec-no">02 — Packaging</span>
+    <h2>Four tiers and a free plan</h2>
+    <p>Prices are the sticker price a Thai customer sees, VAT included — most Thai SMEs are not VAT-registered and cannot credit it back, so the gross number is the real number to them. Margins are computed on the price <em>net</em> of VAT and on cost <em>after</em> the tax and currency uplift of §05. Expected cost assumes customers use 15% of their question allowance, which is the assumption most worth testing.</p>
+  </div>
+
+  <div class="tiers">
+    <div class="tier headline">
+      <div class="tier-name">Free</div>
+      <div class="tier-price">฿0<small>the entire data plane</small></div>
+      <ul>
+        <li>Every connector, no limit</li>
+        <li>Unlimited history</li>
+        <li>After-fees dashboard</li>
+        <li>CSV and Sheets export</li>
+        <li>No action sheet, no questions</li>
+      </ul>
+      <div class="tier-margin">Cost to serve <span class="good">฿1.65</span></div>
+    </div>
+    <div class="tier">
+      <div class="tier-name">Starter</div>
+      <div class="tier-price">฿1,590<small>VAT incl. · ฿1,486 net</small></div>
+      <ul>
+        <li>Weekly action sheet + verification</li>
+        <li>Daily LINE brief</li>
+        <li><strong>100 questions</strong> / month</li>
+        <li>Monthly owner report</li>
+        <li>1 unit, 3 users, 20 keywords</li>
+      </ul>
+      <div class="tier-margin">฿1,211 kept · <span class="good">81%</span> · cap <span class="warn">25%</span></div>
+    </div>
+    <div class="tier">
+      <div class="tier-name">Growth</div>
+      <div class="tier-price">฿4,190<small>VAT incl. · ฿3,916 net</small></div>
+      <ul>
+        <li>Everything in Starter</li>
+        <li><strong>300 questions</strong> / month</li>
+        <li>3 units, 10 users</li>
+        <li>Investor update + P&amp;L pack</li>
+        <li>Restatement webhooks, API</li>
+      </ul>
+      <div class="tier-margin">฿3,134 kept · <span class="good">80%</span> · cap <span class="warn">15%</span></div>
+    </div>
+    <div class="tier">
+      <div class="tier-name">Multi-unit</div>
+      <div class="tier-price">฿13,800<small>VAT incl. · ฿12,897 net</small></div>
+      <ul>
+        <li>10 units or client workspaces</li>
+        <li><strong>1,000 questions</strong> pooled</li>
+        <li>Scoped investor view</li>
+        <li>200 keywords, daily AI visibility</li>
+        <li>Priority support</li>
+      </ul>
+      <div class="tier-margin">฿9,960 kept · <span class="good">77%</span> · cap <span class="bad">12%</span></div>
+    </div>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Cost of goods sold, baht per customer per month <span class="tag t-m">modelled</span></caption>
+      <thead>
+        <tr><th>Line</th><th class="r">Free</th><th class="r">Starter</th><th class="r">Growth</th><th class="r">Multi-unit</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Weekly action sheet <span class="sub">฿11.02 each, batched at 50% off</span></td><td class="r">—</td><td class="r">24</td><td class="r">24</td><td class="r">239</td></tr>
+        <tr><td>Daily brief <span class="sub">฿0.79 each</span></td><td class="r">—</td><td class="r">24</td><td class="r">24</td><td class="r">237</td></tr>
+        <tr><td>Questions <span class="sub">฿9.87 each, at 15% of allowance</span></td><td class="r">—</td><td class="r">148</td><td class="r">444</td><td class="r">1,481</td></tr>
+        <tr><td>Monthly reports <span class="sub">฿11.52 each, batched</span></td><td class="r">—</td><td class="r">6</td><td class="r">12</td><td class="r">58</td></tr>
+        <tr><td>SERP <span class="sub">DataForSEO, ฿0.02 per keyword-day</span></td><td class="r">—</td><td class="r">12</td><td class="r">30</td><td class="r">118</td></tr>
+        <tr><td>AI-answer visibility</td><td class="r">—</td><td class="r">—</td><td class="r">86</td><td class="r">263</td></tr>
+        <tr><td>Infrastructure</td><td class="r">1.65</td><td class="r">1.65</td><td class="r">5</td><td class="r">16</td></tr>
+        <tr class="total"><td>COGS, expected <span class="sub">incl. ×1.006 tax and FX uplift</span></td><td class="r">1.65</td><td class="r">216</td><td class="r">627</td><td class="r">2,426</td></tr>
+        <tr><td>Payment processing <span class="sub">3.7% of the VAT-inclusive price collected</span></td><td class="r">—</td><td class="r">59</td><td class="r">155</td><td class="r">511</td></tr>
+        <tr class="total"><td>Contribution per customer</td><td class="r">−1.65</td><td class="r good">1,211</td><td class="r good">3,134</td><td class="r good">9,960</td></tr>
+        <tr class="total"><td>Gross margin <span class="sub">on revenue net of output VAT</span></td><td class="r">—</td><td class="r good">81.5%</td><td class="r good">80.0%</td><td class="r good">77.2%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <h3>Enterprise is a band, not a price</h3>
+    <p>Above Multi-unit the product stops having a price and starts having a contract, but it does not jump straight to a large one. <strong>Enterprise starts around ฿30,000 a month and runs open-ended</strong>, because what an enterprise buyer actually needs varies enormously: some want single sign-on and a signed DPA and nothing else; some want a pinned data region, custom retention, an uptime credit and a named engineer. Those are different products at different prices, so enterprise is scoped in bands and quoted per deal.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Enterprise bands, baht per month <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Band</th><th>Typical scope</th><th class="r">Range</th><th class="r">Modelled at</th><th class="r">Contribution</th><th class="r">Margin</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>E1</strong><span class="sub">The entry contract</span></td>
+          <td>Single sign-on, signed DPA, named support contact, standard SLA. 3 workspaces, 2,000 pooled questions.</td>
+          <td class="r">฿30–45k</td><td class="r">37,500</td><td class="r good">26,262</td><td class="r">75%</td>
+        </tr>
+        <tr>
+          <td><strong>E2</strong><span class="sub">The group contract</span></td>
+          <td>Adds Directory Sync, custom retention, quarterly business review, 99.5% SLA. 6 workspaces, 4,000 questions.</td>
+          <td class="r">฿60–90k</td><td class="r">75,000</td><td class="r good">52,525</td><td class="r">75%</td>
+        </tr>
+        <tr>
+          <td><strong>E3</strong><span class="sub">Open-ended</span></td>
+          <td>Adds pinned data region, custom integrations, 99.9% SLA with credits, dedicated account manager, security-questionnaire and penetration-test support. 12+ workspaces, 8,000 questions.</td>
+          <td class="r">฿120k+</td><td class="r">160,000</td><td class="r good">118,162</td><td class="r">79%</td>
+        </tr>
+        <tr class="total">
+          <td>Blended, at the modelled month-36 mix</td><td>16 × E1, 7 × E2, 2 × E3</td>
+          <td class="r">—</td><td class="r">59,404</td><td class="r good">—</td><td class="r good">76%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <h3>The floor is a cost, not a preference</h3>
+    <p>Single sign-on is the one feature in the product with a step-function cost. WorkOS charges <span class="num">$125</span> <span class="usd">≈ ฿4,137</span> per connection per month at entry volume, with Directory Sync billed separately at the same rate <span class="tag t-v">verified</span> — and that figure does not shrink with the size of the deal. It is what sets the bottom of the enterprise band, and it sets it precisely:</p>
+  </div>
+
+  <div class="tw">
+    <table class="compact">
+      <caption>Same scope — 3 workspaces, 2,000 questions, one SSO connection — at different prices <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th class="r">Contract</th><th class="r">Net of VAT</th><th class="r">SSO as a share of net</th><th class="r">Contribution</th><th class="r">Margin</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td class="r">฿15,000</td><td class="r">14,019</td><td class="r bad">30%</td><td class="r">6,067</td><td class="r bad">43%</td><td>Worse than the self-serve tier below it. Do not sign this.</td></tr>
+        <tr><td class="r">฿20,000</td><td class="r">18,692</td><td class="r warn">22%</td><td class="r">10,555</td><td class="r warn">56%</td><td>Still dilutive.</td></tr>
+        <tr><td class="r">฿25,000</td><td class="r">23,364</td><td class="r warn">18%</td><td class="r">15,043</td><td class="r warn">64%</td><td>Break-even against Multi-unit&rsquo;s 77%. The true floor.</td></tr>
+        <tr class="rule-top"><td class="r"><strong>฿30,000</strong></td><td class="r">28,037</td><td class="r">15%</td><td class="r good">19,530</td><td class="r good">70%</td><td><strong>The lowest price worth quoting.</strong></td></tr>
+        <tr><td class="r">฿37,500</td><td class="r">35,047</td><td class="r">12%</td><td class="r good">26,262</td><td class="r good">75%</td><td>E1 as modelled.</td></tr>
+        <tr><td class="r">฿75,000</td><td class="r">70,093</td><td class="r good">6%</td><td class="r good">59,921</td><td class="r good">85%</td><td>The fixed cost has stopped mattering.</td></tr>
+        <tr><td class="r">฿120,000</td><td class="r">112,150</td><td class="r good">4%</td><td class="r good">100,313</td><td class="r good">89%</td><td>Effectively pure margin.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p style="margin-top:20px">That table is the whole pricing rule for the tier. Multi-unit self-serve earns <span class="num">77%</span> with no SSO at all, so <strong>an enterprise deal below about ฿25,000 a month earns less than the customer would have produced on the tier beneath it</strong> — the compliance features are being given away. Above ฿30,000 the fixed cost is absorbed and every further baht is nearly all margin, which is why E3 is left open-ended rather than capped. Quote from ฿30,000; walk away below ฿25,000 or sell them Multi-unit instead.</p>
+  </div>
+
+  <div class="note">
+    <p><strong>The Revenue Department will pay 15–20% of your customer&rsquo;s bill, if you are listed.</strong> A regulation effective 7 February 2026 gives Thai SMEs — paid-up capital under ฿5M and revenue under ฿30M, which is exactly this customer — a <strong>200% corporate income tax deduction</strong> on software subscriptions and digital services, capped at ฿300,000 of additional exemption per accounting period and running to 31 December 2027 <span class="tag t-v">verified</span>. A Starter customer deducts ฿38,160 against ฿19,080 paid; at the 15–20% SME rate that is ฿2,862–3,816 back, an effective <strong>15–20% discount funded by the state</strong>. The condition is that the vendor is registered on <strong>DEPA&rsquo;s Thailand Digital Catalog</strong> — purchases from unregistered vendors do not qualify at all. Registering is a form, it is the single cheapest act of pricing power available here, and the window closes at the end of 2027.</p>
+  </div>
+
+  <div class="col">
+    <h3>Blended ARPU is ฿3,356, and that is the number to argue about</h3>
+    <p>At a 60 / 30 / 10 mix the blended price is <span class="num">฿3,356</span> net per customer per month <span class="usd">$102</span>, so a thousand SME customers is ฿40M of ARR and not a baht more. The margin is excellent and the margin is not the constraint — <strong>ARPU is</strong>. Every meaningful increase in enterprise value comes from moving the mix up, not from shaving cost, and the ceiling is where that happens: by month 36 twenty-five enterprise logos are <strong>1.2% of customers and 18% of revenue</strong>, while Multi-unit is 10% of customers and 32%. Together, <strong>an eighth of the logos produce half the revenue</strong>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <span class="sec-no">03 — The cost engine</span>
+    <h2>Where the money actually goes inside a question</h2>
+    <p class="lede">Cheaper models are the obvious lever and the weakest one. The strongest is deciding which questions deserve an expensive model at all.</p>
+    <p>A founder question costs <span class="num">฿9.87</span>. Decomposed, that is a small retrieval-and-routing call and one large reasoning call, and the split is lopsided:</p>
+  </div>
+
+  <div class="tw">
+    <table class="compact">
+      <caption>Anatomy of one ฿9.87 question <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Stage</th><th>Model</th><th class="r">Tokens in / out</th><th class="r">Baht</th><th class="r">Share</th></tr></thead>
+      <tbody>
+        <tr><td>Route, retrieve, prepare the aggregate</td><td>Sonnet 5 <span class="sub">$2 / $10 per Mtok</span></td><td class="r">5k / 0.5k</td><td class="r">0.49</td><td class="r">5%</td></tr>
+        <tr><td>Read the numbers and answer</td><td>Opus 5, adaptive thinking <span class="sub">$5 / $25 per Mtok</span></td><td class="r">35k / 3.5k</td><td class="r">8.64</td><td class="r">88%</td></tr>
+        <tr class="total"><td>Total</td><td></td><td class="r">40k / 4k</td><td class="r">9.14</td><td class="r">100%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p>So swapping the preparation model — Sonnet 5 for Gemini 3.5 Flash-Lite at $0.30 / $2.50 <span class="tag t-v">verified</span> — takes that stage from <span class="num">฿0.49</span> to <span class="num">฿0.09</span> and moves the question by <strong>four per cent</strong>. Worth doing; not worth planning around. The four levers below are ordered by what they are actually worth.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Four levers on the same question, applied in sequence</caption>
+      <thead><tr><th>Lever</th><th>Mechanism</th><th class="r">Cost / question</th><th class="r">Cut</th></tr></thead>
+      <tbody>
+        <tr><td>Baseline</td><td>Sonnet prep, Opus answer, no caching, everything reaches Opus</td><td class="r">฿9.87</td><td class="r">—</td></tr>
+        <tr>
+          <td><strong>1. Cheap models for the mechanical half</strong> <span class="tag t-v">verified</span><span class="sub">Gemini 3.5 Flash-Lite ($0.30/$2.50) or Haiku 4.5 ($1/$5) for routing, retrieval, extraction and verification. Never for advice.</span></td>
+          <td>Prep stage falls 82%, but prep is only 5% of the call</td><td class="r">฿9.48</td><td class="r">4%</td>
+        </tr>
+        <tr>
+          <td><strong>2. Cache the methodology</strong> <span class="tag t-v">verified</span><span class="sub">System prompt, action rubric and the customer's business profile are stable across every call — roughly 12k of the 35k input. Anthropic reads cached input at 0.1×.</span></td>
+          <td>Saves ฿1.78 at a full hit; ฿1.15 at a 65% hit rate <span class="tag t-a">assumed</span></td><td class="r">฿8.33</td><td class="r">12%</td>
+        </tr>
+        <tr>
+          <td><strong>3. Route by shape</strong> <span class="tag t-a">assumed</span><span class="sub">Most of what an owner asks is a lookup — "what did we spend on Facebook last week" — not advice. A lookup is answered from SQL plus a cheap model at ฿0.14. Only genuine judgement reaches Opus.</span></td>
+          <td>At 60% cheap-path, the blend collapses</td><td class="r">฿3.36</td><td class="r"><strong>66%</strong></td>
+        </tr>
+        <tr>
+          <td><strong>4. Batch what nobody is waiting for</strong> <span class="tag t-v">verified</span><span class="sub">Action sheets, monthly reports and verification runs have no user waiting. Anthropic and Google both discount batch 50%. Already applied to those lines in §02.</span></td>
+          <td>Does not touch questions — halves the scheduled artefacts</td><td class="r">—</td><td class="r">50%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pull">
+    <span class="pull-fig">฿9.87&nbsp;→&nbsp;฿3.36</span>
+    <p>The routing classifier is the single highest-value piece of engineering in the product — and you have to build it anyway to make the Ask surface work. It is worth more than every infrastructure decision in this document combined.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>What the four levers do to every tier, baht <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Tier</th><th class="r">COGS today</th><th class="r">COGS routed</th><th class="r">Margin today</th><th class="r">Margin routed</th><th class="r">At cap today</th><th class="r">At cap routed</th></tr></thead>
+      <tbody>
+        <tr><td>Starter</td><td class="r">216</td><td class="r">86</td><td class="r">81%</td><td class="r good">90%</td><td class="r warn">25%</td><td class="r good">71%</td></tr>
+        <tr><td>Growth</td><td class="r">627</td><td class="r">298</td><td class="r">80%</td><td class="r good">88%</td><td class="r warn">15%</td><td class="r good">66%</td></tr>
+        <tr><td>Multi-unit</td><td class="r">2,426</td><td class="r">1,121</td><td class="r">77%</td><td class="r good">87%</td><td class="r bad">12%</td><td class="r good">65%</td></tr>
+        <tr class="total"><td>Blended contribution / customer / month</td><td class="r">—</td><td class="r">—</td><td class="r">฿2,663</td><td class="r good">฿2,970</td><td class="r">—</td><td class="r">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure>
+    <div class="chart-frame">
+      <svg viewBox="0 0 740 350" width="100%" role="img" aria-label="Gross margin falls from about 90 percent to between 12 and 25 percent as customers consume their full question allowance">
+        <g stroke="var(--rule)" stroke-width="1">
+          <line x1="62" y1="278" x2="700" y2="278"></line>
+          <line x1="62" y1="216" x2="700" y2="216"></line>
+          <line x1="62" y1="154" x2="700" y2="154"></line>
+          <line x1="62" y1="92"  x2="700" y2="92"></line>
+          <line x1="62" y1="30"  x2="700" y2="30"></line>
+        </g>
+        <g fill="var(--ink-3)" font-size="11.5" text-anchor="end">
+          <text x="54" y="282">0%</text><text x="54" y="220">25%</text><text x="54" y="158">50%</text><text x="54" y="96">75%</text><text x="54" y="34">100%</text>
+        </g>
+        <g fill="var(--ink-3)" font-size="11.5" text-anchor="middle">
+          <text x="62" y="300">0%</text><text x="221" y="300">25%</text><text x="381" y="300">50%</text><text x="540" y="300">75%</text><text x="700" y="300">100%</text>
+        </g>
+        <text x="381" y="324" fill="var(--ink-3)" font-size="11.5" text-anchor="middle">question allowance consumed</text>
+        <line x1="158" y1="30" x2="158" y2="278" stroke="var(--cost)" stroke-width="1" stroke-dasharray="3 3"></line>
+        <text x="164" y="44" fill="var(--cost)" font-size="11">expected usage 15%</text>
+        <polyline fill="none" stroke="var(--accent)" stroke-width="2.5" points="62,51 158,76 381,134 700,217"></polyline>
+        <polyline fill="none" stroke="var(--ink-2)" stroke-width="2.5" stroke-dasharray="7 4" points="62,51 158,80 381,146 700,240"></polyline>
+        <polyline fill="none" stroke="var(--cost)" stroke-width="2.5" points="62,59 158,88 381,154 700,249"></polyline>
+        <circle cx="700" cy="217" r="3.5" fill="var(--accent)"></circle>
+        <circle cx="700" cy="240" r="3.5" fill="var(--ink-2)"></circle>
+        <circle cx="700" cy="249" r="3.5" fill="var(--cost)"></circle>
+        <circle cx="158" cy="76" r="3.5" fill="var(--accent)"></circle>
+        <circle cx="158" cy="88" r="3.5" fill="var(--cost)"></circle>
+        <text x="694" y="207" fill="var(--accent)" font-size="11.5" text-anchor="end">25%</text>
+        <text x="694" y="227" fill="var(--ink-2)" font-size="11.5" text-anchor="end">15%</text>
+        <text x="694" y="264" fill="var(--cost)" font-size="11.5" text-anchor="end">12%</text>
+        <text x="164" y="71" fill="var(--accent)" font-size="11.5">81%</text>
+      </svg>
+    </div>
+    <div class="key">
+      <span><i class="swatch" style="background:var(--accent)"></i> Starter · 100 questions</span>
+      <span><i class="swatch" style="background:var(--ink-2)"></i> Growth · 300 questions</span>
+      <span><i class="swatch" style="background:var(--cost)"></i> Multi-unit · 1,000 questions</span>
+    </div>
+    <figcaption>The same three tiers, drawn against how much of the allowance a customer actually uses, on today&rsquo;s unmodified cost structure at ฿9.87 a question. Every tier still earns money at its cap — the worst case is 12%, not a loss — but the slope is the problem: the cap is doing structural work rather than acting as an anti-abuse ceiling. Routed, those three endpoints rise to 71%, 66% and 65%, and the line flattens. Enterprise is largely exempt: at 75–79% margin on a contracted allowance, question volume is a negotiated term rather than a risk.</figcaption>
+  </figure>
+
+  <div class="col">
+    <p>Two things to take from that table. The expected-case gain is real but modest — <span class="num">฿307</span> a customer a month, about <span class="num">฿6.9M</span> a year at 1,864 customers <span class="usd">$208k</span>. <strong>The transformation is in the last two columns.</strong> Untouched, a customer who actually uses their allowance drops the tier to 12–25% margin, which is why the caps have to exist and why they feel like caps. Routed, the worst case is 65–71%, and the cap stops being load-bearing. That is what buys the right to advertise a genuinely generous allowance instead of a defensive one.</p>
+
+    <h3>Cloudflare AI Gateway</h3>
+    <p>Worth adding, and it is already on the stack. Core features — analytics, caching, rate limiting, logging — are <strong>free on any Cloudflare plan</strong>, with 10M persistent logs per gateway on Workers Paid, and no per-token markup <span class="tag t-v">verified</span>. What it buys, in order of value here:</p>
+    <ul>
+      <li><strong>Per-workspace cost attribution.</strong> You cannot price a metered product you cannot measure per tenant. This is the reason to adopt it, and it is worth more than the caching.</li>
+      <li><strong>Provider failover and one endpoint.</strong> Anthropic primary, Gemini and OpenRouter as fallbacks, without three SDKs and three retry policies in the worker.</li>
+      <li><strong>Response caching for deterministic calls.</strong> Real hit rate on repeated prep over unchanged data; near zero on questions, which are all different. It complements provider-native prompt caching rather than replacing it — lever 2 above is Anthropic's, not the gateway's.</li>
+      <li><strong>Rate limiting per workspace</strong>, which is how a fair-use cap gets enforced without writing a quota system.</li>
+    </ul>
+    <p>Do not use its unified billing: that adds <span class="num">5%</span> on credit purchases, the same toll OpenRouter charges. Route through the gateway, pay the providers directly.</p>
+  </div>
+
+  <div class="note">
+    <p><strong>Adding Google as a model vendor is a governance decision, not just a cost one.</strong> The stack is deliberately Vercel, Cloudflare and Supabase, and every addition needs a written reason — cost is one, and it belongs in a design note, not in a commit message. Three checks come first: a data-processing agreement with zero retention on the paid tier; a subprocessor disclosure, because customer platform data crosses into a new vendor; and a read of the advertising platforms' own terms, several of which restrict transferring platform data to third parties outside a contracted service-provider relationship. The saving is worth having. It is not worth having quietly.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <span class="sec-no">04 — Operating cost</span>
+    <h2>What it costs to have a company, not just a product</h2>
+    <p class="lede">The platform bill is trivial and always was. Everything around it — a real office, laptops, insurance, recruiters, auditors, penetration testers — is <span class="num">฿23.7M</span> over three years, and it is the difference between a model that looks good and one you can operate. Nearly half of it is the office.</p>
+  </div>
+
+  <div class="tw">
+    <table class="compact">
+      <caption>Platform, baht per month <span class="tag t-v">verified</span></caption>
+      <thead><tr><th>Line</th><th>Basis</th><th class="r">Launch</th><th class="r">500 cust.</th><th class="r">1,500 cust.</th></tr></thead>
+      <tbody>
+        <tr><td>Vercel Pro</td><td>$20 / seat, $20 usage credit</td><td class="r">1,316</td><td class="r">3,948</td><td class="r">7,238</td></tr>
+        <tr><td>Cloudflare Workers Paid + AI Gateway</td><td>10M req included; gateway core free</td><td class="r">198</td><td class="r">1,646</td><td class="r">4,935</td></tr>
+        <tr><td>Supabase Pro + compute</td><td>$25 base; Small → Medium → replica</td><td class="r">987</td><td class="r">4,277</td><td class="r">10,199</td></tr>
+        <tr><td>R2, KV, domain, DNS</td><td>zero egress</td><td class="r">2,006</td><td class="r">8,224</td><td class="r">7,238</td></tr>
+        <tr class="total"><td>Total platform</td><td></td><td class="r">4,507</td><td class="r">18,095</td><td class="r">29,610</td></tr>
+        <tr><td>As a share of revenue</td><td></td><td class="r">—</td><td class="r good">1.1%</td><td class="r good">0.5%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p style="margin-top:20px">That is the whole infrastructure bill — one junior salary at 1,500 customers. Everything below is larger.</p>
+    <h3>Per head, every month</h3>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Cost of having a person, baht per head per month <span class="tag t-v">market rates verified</span></caption>
+      <thead><tr><th>Line</th><th class="r">Per head</th><th>Basis</th></tr></thead>
+      <tbody>
+        <tr><td>Group health insurance</td><td class="r">2,500</td><td>Thai group plans run ฿1,000–5,000 per employee per month. Mid-tier is the level that competes with multinationals for engineers; 60–70% of formal-sector employers provide it, so it is table stakes rather than a perk.</td></tr>
+        <tr><td>Training budget</td><td class="r">1,667</td><td>฿20,000 per head per year. Also counts toward the BOI 8.1 exemption ceiling at 200% for Thai IT personnel, which makes it the cheapest line in the table.</td></tr>
+        <tr><td>Company events</td><td class="r">1,417</td><td>฿17,000 per head per year — quarterly team events and one annual party.</td></tr>
+        <tr><td>Pantry, coffee and supplies</td><td class="r">1,200</td><td>Real once there is a real kitchen to stock.</td></tr>
+        <tr class="total"><td>Total per head</td><td class="r">6,784</td><td>฿128,896 a month at nineteen people. The office is separate and is not a per-head cost — see below.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <h3>The office is a lease, not a desk rate</h3>
+    <p>A conventional lease in a central building, fitted out properly. It is the single largest non-payroll line in the plan and it behaves differently from everything else here: <strong>you commit to the end-state space on day one</strong>, so year one pays for a room that is three-quarters empty. That is the price of not moving twice.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Office — 200 sqm, central Bangkok, three-year lease <span class="tag t-v">market rates verified</span></caption>
+      <thead><tr><th>Line</th><th class="r">Baht</th><th>Basis</th></tr></thead>
+      <tbody>
+        <tr><td>Rent</td><td class="r">110,000 <span class="sub">/ month</span></td><td>200 sqm at ฿550/sqm. Grade A in Asoke runs ฿450–650; Sathorn averages ฿782 and Grade B saves roughly ฿150/sqm, or ฿30,000 a month.</td></tr>
+        <tr><td>Service charge</td><td class="r">26,000 <span class="sub">/ month</span></td><td>฿130/sqm — building management, common areas, security.</td></tr>
+        <tr><td>Utilities</td><td class="r">30,000 <span class="sub">/ month</span></td><td>฿150/sqm. Air-conditioned Bangkok office space in a tower.</td></tr>
+        <tr><td>Business fibre and LTE backup</td><td class="r">7,000 <span class="sub">/ month</span></td><td>Two paths. A data platform cannot ship from one line.</td></tr>
+        <tr><td>Daily cleaning</td><td class="r">12,000 <span class="sub">/ month</span></td><td></td></tr>
+        <tr><td>Contents and fire insurance</td><td class="r">3,000 <span class="sub">/ month</span></td><td>Nineteen laptops, a fitted-out floor and a landlord who will ask for it.</td></tr>
+        <tr class="total"><td>Monthly running cost</td><td class="r">188,000</td><td>Plus ฿1,200 per head of pantry. <strong>฿210,800 a month at nineteen people</strong> — ฿11,095 a head, against ฿8,500 for a serviced desk.</td></tr>
+        <tr class="rule-top"><td><strong>Fit-out</strong> <span class="sub">one-off, months 1–2</span></td><td class="r">3,000,000</td><td>฿15,000/sqm — partitions, ceiling, lighting, power and data, two meeting rooms, pantry, reception, and built-in benching. Cushman &amp; Wakefield benchmark Bangkok corporate fit-out at roughly ฿26,000/sqm, so this is a lean spec deliberately; a fuller one is ฿5.2M.</td></tr>
+        <tr><td><strong>Deposit</strong> <span class="sub">refundable at lease end</span></td><td class="r">408,000</td><td>Three months of rent and service charge. Cash out now, back in year four.</td></tr>
+        <tr><td>Rent-free period</td><td class="r good">−272,000</td><td>Two months during fit-out — standard on a three-year Bangkok lease, and worth asking for in writing.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <p><strong>What the office actually costs, honestly stated.</strong> Over three years it is <span class="num">฿10.34M</span> — running cost ฿6.50M, pantry ฿0.44M, fit-out ฿3.0M, deposit ฿0.41M — against <span class="num">฿3.09M</span> for serviced desks. It adds <strong>฿6.45M to the peak funding requirement</strong>, and in year one, with five people in a room built for nineteen, it works out at ฿38,800 per head per month. Three things buy that back and none of them are on a spreadsheet: it is somewhere to bring an enterprise buyer, it is a company rather than a group of people with laptops, and — the one that is nearly financial — <strong>a controlled office with badge access and a locked comms room is materially easier to evidence in a SOC 2 audit and an enterprise security review than a shared floor you do not control.</strong> Given the security engineer in §06 and the ฿400,000 of SOC 2 readiness above, that is not a small consideration.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Tool subscriptions — every rate is per person, USD per month <span class="tag t-v">verified</span></caption>
+      <thead><tr><th>Role</th><th>Assistant tier</th><th class="r">Assistant<br>each</th><th class="r">Shared stack<br>each</th><th class="r">Per person</th><th class="r">Seats at M36</th><th class="r">Baht / month</th></tr></thead>
+      <tbody>
+        <tr><td>Founders — CEO, PGM, CTO</td><td>Claude Max 20×</td><td class="r">200</td><td class="r">44.50</td><td class="r">244.50</td><td class="r">3</td><td class="r">24,132</td></tr>
+        <tr><td>Security &amp; data-protection engineers</td><td>Claude Max 20×</td><td class="r">200</td><td class="r">48.50</td><td class="r">248.50</td><td class="r">2</td><td class="r">16,351</td></tr>
+        <tr><td>Senior engineers and engineers</td><td>Claude Max 5×</td><td class="r">100</td><td class="r">48.50</td><td class="r">148.50</td><td class="r">4</td><td class="r">19,543</td></tr>
+        <tr><td>CS, sales, account managers, marketing, HR</td><td>Claude Team</td><td class="r">20</td><td class="r">44.50</td><td class="r">64.50</td><td class="r">10</td><td class="r">21,221</td></tr>
+        <tr><td>Company-wide, not per seat <span class="sub">Sentry Business $80, transactional email $20, CI minutes $50, Figma $32, Zoom $48, the CTO&rsquo;s GitHub seat, and Thai accounting and payroll software at ฿4,000</span></td><td>—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">11,699</td></tr>
+        <tr class="total"><td>Total at nineteen people</td><td></td><td class="r"></td><td class="r"></td><td class="r"></td><td class="r">19</td><td class="r">92,945</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p>The shared stack is Slack Business+ at $12.50, Google Workspace Business Standard at $14, 1Password Business at $8 and a planning tool at $10 — <strong>each, for every person</strong> — plus GitHub Team at $4 for anyone who touches the repository <span class="tag t-v">verified</span>.</p>
+    <p><strong>The assistant seats are individual, not a pooled licence.</strong> Every founder is $200 a month on their own, and so is every security engineer; the $200 does not divide across the team. At nineteen people that is <span class="num">฿52,640</span> a month of assistant seats alone — <strong>57% of the entire tool bill</strong> — and the proportion is higher earlier, when the company is five people and five of them are on the expensive tiers:</p>
+    <ul>
+      <li><strong>Month 12, five people</strong> — 3 founders and 1 security engineer at $200, 1 engineer at $100: <span class="num">$900</span> of assistant seats out of ฿45,892 of tools, or <strong>65%</strong>.</li>
+      <li><strong>Month 24, fourteen people</strong> — $1,240 of assistant seats, <strong>55%</strong> of ฿73,518.</li>
+      <li><strong>Month 36, nineteen people</strong> — $1,600 of assistant seats, <strong>57%</strong> of ฿92,945.</li>
+    </ul>
+    <p>That is the line worth defending rather than trimming. A ฿6,580-a-month seat that saves an engineer four hours a week returns about fifteen times its cost at Bangkok salaries, and it is what lets a four-person engineering team hold the surface area in §06. Tier it by how much the person builds, not by seniority — but tier it per person, because that is how it is billed.</p>
+
+    <h3>What a hire costs before their first day</h3>
+  </div>
+
+  <div class="tw">
+    <table class="compact">
+      <caption>One-off cost per hire, baht <span class="tag t-a">assumed</span></caption>
+      <thead><tr><th>Line</th><th class="r">Engineering</th><th class="r">Commercial</th></tr></thead>
+      <tbody>
+        <tr><td>Laptop <span class="sub">MacBook Pro vs Air</span></td><td class="r">75,000</td><td class="r">45,000</td></tr>
+        <tr><td>Monitor</td><td class="r">12,000</td><td class="r">12,000</td></tr>
+        <tr><td>Ergonomic chair <span class="sub">desks are built into the fit-out</span></td><td class="r">12,000</td><td class="r">12,000</td></tr>
+        <tr><td>Peripherals and setup</td><td class="r">5,000</td><td class="r">5,000</td></tr>
+        <tr><td>Recruitment <span class="sub">blended agency fee and job-board spend</span></td><td class="r">80,000</td><td class="r">80,000</td></tr>
+        <tr class="total"><td>All-in, per hire</td><td class="r">184,000</td><td class="r">154,000</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p style="margin-top:20px">Sixteen hires over three years is <span class="num">฿2.64M</span> of cash that lands in lumps, always in the month a hiring trigger fires and never smoothly. Equipment is expensed here rather than amortised, because this is a cash model; a three-year refresh cycle falls just outside the window and should be budgeted in year four.</p>
+
+    <h3>The five costs that were not on anyone&rsquo;s list</h3>
+    <p>These are the ones that arrive with the first enterprise contract rather than with the first customer, and they are not optional once a buyer&rsquo;s procurement team is involved.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Compliance and assurance <span class="tag t-a">assumed</span></caption>
+      <thead><tr><th>Line</th><th class="r">Cost</th><th>Why it is not optional</th></tr></thead>
+      <tbody>
+        <tr><td><strong>SOC 2 Type II readiness</strong><span class="sub">Plus a compliance-automation tool from year two</span></td><td class="r">฿400,000 <span class="sub">first year</span><br>+ ฿27,400/mo</td><td>An E2 or E3 buyer&rsquo;s security questionnaire will ask for it. Without it the deal either stalls for two quarters or shrinks to E1. This is a revenue gate, not overhead.</td></tr>
+        <tr><td><strong>Annual penetration test</strong></td><td class="r">฿200,000 / yr</td><td>Requested by name in most enterprise security reviews, and by any customer whose own auditor is involved.</td></tr>
+        <tr><td><strong>Cyber liability and professional indemnity insurance</strong></td><td class="r">฿150,000 / yr</td><td>Increasingly a contract clause rather than a nice-to-have. You hold advertising credentials for thousands of businesses.</td></tr>
+        <tr><td><strong>Statutory annual audit</strong></td><td class="r">฿60,000 / yr</td><td><strong>Mandatory for every Thai limited company</strong>, regardless of size or profit. Not a choice.</td></tr>
+        <tr><td><strong>Legal retainer</strong><span class="sub">Plus ฿400,000 in month one for incorporation, the BOI application and trademark</span></td><td class="r">฿20,000 / mo</td><td>Customer contracts, the DPA, subprocessor terms, the BOI annual report, and the enterprise redlines that arrive with every E2 deal.</td></tr>
+        <tr><td>External data protection officer <span class="sub">from month 24, per §06</span></td><td class="r">฿25,000 / mo</td><td>PDPA obligation at large-scale processing; ฿1,000,000 fine for not appointing one.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <h3>Trade shows are marketing, not overhead</h3>
+    <p>Two exhibitions a year from year two at ฿250,000 each — THAIFEX and Food &amp; Hospitality Thailand are where every restaurant group, hotel operator and franchise buyer in the country already goes. For a CEO whose network <em>is</em> the enterprise pipeline in §07, a booth is not a brand exercise; it is the highest-density room of E1 buyers available anywhere, and ฿500,000 a year against ฿16.4M of enterprise ARR is not a close call. Business travel is budgeted separately at ฿30,000 a month from month 10.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Everything that is not payroll or acquisition, baht <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Bucket</th><th class="r">36-month total</th><th class="r">Share</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Office</strong> — rent, service charge, utilities, fibre, cleaning, insurance</td><td class="r">6,496,000</td><td class="r">27.4%</td></tr>
+        <tr><td><span class="sub" style="margin:0">fit-out, one-off</span></td><td class="r">3,000,000</td><td class="r">12.7%</td></tr>
+        <tr><td><span class="sub" style="margin:0">deposit, refundable</span></td><td class="r">408,000</td><td class="r">1.7%</td></tr>
+        <tr><td><span class="sub" style="margin:0">pantry, coffee, supplies</span></td><td class="r">436,800</td><td class="r">1.8%</td></tr>
+        <tr class="rule-top"><td>Compliance and assurance <span class="sub">SOC 2, pentest, cyber cover, audit, legal, DPO</span></td><td class="r">3,033,000</td><td class="r">12.8%</td></tr>
+        <tr><td>Onboarding kit and recruitment fees</td><td class="r">2,644,000</td><td class="r">11.2%</td></tr>
+        <tr><td>Tool subscriptions</td><td class="r">2,186,771</td><td class="r">9.2%</td></tr>
+        <tr><td>Bad debt, failed payments and SLA credits <span class="sub">1.5% of SME revenue, 1% of enterprise</span></td><td class="r">1,230,266</td><td class="r">5.2%</td></tr>
+        <tr><td>Trade shows and exhibitions</td><td class="r">1,000,000</td><td class="r">4.2%</td></tr>
+        <tr><td>Group health insurance</td><td class="r">910,000</td><td class="r">3.8%</td></tr>
+        <tr><td>Business travel</td><td class="r">810,000</td><td class="r">3.4%</td></tr>
+        <tr><td>Training</td><td class="r">606,667</td><td class="r">2.6%</td></tr>
+        <tr><td>Company events</td><td class="r">515,667</td><td class="r">2.2%</td></tr>
+        <tr><td>Incorporation, BOI application, trademark</td><td class="r">400,000</td><td class="r">1.7%</td></tr>
+        <tr class="total"><td>Total <span class="sub">the office block alone is 44% of it</span></td><td class="r">23,677,170</td><td class="r">100%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <p><strong>This is the honest cost of the earlier drafts&rsquo; optimism.</strong> Loading all of it raises the peak funding requirement from ฿6.6M to <strong>฿19.3M</strong>, pushes EBITDA break-even from month 23 to month 28, and means cumulative cash does not turn positive inside the 36-month window at all. Nothing about the product, the pricing or the customers changed — only the recognition that a company has a lease, laptops, auditors and insurers. It also makes the §03 routing engine far more valuable than before: on this cost base it takes year-three EBITDA from ฿5.6M to <strong>฿11.6M</strong>, more than double, and pulls ฿1.8M off the peak.</p>
+  </div>
+</section>
+<section>
+  <div class="col">
+    <span class="sec-no">05 — Tax and currency</span>
+    <h2>A Thai company buying American software</h2>
+    <p class="lede">Taxed on both sides of the trade. Every vendor invoice arrives in dollars; every customer pays in baht. Handled properly the whole layer costs about <span class="num">0.6%</span> of foreign spend — handled carelessly, <span class="num">9.5%</span>, and the difference is administrative, not commercial.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Money going out — every payment to a foreign vendor</caption>
+      <thead><tr><th>Layer</th><th>Rule</th><th class="r">Done right</th><th class="r">Done wrong</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Withholding tax <span class="sub">Form PND.54 — remitted by you, not deducted by them</span></td>
+          <td>A royalty paid abroad carries <strong>15%</strong>. TRD private ruling Gor Kor 0702/16261 (19 March 2025) holds that cloud and SaaS payments buy a <em>service</em>, not the right to reproduce software — so they are business profits, and with no Thai permanent establishment and a treaty in force, exempt. <span class="tag t-v">verified</span></td>
+          <td class="r good">0%</td><td class="r bad">15%</td>
+        </tr>
+        <tr>
+          <td>Import VAT <span class="sub">Form PP.36, due the 7th of the following month</span></td>
+          <td>Services bought abroad and used in Thailand carry <strong>7%</strong> on a reverse charge. A VAT-registered company credits it straight back as input tax; a non-registrant cannot. <span class="tag t-v">verified</span></td>
+          <td class="r good">0%<span class="sub">cash-flow only</span></td><td class="r bad">7%</td>
+        </tr>
+        <tr>
+          <td>Currency conversion <span class="sub">on every USD invoice</span></td>
+          <td>A Thai-issued card adds up to <strong>2.5%</strong>, plus <strong>1%</strong> if the merchant bills in baht. A foreign-currency account costs roughly <strong>0.5%</strong> of spread. <span class="tag t-v">verified</span></td>
+          <td class="r good">0.6%</td><td class="r bad">2.5%</td>
+        </tr>
+        <tr class="total"><td>Uplift on foreign vendor spend</td><td></td><td class="r good">×1.006</td><td class="r bad">×1.095</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <p><strong>Two administrative decisions carry the entire difference.</strong> Register for VAT voluntarily from day one, well before the ฿1.8M turnover threshold forces it, so import VAT is recoverable rather than a cost. And pay foreign vendors from a foreign-currency account rather than a Thai credit card. Neither is a negotiation; both are a morning at the bank. Note also that Gor Kor 0702/16261 is a <em>private</em> ruling — it binds the Revenue Department only toward the taxpayer who requested it. Keep vendor contracts describing a service, and treat the 15% as a budgeted exposure: at 500 customers it would be <span class="num">฿45,000</span> a month, at 1,500 customers <span class="num">฿131,000</span>.</p>
+  </div>
+
+  <div class="col">
+    <h3>Money coming in</h3>
+    <p>Output VAT is <strong>7%</strong> on sales to Thai customers, and registration is mandatory above <span class="num">฿1.8M</span> of annual turnover — about a hundred Starter customers, which this plan passes in month 12. VAT is collected, not earned, so it is not a cost; but it decides the sticker price, and that decision is not neutral. A VAT-registered SME credits the 7% and sees the net price; a café doing a million baht a year is not registered, cannot credit anything, and sees the gross. Since the primary customer is the second kind, quote one VAT-inclusive number and set it so the net lands where the model needs it.</p>
+  </div>
+
+  <div class="tw">
+    <table class="compact">
+      <caption>Sticker prices set so the net price carries the model <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Tier</th><th class="r">Sticker, VAT incl.</th><th class="r">Net of 7% VAT</th><th class="r">Contribution kept</th><th class="r">Margin</th></tr></thead>
+      <tbody>
+        <tr><td>Starter</td><td class="r">฿1,590</td><td class="r">฿1,486</td><td class="r good">฿1,211</td><td class="r">81.5%</td></tr>
+        <tr><td>Growth</td><td class="r">฿4,190</td><td class="r">฿3,916</td><td class="r good">฿3,134</td><td class="r">80.0%</td></tr>
+        <tr><td>Multi-unit</td><td class="r">฿13,800</td><td class="r">฿12,897</td><td class="r good">฿9,960</td><td class="r">77.2%</td></tr>
+        <tr><td>Enterprise, from</td><td class="r">฿53,000</td><td class="r">฿49,533</td><td class="r good">~฿38,700</td><td class="r">78%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <h3>What BOI promotion changes, and what it does not</h3>
+    <p>A software company qualifies under BOI activity <strong>8.1 — development of software, digital platforms or digital content</strong>, which carries an <strong>eight-year corporate income tax exemption</strong>, 100% foreign ownership, land rights and Smart Visa access, with no minimum registered capital and no four-Thai-per-foreigner ratio. The binding condition is that the development work is genuinely carried out in Thailand, and the minimum investment is around ฿1M excluding land and working capital. <span class="tag t-v">verified</span></p>
+    <p>Two things about it are widely misread, and both matter to this model.</p>
+    <ul>
+      <li><strong>The exemption is capped, and the cap is a payroll number.</strong> Under 8.1 the CIT exemption is limited to 100% of the salary of <em>additional Thai IT personnel hired after applying</em>, plus 200% of their training cost. This plan pays <span class="num">฿11.4M</span> of Thai engineering salary over 36 months against a maximum possible tax bill far below it, so the cap never binds — but it would bind on a company that outsourced its engineering, and it is a reason to apply <em>before</em> hiring rather than after.</li>
+      <li><strong>BOI exempts corporate income tax and nothing else.</strong> The 7% import VAT of the table above, the withholding exposure, the 7% output VAT and every foreign-exchange cost are unaffected. §05 stands exactly as written under BOI.</li>
+    </ul>
+    <p>In the 36-month window BOI is worth less than it sounds, because ordinary loss carry-forward already shelters most of it: Years 1 and 2 accumulate <span class="num">฿10.8M</span> of losses that offset Year 3&rsquo;s profit, leaving a real tax bill of about <span class="num">฿709,000</span> without promotion and zero with it. <strong>The value is in years four to eight</strong>, when the losses are used up and profit compounds — on this trajectory that is worth several times the whole peak funding requirement. Apply early, because the clock and the salary ceiling both start at approval, not at profitability.</p>
+
+    <p style="margin-top:20px">Quoting VAT-inclusive at ฿1,490 rather than ฿1,590 would have cost 8% of contribution and moved break-even from 103 customers to 112; the extra hundred baht buys that back and still reads as a round number. Corporate income tax sits below all of this and outside a gross-margin model — Thailand taxes small companies on a graduated SME schedule rather than the headline 20%, and whether this company qualifies is a question for the accountant before the first profitable year, which on this plan is Year 3. <span class="tag t-a">assumed</span></p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <span class="sec-no">06 — The team</span>
+    <h2>Three founders who cover three different jobs</h2>
+    <p class="lede">The founding team maps onto the three things this business actually has to do at once: sell into an industry, build a correctness product, and convert a funnel nobody has built before.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Founders and what each one owns in this model <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Founder</th><th>Owns</th><th>Where it shows up in the numbers</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>CEO</strong><span class="sub">Network and sales, F&amp;B background</span></td>
+          <td>Enterprise and Multi-unit, partnerships, fundraising, the first hundred customers</td>
+          <td>The entire enterprise line — twenty-five logos averaging ฿59,000 a month is <strong>18% of month-36 revenue</strong> and is not reachable by cold outbound from a standing start. An F&amp;B network is a restaurant-group, hotel-group and franchise network, which is precisely the Multi-unit and enterprise buyer. A ฿30,000 entry contract also closes in weeks rather than quarters, which is why the first logo lands in month 14 rather than month 18. This is the most founder-dependent assumption in the document.</td>
+        </tr>
+        <tr>
+          <td><strong>Product Growth Manager</strong></td>
+          <td>The funnel end to end: free signup, activation, free-to-paid, retention, pricing experiments</td>
+          <td>The 4.3% free-to-paid rate and the 4.5% churn in §07. Both are assumptions today; this role exists to make them measurements. Also delays the marketing hire — modelled at 450 customers, and defensibly later.</td>
+        </tr>
+        <tr>
+          <td><strong>CTO</strong></td>
+          <td>The data plane, restatement correctness, tenant isolation, the routing classifier</td>
+          <td>Six months of build before the first engineer, and the §03 cost engine — worth ฿6.9M a year at scale and two months of runway. Carries engineering alone until month 7.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p>Compensation is budgeted at <strong>fourteen months of salary a year</strong> — twelve base, a guaranteed thirteenth month, and a performance bonus of up to one further month for every employee — plus the employer&rsquo;s social-security contribution of ฿750 a head. Founders draw <strong>฿120,000 in year one, stepping to ฿150,000 from month 13</strong>.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Monthly compensation, baht <span class="tag t-v">market ranges verified</span></caption>
+      <thead><tr><th>Role</th><th class="r">Bangkok market</th><th class="r">Base</th><th class="r">Fully loaded</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>Founder ×3</td><td class="r">—</td><td class="r">120,000 → 150,000</td><td class="r">140,750 → 175,750</td><td>฿120,000 through month 12, ฿150,000 from month 13. Still below the senior-engineer market band in year one.</td></tr>
+        <tr><td>Senior engineer</td><td class="r">105,000 – 234,000</td><td class="r">120,000</td><td class="r">140,750</td><td>Bottom of the senior band. The top of that range is multinational pay, not startup pay.</td></tr>
+        <tr><td><strong>Security &amp; data-protection engineer</strong></td><td class="r">70,000 – 150,000</td><td class="r">90,000</td><td class="r">105,750</td><td>From month 10. Tenant isolation, secrets and key rotation, access review, audit logging, incident response, vendor security assessments, and the PDPA record of processing.</td></tr>
+        <tr><td>Engineer</td><td class="r">34,000 – 66,000</td><td class="r">70,000</td><td class="r">82,417</td><td>Above the JobsDB median of ฿37,500, because the work is data correctness rather than CRUD.</td></tr>
+        <tr><td>Customer success</td><td class="r">25,000 – 45,000</td><td class="r">35,000</td><td class="r">41,583</td><td>Thai-language, LINE-first support. One per ~400 paying customers.</td></tr>
+        <tr><td>Inside sales</td><td class="r">26,000 – 96,000</td><td class="r">50,000 OTE</td><td class="r">59,083</td><td>฿35k base plus commission. The bonus multiple applies to base only, so this line is conservative.</td></tr>
+        <tr><td>Account manager</td><td class="r">46,000 – 109,000</td><td class="r">70,000 OTE</td><td class="r">82,417</td><td>Multi-unit and Enterprise. Owns expansion and renewal, not new logos.</td></tr>
+        <tr><td>Marketing</td><td class="r">40,000 – 90,000</td><td class="r">60,000</td><td class="r">70,750</td><td>Content, LINE communities, paid search. One hire, late — the PGM covers it until then.</td></tr>
+        <tr><td><strong>HR / People &amp; Ops</strong></td><td class="r">40,000 – 90,000</td><td class="r">55,000</td><td class="r">65,000</td><td>At twelve people. Recruitment across sixteen hires, onboarding, payroll liaison, Thai labour compliance, work permits. Below twelve a founder absorbs it; above twelve they stop doing their own job.</td></tr>
+        <tr><td>Data protection officer <span class="sub">external retainer</span></td><td class="r">—</td><td class="r">25,000</td><td class="r">25,000</td><td>From month 24. May be an employee or a contractor; a contractor is cheaper and carries no conflict-of-interest problem.</td></tr>
+        <tr><td>Accountant <span class="sub">external retainer</span></td><td class="r">—</td><td class="r">15,000</td><td class="r">15,000</td><td>From month one. PP.30, PP.36, PND.54 and the annual BOI report are monthly and unforgiving.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <h3>The security hire, and a correction</h3>
+    <p>An earlier version of this model argued there should be no IT function, on the grounds that a fully managed stack removes the servers, the load balancer, the queue and the backups. That part is still true — <strong>there is no infrastructure to administer and no ops hire</strong>. But it was the wrong conclusion, because the job that is needed here was never ops.</p>
+    <p>This product holds bring-your-own advertising and commerce credentials for thousands of businesses in one multi-tenant database, and the whole promise is per-workspace separation. The role that protects that is a <strong>security and data-protection engineer</strong>, and it is a different job from IT support: tenant isolation testing, secret and key rotation, access review, audit logging, incident response, subprocessor and vendor security assessments, and the PDPA record of processing that a customer&rsquo;s own auditor will eventually ask for. It is modelled from <strong>month 10</strong> — before the customer base makes a mistake expensive, and before the first enterprise security questionnaire arrives.</p>
+
+    <h3>What PDPA actually requires</h3>
+    <p>Thailand&rsquo;s PDPA obliges a controller or processor to appoint a <strong>Data Protection Officer</strong> where core activities involve regular monitoring of personal data on a large scale — read in practice as <strong>100,000 or more data subjects</strong> — or large-scale processing of sensitive data. Failing to appoint one when required carries an administrative fine of up to <strong>฿1,000,000</strong>, and has been treated as an aggravating factor in calculating other fines. <span class="tag t-v">verified</span></p>
+    <p>On this trajectory the combined free and paying base, plus the end-customer records inside each workspace, crosses that threshold somewhere in year three. The DPO may be an employee or an external contractor; a contractor is both cheaper and cleaner, because a DPO must be able to act independently of the people whose processing they oversee. Modelled at ฿25,000 a month from month 24 — before the threshold rather than after it, because the fine is for not having appointed one, not for appointing one late.</p>
+    <p>Two design decisions already reduce this exposure and should be held to: contact data is hashed at the edge and never stored raw, and there is no cross-customer aggregation of platform data. Both narrow what counts as personal data on the platform, and both are worth more than any amount of policy documentation.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Headcount ramp — every hire and the month it lands <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th class="r">Month</th><th class="r">FTE</th><th>Joins</th><th>Trigger</th><th class="r">Payroll / mo</th></tr></thead>
+      <tbody>
+        <tr><td class="r mono">1</td><td class="r">3</td><td>CEO, Product Growth Manager, CTO + accountant retainer</td><td>Build phase begins</td><td class="r">437,250</td></tr>
+        <tr><td class="r mono">7</td><td class="r">4</td><td>Engineer #1</td><td>Launch — connector surface grows fastest</td><td class="r">519,667</td></tr>
+        <tr><td class="r mono">10</td><td class="r">5</td><td>Security &amp; data-protection engineer</td><td>Real customer credentials in production</td><td class="r">623,417</td></tr>
+        <tr><td class="r mono">13</td><td class="r">6</td><td>Customer success #1 <span class="sub">and the founder draw steps to ฿150,000</span></td><td>150 customers</td><td class="r">772,000</td></tr>
+        <tr><td class="r mono">16</td><td class="r">7</td><td>Inside sales #1</td><td>250 customers</td><td class="r">831,083</td></tr>
+        <tr><td class="r mono">18</td><td class="r">8</td><td>Senior engineer #1</td><td>400 customers · first enterprise logo</td><td class="r">971,833</td></tr>
+        <tr><td class="r mono">19</td><td class="r">9</td><td>Marketing #1</td><td>450 customers</td><td class="r">1,042,583</td></tr>
+        <tr><td class="r mono">21</td><td class="r">11</td><td>Customer success #2, account manager #1</td><td>550 and 600 customers</td><td class="r">1,166,583</td></tr>
+        <tr><td class="r mono">23</td><td class="r">13</td><td>Inside sales #2, <strong>HR / People &amp; Ops</strong></td><td>700 customers · team reaches twelve</td><td class="r">1,290,583</td></tr>
+        <tr><td class="r mono">24</td><td class="r">14</td><td>Engineer #2 <span class="sub">and the external DPO retainer begins</span></td><td>800 customers · PDPA threshold approaching</td><td class="r">1,373,000</td></tr>
+        <tr><td class="r mono">26</td><td class="r">15</td><td>Senior engineer #2</td><td>1,000 customers</td><td class="r">1,513,750</td></tr>
+        <tr><td class="r mono">27</td><td class="r">16</td><td>Customer success #3</td><td>1,050 customers</td><td class="r">1,555,333</td></tr>
+        <tr><td class="r mono">29</td><td class="r">18</td><td>Inside sales #3, security engineer #2</td><td>1,200 customers</td><td class="r">1,720,167</td></tr>
+        <tr><td class="r mono">30</td><td class="r">19</td><td>Account manager #2</td><td>1,300 customers</td><td class="r">1,802,583</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p style="margin-top:20px">Fourteen hiring events in three years, twelve of them attached to a customer count rather than a date. The three time-based commitments — engineer #1 at launch, the security engineer at month 10, and the founder step-up at month 13 — are the only places the plan spends before the customers arrive, and each is deliberate. Payroll runs from an unmeasurable multiple of year-one revenue to <span class="num">31%</span> in year three without a single layoff. Every one of these people also carries <span class="num">฿14,083</span> a month of desk, health cover, training and events, and <span class="num">฿162,000–192,000</span> of one-off kit and recruiting on arrival — all of it in §04.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <span class="sec-no">07 — Funnel and retention</span>
+    <h2>Seventeen free users for every one who pays</h2>
+    <p class="lede">At ฿1,590 a month, no human can profitably sell the entry tier. A single sales touch costs roughly ฿10,000 in loaded rep time against ฿1,211 of monthly contribution — eight months to repay the conversation alone. <strong>Starter and Growth have to convert without a human in the loop.</strong></p>
+    <p>Human selling exists above them: Multi-unit through an account manager, and enterprise through the CEO. At ฿13,800 and ฿30,000+ a month those tickets carry a person easily, and the founder&rsquo;s existing network is what makes the enterprise ramp credible at all. The ฿30,000 entry band matters here more than the headline numbers suggest — it is a contract a restaurant group can approve without a board paper, which is why the first one lands in month 14.</p>
+  </div>
+
+  <h3 class="col">What a typical churn rate looks like</h3>
+  <div class="col">
+    <p>The published benchmarks are consistent and unflattering. Median monthly logo churn across B2B SaaS is about <strong>3.5%</strong>. Self-serve SMB products run <strong>3–7%</strong>, with 2–4% considered healthy and 3–5% tolerated where ACV is under $10,000 <span class="tag t-v">verified</span>.</p>
+    <p>This product sits at the deep end of that segment: ฿19,080 of annual value at Starter, an owner-operator buyer, no procurement, and no switching cost beyond re-authorising four connectors. The model uses <strong>4.5% for monthly plans, 2.0% for annual plans, and 1.0% for enterprise contracts</strong>.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>What each churn rate does to the entry tier <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Monthly churn</th><th>Reads as</th><th class="r">Alive after 12 mo</th><th class="r">Average life</th><th class="r">Starter LTV</th><th class="r">LTV / CAC</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">1.0%</td><td>Enterprise contracts in this model — all bands</td><td class="r">89%</td><td class="r">100 mo</td><td class="r">—</td><td class="r">—</td></tr>
+        <tr><td class="mono">2.0%</td><td><strong>Annual plans in this model</strong> — 78% renewal</td><td class="r">78%</td><td class="r">50 mo</td><td class="r">฿48,658</td><td class="r good">8.4×</td></tr>
+        <tr><td class="mono">3.5%</td><td>B2B SaaS median across all segments</td><td class="r">65%</td><td class="r">29 mo</td><td class="r">฿34,600</td><td class="r good">6.0×</td></tr>
+        <tr class="rule-top"><td class="mono"><strong>4.5%</strong></td><td><strong>Monthly plans in this model</strong> — mid self-serve SMB band</td><td class="r"><strong>58%</strong></td><td class="r"><strong>22 mo</strong></td><td class="r"><strong>฿26,911</strong></td><td class="r good"><strong>4.7×</strong></td></tr>
+        <tr class="rule-top"><td class="mono">6.0%</td><td>Poor but survivable; the model still funds itself</td><td class="r">48%</td><td class="r">17 mo</td><td class="r">฿20,183</td><td class="r warn">3.5×</td></tr>
+        <tr><td class="mono">7.0%</td><td>Downside case in §09</td><td class="r">42%</td><td class="r">14 mo</td><td class="r">฿17,300</td><td class="r warn">3.0×</td></tr>
+        <tr><td class="mono">9.0%</td><td>The business does not work. Stop and fix retention.</td><td class="r">32%</td><td class="r">11 mo</td><td class="r">฿13,456</td><td class="r bad">2.3×</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="col">Annual billing, priced at ten months for twelve</h3>
+  <div class="col">
+    <p>An annual plan removes eleven cancellation decisions a year, collapses payment-processing transaction count twelvefold, and collects a year of revenue on day one. The discount costs 16.7% of price; the retention gain repays it nearly five times.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Monthly versus annual, per customer <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Tier</th><th class="r">Monthly, per year</th><th class="r">Annual, up front</th><th class="r">Customer saves</th><th class="r">Contribution / mo</th><th class="r">Lifetime value</th><th class="r">LTV change</th></tr></thead>
+      <tbody>
+        <tr><td>Starter <span class="sub">monthly</span></td><td class="r">฿19,080</td><td class="r">—</td><td class="r">—</td><td class="r">1,211</td><td class="r">26,911</td><td class="r">—</td></tr>
+        <tr><td>Starter <span class="sub">annual</span></td><td class="r">—</td><td class="r">฿15,900</td><td class="r good">฿3,180</td><td class="r">973</td><td class="r good">48,658</td><td class="r good">+81%</td></tr>
+        <tr class="rule-top"><td>Growth <span class="sub">monthly</span></td><td class="r">฿50,280</td><td class="r">—</td><td class="r">—</td><td class="r">3,134</td><td class="r">69,640</td><td class="r">—</td></tr>
+        <tr><td>Growth <span class="sub">annual</span></td><td class="r">—</td><td class="r">฿41,900</td><td class="r good">฿8,380</td><td class="r">2,507</td><td class="r good">125,350</td><td class="r good">+80%</td></tr>
+        <tr class="rule-top"><td>Multi-unit <span class="sub">monthly</span></td><td class="r">฿165,600</td><td class="r">—</td><td class="r">—</td><td class="r">9,960</td><td class="r">221,344</td><td class="r">—</td></tr>
+        <tr><td>Multi-unit <span class="sub">annual</span></td><td class="r">—</td><td class="r">฿138,000</td><td class="r good">฿27,600</td><td class="r">7,896</td><td class="r good">394,802</td><td class="r good">+78%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pull">
+    <span class="pull-fig">2.6×</span>
+    <p>An annual Starter customer pays <strong>฿14,860 net on day one</strong> against a blended acquisition cost of ฿5,784 — repaying their own CAC two and a half times before month two. On Growth it is 6.8×. Combined with the state-funded 15–20% deduction of §02, annual billing is the closest thing this business has to free money.</p>
+  </div>
+
+  <div class="col">
+    <p>The model assumes <strong>30% of new customers choose annual</strong>, ordinary for SMB SaaS at a two-month discount, rising to 35% of the base by month 36 because annual customers persist longer. Holding everything else constant, that take-up is worth:</p>
+    <ul>
+      <li><strong>Peak funding falls from ฿10.3M to ฿6.6M</strong> — ฿3.7M of capital that does not have to be raised.</li>
+      <li><strong>Cumulative cash turns positive in month 28 rather than month 34.</strong></li>
+      <li>The customer base at month 36 is <strong>7% larger</strong> on identical acquisition, purely from lower churn.</li>
+    </ul>
+    <p>Two operating rules follow. Offer annual at signup and at every renewal, not as a hidden option — and pair it with the DEPA deduction, since a customer claiming both pays an effective ฿12,700 for a ฿19,080 list price. Never discount deeper than two months to buy it: at three months the LTV gain stops covering the price given away.</p>
+  </div>
+
+  <h3 class="col">How many stay free</h3>
+  <div class="col">
+    <p>Almost all of them. Published freemium benchmarks put free-to-paid conversion at <strong>2–5% as the median</strong>, with 3–5% good and 8–12% exceptional; across 200 B2B products the median is 4.5%, and a quarter convert below 2.5% <span class="tag t-v">verified</span>. Freemium converts far worse than a trial — opt-in trials run 8–22%, card-required trials 35–55% — because a free plan has no deadline and no moment of decision.</p>
+    <p>This model assumes <span class="num">4.3%</span>, essentially the published median. <strong>About 96 in every 100 signups never pay.</strong> Because serving them costs ฿1.65 a head, that is a feature — though it is also what pushes the platform across the PDPA threshold in §06, which is the one cost the free tier genuinely carries.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>The three populations <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Year end</th><th class="r">SME paying</th><th class="r">of which annual</th><th class="r">Enterprise</th><th class="r">Active free</th><th class="r">Free : paying</th><th class="r">Free serving cost</th></tr></thead>
+      <tbody>
+        <tr><td>Year 1</td><td class="r">124</td><td class="r">38 · 31%</td><td class="r">0</td><td class="r">2,482</td><td class="r">20 : 1</td><td class="r">฿4,083</td></tr>
+        <tr><td>Year 2</td><td class="r">843</td><td class="r">277 · 33%</td><td class="r">10</td><td class="r">15,694</td><td class="r">19 : 1</td><td class="r">฿25,817</td></tr>
+        <tr><td>Year 3</td><td class="r">1,995</td><td class="r">690 · 35%</td><td class="r">25</td><td class="r">34,779</td><td class="r">17 : 1</td><td class="r good">฿57,212</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p>Free users are modelled as churning to dormancy at 6% a month, so the active base is smaller than cumulative signups: reaching 1,995 paying customers requires roughly <strong>58,000 free signups over three years</strong>, peaking near 3,700 a month. That is the real top-of-funnel commitment behind the growth curve in §08, and it is where the plan is most demanding — not in the cost model.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Paid acquisition funnel, Google Ads Thailand <span class="tag t-a">assumed within verified CPC range</span></caption>
+      <thead><tr><th>Step</th><th class="r">Pessimistic</th><th class="r">Base</th><th class="r">Optimistic</th></tr></thead>
+      <tbody>
+        <tr><td>Cost per click <span class="sub">Thai local-service searches run ฿8–45; competitive commercial verticals ฿40–100+. <span class="tag t-v">verified</span></span></td><td class="r">฿40</td><td class="r">฿25</td><td class="r">฿18</td></tr>
+        <tr><td>Click → free signup <span class="sub">No credit card, no trial clock, the whole data plane.</span></td><td class="r">4%</td><td class="r">7%</td><td class="r">10%</td></tr>
+        <tr><td>Free → paid <span class="sub">Published freemium median is 2–5%.</span></td><td class="r">2.5%</td><td class="r">4.3%</td><td class="r">6%</td></tr>
+        <tr class="total"><td>Acquisition cost, paid channel</td><td class="r bad">฿39,500</td><td class="r">฿8,324</td><td class="r good">฿3,030</td></tr>
+        <tr><td>Blended with 40% organic at ฿1,974</td><td class="r bad">฿24,490</td><td class="r">฿5,784</td><td class="r good">฿2,608</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <p><strong>Adopt a hard CAC ceiling: twelve months of contribution.</strong> That is ฿14,532 for Starter, ฿37,608 for Growth and ฿119,520 for Multi-unit. If measured blended CAC exceeds it, the correct response is to stop buying, not to buy harder — §09 shows that spending through a broken funnel turns a ฿10.6M problem into something far worse, while switching paid off and growing organically keeps the company alive. The ceiling is the only rule here that prevents a recoverable bad year from becoming a terminal one.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Unit economics by tier <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Tier</th><th class="r">Contribution / mo</th><th class="r">Lifetime value</th><th class="r">CAC</th><th class="r">LTV / CAC</th><th class="r">Payback</th></tr></thead>
+      <tbody>
+        <tr><td>Starter <span class="sub">self-serve, monthly</span></td><td class="r">฿1,211</td><td class="r">฿26,911</td><td class="r">฿5,784</td><td class="r good">4.7×</td><td class="r good">4.8 mo</td></tr>
+        <tr><td>Growth <span class="sub">self-serve, monthly</span></td><td class="r">฿3,134</td><td class="r">฿69,644</td><td class="r">฿5,784</td><td class="r good">12.0×</td><td class="r good">1.8 mo</td></tr>
+        <tr><td>Multi-unit <span class="sub">sales-led, monthly</span></td><td class="r">฿9,960</td><td class="r">฿221,333</td><td class="r">฿98,700</td><td class="r bad">2.2×</td><td class="r warn">9.9 mo</td></tr>
+        <tr><td>Multi-unit <span class="sub">sales-led, annual</span></td><td class="r">฿7,896</td><td class="r">฿394,802</td><td class="r">฿98,700</td><td class="r good">4.0×</td><td class="r good">first invoice</td></tr>
+        <tr class="rule-top"><td><strong>Enterprise E1</strong> <span class="sub">฿30–45k, founder-led, 1.0% churn</span></td><td class="r">฿26,262</td><td class="r good">฿2,626,200</td><td class="r">฿60,000</td><td class="r good">44×</td><td class="r good">2.3 mo</td></tr>
+        <tr><td><strong>Enterprise E2</strong> <span class="sub">฿60–90k</span></td><td class="r">฿52,525</td><td class="r good">฿5,252,500</td><td class="r">฿140,000</td><td class="r good">38×</td><td class="r good">2.7 mo</td></tr>
+        <tr><td><strong>Enterprise E3</strong> <span class="sub">฿120k+</span></td><td class="r">฿118,162</td><td class="r good">฿11,816,200</td><td class="r">฿280,000</td><td class="r good">42×</td><td class="r good">2.4 mo</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p>The self-serve tiers clear the conventional 3× bar comfortably. <strong>Multi-unit only clears it on an annual plan</strong> — 2.2× monthly, 4.0× annual — so Multi-unit and enterprise are sold annually or they are not sold outbound at all. Enterprise sits in a different regime: every band repays its acquisition cost inside three months and returns forty times over, because 1% churn on a contracted relationship compounds for years.</p>
+    <p>The ratios barely move between bands, which is the useful part — <strong>a ฿37,500 entry contract is as good a use of the CEO&rsquo;s time as a ฿160,000 one</strong>, and it closes faster. The right motion is to land at E1 and grow inside the account: the model moves 2% of E1 logos up to E2 each month and 1% of E2 up to E3, which by month 36 turns twenty-one directly-won logos into a base of 16 × E1, 7 × E2 and 2 × E3. Expansion, not new logos, is what an account manager is for.</p>
+    <p>It is also the model&rsquo;s largest single risk: twenty-five enterprise logos are 18% of month-36 revenue, they depend on one person&rsquo;s network, and no amount of product work substitutes for it.</p>
+
+    <div class="finding">
+      <h3>The free tier is the acquisition channel</h3>
+      <p>Thirty-five thousand free users cost <span class="num">฿57,000</span> a month to serve. They are simultaneously the top of the funnel, the referral engine, the product-feedback surface, and the reason a Thai SME hears about this at all in a market with no category awareness. Every conventional SaaS instinct says to gate the data plane and force a trial clock; the cost structure in §01 says the opposite, and the cost structure is right.</p>
+      <p style="margin-top:14px">Two costs it does carry, both named elsewhere: freemium converts worse than a trial, so layer a fourteen-day full-feature trial <em>on top of</em> the free plan rather than instead of it; and the free base is what pushes the platform past the PDPA large-scale threshold, which is a ฿25,000-a-month DPO retainer and a real compliance obligation, not a rounding error.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <span class="sec-no">08 — Five years</span>
+    <h2>฿19.3M in, ฿249M of ARR out</h2>
+    <p class="lede">The three-year window ends mid-story: the company is EBITDA-positive but has not repaid its own trough. Years four and five are where a subscription business with 76% gross margins and customer-linked hiring actually compounds — and where BOI stops being a formality and starts being worth ฿17.9M.</p>
+    <p>Years four and five extend the same engine: SME additions keep growing but decelerate as a share of the base, the enterprise ramp doubles to two entry-band logos a month, expansion keeps moving E1 accounts up to E2 and E3, and the hiring triggers keep firing on customer count. The office expands to 420 sqm at month 42, with a second fit-out and deposit.</p>
+  </div>
+
+  <figure>
+    <div class="chart-frame">
+      <svg viewBox="0 0 900 360" width="100%" role="img" aria-label="Cumulative cash over sixty months. Without the routing engine it troughs at minus 19.3 million baht in month 24, turns positive in month 39 and reaches 134.9 million by month 60. With the routing engine shipped in month 15 it troughs at minus 17.8 million, turns positive in month 36 and reaches 172.9 million.">
+        <g stroke="var(--rule)" stroke-width="1">
+          <line x1="70" y1="290" x2="860" y2="290"></line>
+          <line x1="70" y1="231" x2="860" y2="231"></line>
+          <line x1="70" y1="172" x2="860" y2="172"></line>
+          <line x1="70" y1="114" x2="860" y2="114"></line>
+          <line x1="70" y1="55"  x2="860" y2="55"></line>
+        </g>
+        <line x1="70" y1="260.6" x2="860" y2="260.6" stroke="var(--ink-2)" stroke-width="1.5"></line>
+        <g fill="var(--ink-3)" font-size="11" text-anchor="end">
+          <text x="62" y="294">−฿24M</text><text x="62" y="235">฿24M</text><text x="62" y="176">฿72M</text><text x="62" y="118">฿120M</text><text x="62" y="59">฿168M</text>
+        </g>
+        <text x="70" y="24" fill="var(--ink-3)" font-size="11">cumulative cash</text>
+        <text x="76" y="256" fill="var(--ink-2)" font-size="10.5">break-even line</text>
+        <g fill="var(--ink-3)" font-size="11" text-anchor="middle">
+          <text x="70" y="316">M1</text><text x="217" y="316">M12</text><text x="378" y="316">M24</text><text x="539" y="316">M36</text><text x="699" y="316">M48</text><text x="860" y="316">M60</text>
+        </g>
+        <g stroke="var(--rule-firm)" stroke-width="1" stroke-dasharray="2 4">
+          <line x1="217" y1="40" x2="217" y2="290"></line><line x1="378" y1="40" x2="378" y2="290"></line>
+          <line x1="539" y1="40" x2="539" y2="290"></line><line x1="699" y1="40" x2="699" y2="290"></line>
+        </g>
+
+        <polyline fill="none" stroke="var(--cost)" stroke-width="2.5" stroke-dasharray="7 4" points="70,264.1 83,266.7 97,267.5 110,268.4 124,269.3 137,270.1 150,271.3 164,272.1 177,273.0 191,274.2 204,275.1 217,275.9 231,277.2 244,278.2 257,279.0 271,280.0 284,280.7 298,281.6 311,282.4 324,282.8 338,283.5 351,283.8 365,284.1 378,284.2 391,283.9 405,283.8 418,283.3 432,282.4 445,282.0 458,281.0 472,279.3 485,277.9 498,275.8 512,274.0 525,271.6 539,268.4 552,265.7 565,262.3 579,258.6 592,254.7 606,252.4 619,250.1 632,244.8 646,240.1 659,234.0 673,227.6 686,221.4 699,214.5 713,207.4 726,199.5 739,191.1 753,182.5 766,173.6 780,163.9 793,153.6 806,143.2 820,131.8 833,120.1 847,107.8 860,95.3"></polyline>
+        <polyline fill="none" stroke="var(--accent)" stroke-width="2.5" points="70,264.1 83,266.7 97,267.5 110,268.4 124,269.3 137,270.1 150,271.3 164,272.1 177,273.0 191,274.2 204,275.1 217,275.9 231,277.2 244,278.2 257,278.9 271,279.8 284,280.3 298,281.1 311,281.7 324,281.9 338,282.4 351,282.3 365,282.3 378,282.1 391,281.4 405,280.9 418,280.0 432,278.5 445,277.6 458,276.0 472,273.7 485,271.6 498,268.8 512,266.3 525,263.1 539,259.1 552,255.4 565,251.1 579,246.4 592,241.4 606,238.0 619,234.5 632,228.1 646,222.0 659,214.6 673,206.8 686,199.1 699,190.7 713,182.0 726,172.5 739,162.4 753,152.1 766,141.3 780,129.8 793,117.6 806,105.1 820,91.7 833,77.9 847,63.4 860,48.7"></polyline>
+
+        <circle cx="378" cy="284.2" r="4" fill="var(--cost)"></circle>
+        <text x="372" y="299" fill="var(--cost)" font-size="10.5" text-anchor="end">trough −฿19.3M</text>
+        <circle cx="860" cy="95.3" r="4" fill="var(--cost)"></circle>
+        <circle cx="860" cy="48.7" r="4" fill="var(--accent)"></circle>
+        <text x="852" y="89" fill="var(--cost)" font-size="11.5" text-anchor="end">฿134.9M</text>
+        <text x="852" y="42" fill="var(--accent)" font-size="11.5" text-anchor="end">฿172.9M</text>
+        <line x1="257" y1="248" x2="257" y2="283" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 3"></line>
+        <text x="263" y="244" fill="var(--accent)" font-size="10.5">routing engine ships M15</text>
+      </svg>
+    </div>
+    <div class="key">
+      <span><i class="swatch" style="background:var(--cost)"></i> Base — no routing engine</span>
+      <span><i class="swatch" style="background:var(--accent)"></i> Routing engine shipped in month 15</span>
+    </div>
+    <figcaption>Two cumulative-cash paths, identical in every respect except one piece of engineering. The lines are indistinguishable for the first year — the engine ships in month 15 and the base is small — and by month 60 they are <strong>฿38.1M apart</strong>. Nothing in this document compounds like it.</figcaption>
+  </figure>
+
+  <div class="tw">
+    <table>
+      <caption>Five-year profit and loss, baht — base case, no routing engine <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Line</th><th class="r">Year 1</th><th class="r">Year 2</th><th class="r">Year 3</th><th class="r">Year 4</th><th class="r">Year 5</th></tr></thead>
+      <tbody>
+        <tr><td>Revenue recognised</td><td class="r">1,180,426</td><td class="r">19,753,595</td><td class="r">65,308,963</td><td class="r">131,631,608</td><td class="r">210,893,278</td></tr>
+        <tr><td><span class="sub" style="margin:0">of which enterprise</span></td><td class="r">0</td><td class="r">1,941,516</td><td class="r">10,734,294</td><td class="r">26,899,899</td><td class="r">47,925,285</td></tr>
+        <tr><td>Model, SERP, data, free tier, SSO</td><td class="r">−220,118</td><td class="r">−3,728,479</td><td class="r">−12,354,902</td><td class="r">−24,891,042</td><td class="r">−39,880,623</td></tr>
+        <tr><td>Processing, bad debt, SLA credits</td><td class="r">−64,439</td><td class="r">−1,068,641</td><td class="r">−3,511,545</td><td class="r">−7,051,270</td><td class="r">−11,273,038</td></tr>
+        <tr class="rule-top"><td>Gross profit</td><td class="r">895,868</td><td class="r">14,956,475</td><td class="r">49,442,516</td><td class="r">99,689,296</td><td class="r">159,739,617</td></tr>
+        <tr><td>Gross margin</td><td class="r good">75.9%</td><td class="r good">75.7%</td><td class="r good">75.7%</td><td class="r good">75.7%</td><td class="r good">75.7%</td></tr>
+        <tr class="rule-top"><td>Payroll</td><td class="r">−6,058,750</td><td class="r">−12,031,917</td><td class="r">−21,380,167</td><td class="r">−30,208,333</td><td class="r">−37,467,000</td></tr>
+        <tr><td>Office and people</td><td class="r">−2,289,250</td><td class="r">−2,981,817</td><td class="r">−3,802,600</td><td class="r">−5,882,533</td><td class="r">−7,476,733</td></tr>
+        <tr><td>Operating and compliance <span class="sub">year four carries the office expansion</span></td><td class="r">−5,068,222</td><td class="r">−4,165,355</td><td class="r">−5,419,480</td><td class="r">−9,742,887</td><td class="r">−5,348,689</td></tr>
+        <tr><td>Sales and marketing</td><td class="r">−1,020,522</td><td class="r">−7,585,790</td><td class="r">−15,051,194</td><td class="r">−23,100,752</td><td class="r">−29,131,809</td></tr>
+        <tr class="total"><td>EBITDA</td><td class="r bad">−13,540,876</td><td class="r bad">−11,808,403</td><td class="r good">+3,789,075</td><td class="r good">+30,754,790</td><td class="r good">+80,315,386</td></tr>
+        <tr><td>EBITDA margin</td><td class="r">—</td><td class="r">—</td><td class="r">5.8%</td><td class="r good">23.4%</td><td class="r good">38.1%</td></tr>
+        <tr class="rule-top"><td>Cash flow</td><td class="r bad">−12,520,983</td><td class="r bad">−6,755,738</td><td class="r good">+12,883,188</td><td class="r good">+44,011,167</td><td class="r good">+97,237,771</td></tr>
+        <tr class="total"><td>Cumulative cash at year end</td><td class="r bad">−12,520,983</td><td class="r bad">−19,276,720</td><td class="r warn">−6,393,532</td><td class="r good">+37,617,635</td><td class="r good">+134,855,406</td></tr>
+        <tr class="rule-top"><td>Exit SME customers <span class="sub">of which annual</span></td><td class="r">124 <span class="sub">38</span></td><td class="r">843 <span class="sub">277</span></td><td class="r">1,995 <span class="sub">690</span></td><td class="r">3,453 <span class="sub">1,247</span></td><td class="r">5,047 <span class="sub">1,895</span></td></tr>
+        <tr><td>Exit enterprise logos <span class="sub">E1 / E2 / E3</span></td><td class="r">0</td><td class="r">10 <span class="sub">8/2/0</span></td><td class="r">25 <span class="sub">16/7/2</span></td><td class="r">53 <span class="sub">31/16/6</span></td><td class="r">78 <span class="sub">42/26/11</span></td></tr>
+        <tr><td>Exit free users</td><td class="r">2,482</td><td class="r">15,694</td><td class="r">34,779</td><td class="r">57,025</td><td class="r">79,454</td></tr>
+        <tr><td>Exit ARR</td><td class="r">4,727,329</td><td class="r">36,872,054</td><td class="r">92,117,999</td><td class="r">168,115,233</td><td class="r good">248,956,438</td></tr>
+        <tr><td>Headcount</td><td class="r">5</td><td class="r">14</td><td class="r">23</td><td class="r">33</td><td class="r">37</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <p><strong>A correction against the three-year draft.</strong> Extending the model past 1,300 customers exposed that the earlier hiring triggers simply stopped — a 1,995-customer business was being staffed as though it had 1,300. With the triggers continued properly, year three carries <strong>23 people rather than 19</strong> and year-three EBITDA is <span class="num">฿3.8M</span> rather than ฿5.6M. The peak funding requirement and every unit economic are unchanged; the third-year profit was overstated by understaffed support and sales.</p>
+  </div>
+
+  <h3 class="col">What shipping the routing engine is worth</h3>
+  <div class="col">
+    <p>The same five years, with the §03 cost engine shipped in month 15 — early enough to matter, late enough to be realistic. Question cost falls from ฿9.87 to ฿3.36 and every scheduled artefact falls with it.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>Base versus routed, baht <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Measure</th><th class="r">Base</th><th class="r">Routed from M15</th><th class="r">Difference</th></tr></thead>
+      <tbody>
+        <tr><td>Gross margin, years 2–5</td><td class="r">75.7%</td><td class="r good">84.6%</td><td class="r good">+8.9 pts</td></tr>
+        <tr><td>Year 3 EBITDA</td><td class="r">3,789,075</td><td class="r good">9,712,454</td><td class="r good">+156%</td></tr>
+        <tr><td>Year 4 EBITDA</td><td class="r">30,754,790</td><td class="r good">42,507,704</td><td class="r good">+38%</td></tr>
+        <tr><td>Year 5 EBITDA</td><td class="r">80,315,386</td><td class="r good">98,988,495</td><td class="r good">+23%</td></tr>
+        <tr><td>Year 5 EBITDA margin</td><td class="r">38.1%</td><td class="r good">46.9%</td><td class="r good">+8.8 pts</td></tr>
+        <tr class="rule-top"><td>Peak cash requirement</td><td class="r">−19,276,720</td><td class="r good">−17,765,089</td><td class="r good">฿1.5M less</td></tr>
+        <tr><td>Cumulative cash turns positive</td><td class="r">Month 39</td><td class="r good">Month 36</td><td class="r good">3 months earlier</td></tr>
+        <tr class="total"><td>Cumulative cash at month 60</td><td class="r">134,855,406</td><td class="r good">172,929,166</td><td class="r good">+38,073,760</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pull">
+    <span class="pull-fig">฿38.1M</span>
+    <p>What one piece of engineering is worth in cash by month 60 — roughly <strong>twice the entire amount raised</strong>. It is also work the Ask surface requires anyway, which makes it the only line in this document that is simultaneously free and decisive.</p>
+  </div>
+
+  <h3 class="col">Where BOI finally pays</h3>
+  <div class="col">
+    <p>For three years the BOI promotion is worth nothing, because carried-forward losses shelter year three completely. Years four and five are where it lands.</p>
+  </div>
+
+  <div class="tw">
+    <table class="compact">
+      <caption>Corporate income tax, with and without BOI 8.1 <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Year</th><th class="r">Pre-tax profit</th><th class="r">Loss pool carried</th><th class="r">CIT without BOI</th><th class="r">CIT under BOI</th></tr></thead>
+      <tbody>
+        <tr><td>Year 1</td><td class="r">−13,540,876</td><td class="r">13,540,876</td><td class="r">0</td><td class="r">0</td></tr>
+        <tr><td>Year 2</td><td class="r">−11,808,403</td><td class="r">25,349,280</td><td class="r">0</td><td class="r">0</td></tr>
+        <tr><td>Year 3</td><td class="r">+3,789,075</td><td class="r">21,560,205</td><td class="r">0</td><td class="r">0</td></tr>
+        <tr><td>Year 4</td><td class="r">+30,754,790</td><td class="r">0</td><td class="r warn">−1,838,917</td><td class="r good">0</td></tr>
+        <tr><td>Year 5</td><td class="r">+80,315,386</td><td class="r">0</td><td class="r bad">−16,063,077</td><td class="r good">0</td></tr>
+        <tr class="total"><td>Five-year total</td><td class="r"></td><td class="r"></td><td class="r bad">−17,901,994</td><td class="r good">0</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p style="margin-top:20px"><strong>BOI is worth ฿17.9M across five years — ฿25.5M if the routing engine ships</strong>, because a more profitable company has more tax to exempt. The exemption ceiling is cumulative Thai IT salary paid after approval, which over sixty months is <span class="num">฿38.3M</span> — comfortably above either figure, so the cap never binds. It binds only on a company that outsourced its engineering, which is precisely the structure BOI 8.1 is designed to discourage. Apply in year one; the ceiling starts at approval, not at profitability.</p>
+
+    <h3>The financing question, restated over five years</h3>
+    <p>Peak cumulative cash requirement is <strong>฿19.3M</strong> <span class="usd">$586k</span> at month 24, and the pessimistic outlook in §09 needs ฿22.4M. <strong>Raise ฿24–26M</strong> <span class="usd">$730–790k</span>. On the base case that capital is fully repaid by month 39 and returns <span class="num">฿134.9M</span> of cumulative cash by month 60 — about <strong>five and a half times</strong> the raise, without a second round. With the routing engine it is ฿172.9M, or seven times.</p>
+    <p>Two caveats on the outer years, both stated rather than modelled. Year-five revenue of ฿211M assumes 5,047 SME customers and 78 enterprise logos, which is a materially larger Thai market position than anything the first three years demonstrate — the further out the line goes, the more it is a plan rather than a forecast. And the DEPA deduction that funds 15–20% of a customer&rsquo;s bill expires at the end of 2027, inside year two; years three onward carry no pricing support from it at all.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <span class="sec-no">09 — Three outlooks</span>
+    <h2>Pessimistic, normal, optimistic</h2>
+    <p class="lede">The three-year view, since that is the window a raise is priced against. Same product, same prices, same cost structure, same hiring triggers, same lease — the only differences are how fast customers arrive, how fast they leave, how many take an annual plan, and how many enterprise logos the CEO&rsquo;s network converts. §08 carries the five-year extension of the normal case.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>What changes between the three <span class="tag t-a">assumed</span></caption>
+      <thead><tr><th>Input</th><th class="r">Pessimistic</th><th class="r">Normal</th><th class="r">Optimistic</th></tr></thead>
+      <tbody>
+        <tr><td>SME acquisition against plan</td><td class="r">60%</td><td class="r">100%</td><td class="r">130%</td></tr>
+        <tr><td>Monthly churn <span class="sub">monthly plans / annual plans</span></td><td class="r">7.0% / 3.5%</td><td class="r">4.5% / 2.0%</td><td class="r">3.0% / 1.5%</td></tr>
+        <tr><td>Annual take-up</td><td class="r">20%</td><td class="r">30%</td><td class="r">45%</td></tr>
+        <tr><td>Acquisition channel</td><td class="r">organic only <span class="sub">paid switched off at the CAC ceiling</span></td><td class="r">฿8,324 paid CAC</td><td class="r">฿6,580 paid CAC</td></tr>
+        <tr><td>Enterprise ramp</td><td class="r">50%</td><td class="r">100%</td><td class="r">150%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure>
+    <div class="chart-frame">
+      <svg viewBox="0 0 900 360" width="100%" role="img" aria-label="Cumulative cash under three outlooks over 36 months: optimistic troughs at minus 14.5 million baht in month 20 and ends at plus 21.1 million; normal troughs at minus 19.3 million in month 24 and ends at minus 6.4 million; pessimistic troughs at minus 22.4 million in month 29 and ends at minus 19.9 million">
+        <g stroke="var(--rule)" stroke-width="1">
+          <line x1="70" y1="300" x2="860" y2="300"></line>
+          <line x1="70" y1="235" x2="860" y2="235"></line>
+          <line x1="70" y1="105" x2="860" y2="105"></line>
+          <line x1="70" y1="40"  x2="860" y2="40"></line>
+        </g>
+        <line x1="70" y1="170" x2="860" y2="170" stroke="var(--ink-2)" stroke-width="1.5"></line>
+        <g fill="var(--ink-3)" font-size="11" text-anchor="end">
+          <text x="62" y="304">−฿24M</text><text x="62" y="239">−฿12M</text><text x="62" y="174">฿0</text><text x="62" y="109">฿12M</text><text x="62" y="44">฿24M</text>
+        </g>
+        <text x="70" y="20" fill="var(--ink-3)" font-size="11">cumulative cash</text>
+        <text x="76" y="165" fill="var(--ink-2)" font-size="10.5">break-even line</text>
+        <g fill="var(--ink-3)" font-size="11" text-anchor="middle">
+          <text x="70" y="322">M1</text><text x="183" y="322">M6</text><text x="318" y="322">M12</text><text x="454" y="322">M18</text><text x="589" y="322">M24</text><text x="725" y="322">M30</text><text x="860" y="322">M36</text>
+        </g>
+
+        <polyline fill="none" stroke="var(--accent)" stroke-width="2.5" points="70,185.6 93,196.8 115,200.7 138,204.5 160,208.3 183,211.8 205,216.5 228,219.8 251,222.8 273,227.2 296,229.9 318,233.1 341,236.0 363,239.6 386,241.2 409,244.2 431,246.2 454,247.5 476,247.9 499,248.4 521,247.4 544,244.4 567,241.4 589,235.0 612,230.0 634,223.5 657,215.6 679,204.2 702,195.0 725,180.2 747,165.2 770,146.3 792,126.2 815,103.6 837,81.7 860,55.9"></polyline>
+        <polyline fill="none" stroke="var(--ink-2)" stroke-width="2.5" stroke-dasharray="7 4" points="70,185.6 93,196.8 115,200.7 138,204.5 160,208.3 183,212.0 205,217.1 228,221.1 251,224.8 273,230.1 296,234.2 318,237.8 341,243.3 363,247.8 386,251.4 409,256.0 431,258.8 454,262.9 476,266.4 499,268.2 521,271.4 544,272.4 567,274.0 589,274.4 612,272.9 634,272.6 657,270.5 679,266.3 702,264.8 725,260.3 747,252.9 770,246.5 792,237.1 815,229.4 837,218.6 860,204.6"></polyline>
+        <polyline fill="none" stroke="var(--cost)" stroke-width="2.5" points="70,185.6 93,196.8 115,200.7 138,204.5 160,208.3 183,212.1 205,217.3 228,221.3 251,225.3 273,230.9 296,235.3 318,239.4 341,244.4 363,249.3 386,253.6 409,258.9 431,262.8 454,266.4 476,270.7 499,275.5 521,278.8 544,281.7 567,283.7 589,285.2 612,287.6 634,288.8 657,290.2 679,291.4 702,291.6 725,290.6 747,291.0 770,289.1 792,288.0 815,285.4 837,282.2 860,277.6"></polyline>
+
+        <circle cx="499" cy="248.4" r="4" fill="var(--accent)"></circle>
+        <circle cx="589" cy="274.4" r="4" fill="var(--ink-2)"></circle>
+        <circle cx="702" cy="291.6" r="4" fill="var(--cost)"></circle>
+        <circle cx="860" cy="55.9" r="4" fill="var(--accent)"></circle>
+        <circle cx="860" cy="204.6" r="4" fill="var(--ink-2)"></circle>
+        <circle cx="860" cy="277.6" r="4" fill="var(--cost)"></circle>
+
+        <text x="852" y="49" fill="var(--accent)" font-size="11.5" text-anchor="end">+฿21.1M</text>
+        <text x="852" y="198" fill="var(--ink-2)" font-size="11.5" text-anchor="end">−฿6.4M</text>
+        <text x="852" y="296" fill="var(--cost)" font-size="11.5" text-anchor="end">−฿19.9M</text>
+        <text x="493" y="242" fill="var(--accent)" font-size="10.5" text-anchor="end">−฿14.5M</text>
+        <text x="583" y="268" fill="var(--ink-2)" font-size="10.5" text-anchor="end">−฿19.3M</text>
+        <text x="696" y="285" fill="var(--cost)" font-size="10.5" text-anchor="end">−฿22.4M</text>
+      </svg>
+    </div>
+    <div class="key">
+      <span><i class="swatch" style="background:var(--accent)"></i> Optimistic</span>
+      <span><i class="swatch" style="background:var(--ink-2)"></i> Normal</span>
+      <span><i class="swatch" style="background:var(--cost)"></i> Pessimistic</span>
+    </div>
+    <figcaption>Three cumulative-cash paths on an identical cost base; the dots mark each outlook&rsquo;s trough. All three start at the same steep drop, because the lease, the fit-out and the founding team are committed before any of the differences between the outlooks can show up. Only the optimistic case crosses back above the line inside 36 months.</figcaption>
+  </figure>
+
+  <div class="tw">
+    <table>
+      <caption>Where each outlook lands <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Outlook</th><th class="r">M36 ARR</th><th class="r">Year 3 EBITDA</th><th class="r">EBITDA+</th><th class="r">Cash+</th><th class="r">Peak cash</th><th class="r">Cash at M36</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Pessimistic</strong></td><td class="r">฿46.2M</td><td class="r bad">−฿2.3M</td><td class="r warn">M32</td><td class="r bad">beyond M36</td><td class="r bad">−฿22.4M</td><td class="r bad">−฿19.9M</td></tr>
+        <tr><td><strong>Normal</strong></td><td class="r">฿92.1M</td><td class="r good">+฿3.8M</td><td class="r">M28</td><td class="r warn">M39</td><td class="r">−฿19.3M</td><td class="r warn">−฿6.4M</td></tr>
+        <tr><td><strong>Optimistic</strong></td><td class="r good">฿132.6M</td><td class="r good">+฿15.5M</td><td class="r good">M24</td><td class="r good">M31</td><td class="r good">−฿14.5M</td><td class="r good">+฿21.1M</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tw">
+    <table class="compact">
+      <caption>The same three, with the §03 routing engine shipped in month 15 <span class="tag t-m">modelled</span></caption>
+      <thead><tr><th>Outlook</th><th class="r">Year 3 EBITDA</th><th class="r">Change</th><th class="r">EBITDA+</th><th class="r">Cash+</th><th class="r">Peak cash</th></tr></thead>
+      <tbody>
+        <tr><td>Pessimistic</td><td class="r good">+฿0.7M</td><td class="r good">from −฿2.3M</td><td class="r">M30</td><td class="r">beyond M36</td><td class="r">−฿20.7M</td></tr>
+        <tr><td>Normal</td><td class="r good">+฿9.7M</td><td class="r good">+156%</td><td class="r good">M27</td><td class="r good">M36</td><td class="r good">−฿17.8M</td></tr>
+        <tr><td>Optimistic</td><td class="r good">+฿24.1M</td><td class="r good">+55%</td><td class="r good">M24</td><td class="r good">M29</td><td class="r good">−฿13.7M</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <p><strong>The routing engine is the highest-return engineering work in the plan.</strong> Against a fully loaded cost base it lifts year-three EBITDA by 156% in the normal case, turns the pessimistic outlook from a ฿2.3M loss into a ฿0.7M profit, and is the difference between turning cash-positive inside the window and not. Over five years, as §08 shows, it is worth <strong>฿38.1M of cumulative cash</strong> — roughly twice the entire raise. It is also work the Ask surface requires anyway.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <span class="sec-no">10 — Risk register</span>
+    <h2>What this model does not know</h2>
+    <p>Ranked by how much the answer moves the outcome. The first four are unvalidated commercial assumptions; nothing in the cost model can settle them and no amount of further modelling should be mistaken for trying.</p>
+    <ul>
+      <li><strong>Whether the CEO&rsquo;s network converts into enterprise contracts.</strong> Twenty-five logos averaging ฿59,000 a month are 18% of month-36 revenue and pull break-even forward, and they rest entirely on one person&rsquo;s relationships in Thai F&amp;B. The ฿30,000 entry band makes the assumption more reachable than a ฿100,000 floor would — that is a contract a restaurant group approves without a board paper — but it does not make it evidence.</li>
+      <li><strong>Whether a Thai SME pays ฿1,590 a month.</strong> The comparable anchors are accounting software at ฿199–999 and POS at ฿500–1,500. This price sits above both and is justified only if the after-fees number is one nobody else produces. The DEPA 200% deduction narrows the gap by 15–20% and expires at the end of 2027; five conversations settle the rest. <span class="tag t-a">assumed</span></li>
+      <li><strong>Whether 58,000 Thai SMEs will open a free account in three years.</strong> The growth curve is a plan, not a forecast — it assumes a funnel that does not yet exist in a market with no category awareness, peaking at 3,700 signups a month.</li>
+      <li><strong>Real churn, and real annual take-up.</strong> 4.5% monthly, 2.0% on annual and 1.0% on enterprise are the middle of published bands, not measurements, and 30% annual take-up is a convention. Between the pessimistic and optimistic outlooks the terminal ARR differs threefold with no change to anything else. Both are visible by month 9. <span class="tag t-v">benchmark verified</span></li>
+      <li><strong>Free-to-paid conversion.</strong> 4.3% is the published freemium median, and a quarter of freemium products convert below 2.5%. At 2.5% the CAC rises to ฿14,300 — through the ceiling — and the paid channel has to be switched off entirely, which is the pessimistic outlook. <span class="tag t-v">benchmark verified</span></li>
+      <li><strong>Whether SOC 2 is actually required, and when.</strong> ฿400,000 of readiness plus ฿27,400 a month of tooling is budgeted from year two on the assumption that E2 and E3 buyers demand it. If the first ten enterprise buyers accept a security questionnaire and a penetration-test report instead, that money is saved for a year. If a single large buyer demands ISO 27001 as well, it doubles. This is the widest-variance line in §04.</li>
+      <li><strong>Support load per paying customer.</strong> Modelled at one hire per 400. For owner-operated businesses with no in-house analyst that ratio may be optimistic, and support is the line most likely to turn a 76% gross margin into a 45% operating one. Free users generate support load too, and this model charges them none.</li>
+      <li><strong>Whether BOI promotion is granted, and when.</strong> Activity 8.1 requires that development genuinely happens in Thailand and carries an application process measured in months. The exemption ceiling is cumulative Thai IT salary paid <em>after</em> approval, so applying late permanently shrinks it. In this 36-month window BOI is worth nothing at all — carried-forward losses shelter year three completely — and in years four to eight it is worth many times the entire raise. <span class="tag t-v">verified</span></li>
+      <li><strong>Enterprise scope creep, and the floor holding.</strong> The band margins in §02 assume a fixed scope per band; a customer who negotiates E1 pricing with E3 requirements is a different product sold at a loss. The ฿25,000 break-even is the number to hold, and the temptation to sign below it will be strongest exactly when the pipeline is thin.</li>
+      <li><strong>Marketplace and partner terms.</strong> No published API fee has been found for Shopee, Lazada or LINE MAN Wongnai, and partner programmes may carry commercial terms. If distribution ever runs through an app store, a 15% revenue share is larger than the entire infrastructure bill. <span class="tag t-a">assumed</span></li>
+    </ul>
+
+    <h3>And what is still not in the model at all</h3>
+    <p>None of these change the shape of the answer, but each is a real number somebody will eventually have to write down. They are listed so that the omission is a decision rather than an oversight.</p>
+    <ul>
+      <li><strong>Thai severance accrual.</strong> Labour law requires severance on termination, rising with length of service. A prudent provision is 2–4% of payroll — roughly ฿400,000–800,000 a year by year three. It is a liability rather than a cash cost until somebody leaves, which is exactly why companies forget it.</li>
+      <li><strong>Equipment refresh.</strong> Laptops are expensed at hire here; a three-year cycle means the first refresh lands in year four, around ฿700,000.</li>
+      <li><strong>A second office.</strong> The 200 sqm lease is sized for nineteen people at 10.5 sqm each. The optimistic outlook does not need more space, but a fourth year at that growth rate does — and a mid-lease move means a second fit-out and an overlap period.</li>
+      <li><strong>Work permits and visas</strong> for any non-Thai founder or hire. BOI promotion makes this materially easier and cheaper, which is a second reason to apply early.</li>
+      <li><strong>ESOP.</strong> Setting up an option pool has legal cost and, more importantly, dilution that no operating model shows. Decide the pool size before the raise, not after.</li>
+      <li><strong>Directors&rsquo; and officers&rsquo; liability insurance</strong>, usually requested by an institutional investor at the point of the round rather than before it.</li>
+      <li><strong>Marketing production</strong> — video, photography, Thai-language content at volume. Budgeted only inside the blended CAC, which understates it if the content channel becomes the primary one.</li>
+      <li><strong>Foreign-exchange hedging.</strong> Revenue is entirely in baht and roughly a fifth of cost is in dollars. A 10% baht depreciation adds about ฿1.2M a year to the year-three cost base. The ×1.006 uplift in §05 covers conversion spread, not currency risk.</li>
+      <li><strong>Deferred revenue.</strong> Annual and enterprise contracts create a balance-sheet liability that grows to roughly ฿9M by month 36. It costs nothing, but it is the difference between the cash line in §08 and what an auditor will call distributable.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <span class="sec-no">11 — Position and verdict</span>
+    <h2>Why here, why now, and what could take it away</h2>
+    <p class="lede">Everything above this section is arithmetic. This one is judgement: where a product like this sits in the Thai market in September 2026, what the market is currently handing it for free, and what it could take back.</p>
+  </div>
+
+  <h3 class="col">What the market gives you</h3>
+
+  <div class="tw">
+    <table>
+      <caption>Structural advantages, strongest first <span class="tag t-a">judgement</span></caption>
+      <thead><tr><th>Advantage</th><th>Why it is real</th><th class="r">Durability</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>The cost asymmetry itself</strong></td>
+          <td>Serving a customer&rsquo;s data costs ฿1.65 a month. Any incumbent with a per-seat or per-connector cost structure has to charge for the data plane; you do not. A free tier that hands over every connector and unlimited history is not a promotion here — it is what the cost structure permits and theirs does not. That is the closest thing in this document to a defensible position.</td>
+          <td class="r good">High</td>
+        </tr>
+        <tr>
+          <td><strong>Bangkok payroll against Western pricing pressure</strong></td>
+          <td>A senior engineer at ฿120,000 builds a product sold to a market a Singapore-based competitor cannot serve at ฿1,590. The entire ฿19.3M plan exists because of this, and it is the reason the free tier can be genuinely free.</td>
+          <td class="r good">High</td>
+        </tr>
+        <tr>
+          <td><strong>The reconciliation job nobody does</strong></td>
+          <td>A Thai SME genuinely runs Shopee, Lazada, LINE MAN, Facebook and a POS at once, and nothing reconciles them after fees, commissions and returns. The aggregators sell <em>connectors</em>; the unmet job is the after-fees number. Selling the connector is a race you lose; selling the number is not.</td>
+          <td class="r warn">Medium</td>
+        </tr>
+        <tr>
+          <td><strong>BOI 8.1 promotion</strong> <span class="tag t-v">verified</span></td>
+          <td>Eight years of corporate income tax exemption, 100% foreign ownership, and visa access. Worth nothing in this 36-month window and a great deal in years four to eight — a structural cost advantage a foreign competitor serving Thailand from abroad does not have.</td>
+          <td class="r good">High</td>
+        </tr>
+        <tr>
+          <td><strong>The DEPA 200% deduction</strong> <span class="tag t-v">verified</span></td>
+          <td>The Revenue Department funds 15–20% of your customer&rsquo;s bill if you are on the Thailand Digital Catalog. Free pricing power — <strong>and it expires 31 December 2027</strong>, which is both an advantage and a clock.</td>
+          <td class="r bad">Expires 2027</td>
+        </tr>
+        <tr>
+          <td><strong>LINE as the channel</strong></td>
+          <td>Thai SME owners live in LINE, replies are free at any volume, and the account is the customer&rsquo;s own. Global SaaS competitors treat LINE as an afterthought because it is irrelevant in their home markets. A daily brief that arrives where the owner already is beats a dashboard they have to remember to open.</td>
+          <td class="r warn">Medium</td>
+        </tr>
+        <tr>
+          <td><strong>Compliance as a floor, not just a cost</strong></td>
+          <td>PDPA, a real security engineer, SOC 2 and a controlled office cost ฿3.0M and a hire — which is exactly why a two-person side project cannot take an enterprise deal off you. The regulatory burden that §04 prices is also a barrier behind you.</td>
+          <td class="r warn">Medium</td>
+        </tr>
+        <tr>
+          <td><strong>An F&amp;B network with a ฿30,000 entry point</strong></td>
+          <td>Restaurant groups, hotel operators and franchisors are exactly the Multi-unit and enterprise buyer, and the E1 band is small enough to sign without a board paper. Founder-specific rather than structural — but it is what makes 18% of month-36 revenue reachable at all.</td>
+          <td class="r bad">Founder-specific</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="col">What could take it away</h3>
+
+  <div class="tw">
+    <table>
+      <caption>Business risks distinct from the modelling uncertainties in §10 <span class="tag t-a">judgement</span></caption>
+      <thead><tr><th>Risk</th><th>What it looks like</th><th>What blunts it</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>The aggregator localises</strong><span class="sub">Highest likelihood, highest impact</span></td>
+          <td>Supermetrics or Windsor already carry Shopee and Lazada connectors. If one prices for Southeast Asia and ships Thai-language onboarding, the connector advantage disappears in a quarter.</td>
+          <td>Do not compete on connector count. The defensible product is the after-fees number, the restatement correctness and the advice layer — none of which an aggregator sells, because their customer is an analyst, not an owner.</td>
+        </tr>
+        <tr>
+          <td><strong>Platform permission risk</strong></td>
+          <td>Every connector is a permission granted by Meta, Google, Shopee or Lazada and revocable by them. App Review, business verification and sensitive-scope review are gates you do not control, and a single policy change can remove a source overnight.</td>
+          <td>Bring-your-own-credential everywhere the terms require it, no shared platform tokens, per-workspace separation, and the Meta client-list obligation designed in from the start. It is why those constraints are treated as design inputs rather than paperwork.</td>
+        </tr>
+        <tr>
+          <td><strong>Nobody is searching for this</strong></td>
+          <td>The plan needs 58,000 free signups in a market with no category awareness, peaking at 3,700 a month. This is not a product problem and no amount of engineering fixes it.</td>
+          <td>Trade shows, the free tier as the entire top of funnel, accountant and agency referral, and a CEO whose network substitutes for the awareness that does not exist yet.</td>
+        </tr>
+        <tr>
+          <td><strong>Thai SME mortality</strong></td>
+          <td>Churn benchmarks from Western SaaS do not capture the base rate at which small Thai restaurants and retailers simply close. Some of the 4.5% is not a product failure and cannot be fixed by a better product.</td>
+          <td>Annual billing removes eleven cancellation decisions a year and is the only lever that works on churn you did not cause. It is also why the Multi-unit and enterprise mix matters — larger customers close less often.</td>
+        </tr>
+        <tr>
+          <td><strong>The ฿1,590 ceiling</strong></td>
+          <td>Accounting software anchors at ฿199–999 and POS at ฿500–1,500. If the after-fees number is not visibly worth more than both combined, the whole ARPU stack, and therefore the whole plan, resets downward.</td>
+          <td>The DEPA deduction closes 15–20% of the gap through 2027. Beyond that, only the product does — which is the real reason the routing engine and the action sheet matter more than any cost line.</td>
+        </tr>
+        <tr>
+          <td><strong>Model pricing and capability drift</strong></td>
+          <td>Every margin here assumes September 2026 token prices. Prices have fallen historically, which helps — but the advice layer is a single vendor&rsquo;s frontier model, and a price change or capability regression moves COGS directly.</td>
+          <td>Cloudflare AI Gateway with Anthropic primary and Gemini plus OpenRouter as failover; the routing engine, which cuts exposure by two thirds; and batching, which is vendor-agnostic.</td>
+        </tr>
+        <tr>
+          <td><strong>Talent competition</strong></td>
+          <td>Bangkok senior engineers are contested by multinationals paying up to ฿234,000. This plan pays ฿120,000 plus a fourteen-month package.</td>
+          <td>Equity, a real office, genuine ownership of a correctness problem, and ฿200-a-month tooling. It is a real constraint on hiring speed, not on whether hiring is possible.</td>
+        </tr>
+        <tr>
+          <td><strong>Founder concentration</strong></td>
+          <td>18% of month-36 revenue depends on one person&rsquo;s relationships; the routing engine depends on one person&rsquo;s execution. Neither is diversified in a three-person founding team.</td>
+          <td>Nothing, honestly, inside three years. It is a fact of the shape rather than a problem with a mitigation, and it belongs in the conversation with an investor rather than buried.</td>
+        </tr>
+        <tr>
+          <td><strong>Data-residency tightening</strong></td>
+          <td>If PDPA enforcement or an enterprise buyer forces Thai-hosted data, the Cloudflare and Supabase cost structure — and the zero-egress economics behind the free tier — no longer applies.</td>
+          <td>Watch it rather than pre-build for it. A pinned data region is already an E3 line item, so the first customer who needs it pays for finding out.</td>
+        </tr>
+        <tr>
+          <td><strong>The twenty-four-month plateau</strong></td>
+          <td>The company needs ฿19.3M, does not turn cash-positive inside the window, and every month of delay compounds against a fixed lease and a fixed team.</td>
+          <td>Annual billing, the enterprise entry band collecting up front, and raising ฿24–26M rather than the minimum. Under-raising is the most common way a plan like this fails, and it fails at month 22, not month 6.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="finding">
+    <h3>The verdict</h3>
+    <p><strong>This is a real business and a slow one.</strong> The unit economics are not in question: 76% gross margin, flat across scale, on a cost base that has now been loaded with a lease, a fit-out, an auditor and a penetration tester and still holds. What is in question is entirely commercial — whether Thai SMEs will pay ฿1,590 for a number nobody currently produces for them, and whether 58,000 of them can be reached in a market with no category.</p>
+    <p style="margin-top:14px">The shape is unusual and worth naming plainly. It has the margin profile of software and the capital profile of a small services company: <strong>฿19.3M in, no cash-positive month inside three years, and ฿92M of ARR at the end of it.</strong> It is not a venture-scale outcome on this trajectory and it is not trying to be — but the optimistic case reaches ฿132.6M of ARR on ฿14.5M of capital, and the downside is bounded by a cheque rather than by a structural flaw.</p>
+    <p style="margin-top:14px">Three things decide which outlook you land in, and none of them is in this document. <strong>Retention</strong>, which is visible by month nine and which annual billing is the only real lever on. <strong>Category creation</strong>, which the free tier and the trade-show floor have to do together because paid search cannot create demand that does not exist. And <strong>the CEO&rsquo;s network</strong>, which converts into an enterprise line worth 18% of revenue or it does not. The cost model is settled. The commercial assumptions are not, and five customer conversations are worth more than another revision of this page.</p>
+  </div>
+
+  <div class="col">
+    <p style="margin-top:24px">One internal decision is large enough to change the answer inside any outlook: <strong>ship the routing engine in §03 before scaling acquisition.</strong> It more than doubles year-three EBITDA in the normal case, turns the pessimistic case profitable, is worth ฿1.8M of the raise, and is work the product requires anyway. Everything else in this document is a number to be measured rather than a choice to be made.</p>
+  </div>
+</section>
+
+<footer>
+  <p>Vendor prices verified 8–9 September 2026 against Anthropic, Google, DataForSEO, OpenRouter, Vercel, Cloudflare, Supabase, WorkOS, LINE, Slack, Sentry and Google Workspace published rates. Churn and freemium conversion benchmarks from published 2026 SaaS benchmark studies. Thai salary bands from JobsDB, Glassdoor and levels.fyi; Bangkok office rents from published CBD agency data; Thai group health premiums from published broker ranges. Thai CPC ranges from published agency data; Google does not publish CPC by industry for Thailand. BOI activity 8.1 terms, the DEPA 200% SME digital deduction and PDPA data-protection-officer obligations per published guidance current at September 2026. Tax treatment per Thai Revenue Code and TRD private ruling Gor Kor 0702/16261. Exchange rate ฿32.9 = $1.00, 7 September 2026.</p>
+  <p style="margin-top:14px">Everything tagged <span class="tag t-m">modelled</span> is arithmetic from those inputs and can be recomputed; everything tagged <span class="tag t-a">assumed</span> is a judgement awaiting evidence. Sections 01 to 09 are arithmetic; §10 is what the arithmetic does not know; §11 is judgement and is labelled as such. No figure here is a commitment, and five customer conversations are worth more than another revision of this page.</p>
+</footer>

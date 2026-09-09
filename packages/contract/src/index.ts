@@ -1,5 +1,6 @@
 export { ATTRIBUTION_WINDOWS, type AttributionWindow } from "./attribution.js";
 export {
+  COMMERCE_METRICS,
   CONVERSION_METRICS,
   METRICS,
   isConversionMetric,
@@ -12,8 +13,13 @@ export {
   type RestatementClock,
   type RestatementInput,
 } from "./restatement.js";
+export {
+  restatementEventSchema,
+  type RestatementEvent,
+} from "./restatement-event.js";
 export { SOURCES, type Source } from "./source.js";
 export {
+  ADVERTISING_ENTITY_TYPES,
   ENTITY_TYPES,
   dimensionsSchema,
   entitySchema,

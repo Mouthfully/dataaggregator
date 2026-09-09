@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // `crypto.subtle`, `fetch`, `AbortSignal` and `TextEncoder` are provided by both target runtimes
+    // -- workerd and Node 22 -- but `lib: ["ES2022"]` alone declares none of them. The same caveat
+    // as @repo/payloads applies: this standalone check is the weaker one, and the real proof is that
+    // the package typechecks inside apps/api-edge under @cloudflare/workers-types with no DOM lib.
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}

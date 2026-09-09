@@ -14,6 +14,7 @@
  */
 
 import { handlePerformance } from "./performance.js";
+import { type ScheduledOutcome, handleScheduled } from "./webhooks.js";
 
 /**
  * The bindings are declared once, in `env.d.ts`, as `Cloudflare.Env` -- the extension point both
@@ -24,6 +25,28 @@ import { handlePerformance } from "./performance.js";
 export type Env = Cloudflare.Env;
 
 export default {
+  /**
+   * The scheduled half. Two crons, declared in `wrangler.jsonc` and dispatched by name in
+   * `src/webhooks.ts` -- which reports a cron it does not recognise rather than doing nothing,
+   * because a schedule added there and forgotten here would run every minute forever, invisibly.
+   *
+   * The store is null for the same reason `/v1/performance` answers 503: there is no database
+   * connection to bind. The outcome is logged either way, and logging it is what makes an
+   * unconfigured deployment visible instead of quiet.
+   */
+  async scheduled(controller, env, ctx) {
+    const run = handleScheduled(controller.cron, {
+      store: null,
+      signingKey: env.WEBHOOK_SIGNING_KEY ?? null,
+    }).then((outcome: ScheduledOutcome) => {
+      // Counts and reasons only. A payload or a secret must never reach a log line, and the shape
+      // of `ScheduledOutcome` is what guarantees neither can.
+      console.log(JSON.stringify({ cron: controller.cron, ...outcome }));
+    });
+    ctx.waitUntil(run);
+    await run;
+  },
+
   fetch(request) {
     const { pathname } = new URL(request.url);
 
@@ -54,3 +77,4 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 export { handlePerformance };
+export { handleScheduled };

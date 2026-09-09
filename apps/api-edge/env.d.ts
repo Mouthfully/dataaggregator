@@ -30,5 +30,21 @@ declare namespace Cloudflare {
      * app because the 128 MB-isolate guarantee can only be demonstrated against a real R2.
      */
     readonly PAYLOADS: R2Bucket;
+
+    /**
+     * The key every webhook signing secret is derived from (`@repo/webhooks`, spec 11A.16).
+     *
+     * OPTIONAL IN THE TYPE, AND REQUIRED IN PRACTICE. It is a Worker secret rather than a var, so
+     * it is absent in local development and in every test, and a required type would force each of
+     * those to invent one. `handleScheduled` refuses to claim events when it is missing, which is
+     * where the real requirement is enforced.
+     */
+    readonly WEBHOOK_SIGNING_KEY?: string;
   }
+}
+
+/** `?raw` imports, which Vite resolves to the file's text. Used to assert wrangler.jsonc's crons. */
+declare module "*?raw" {
+  const content: string;
+  export default content;
 }

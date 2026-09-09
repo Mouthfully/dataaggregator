@@ -39,7 +39,7 @@
 
 import { z } from "zod";
 import { ATTRIBUTION_WINDOWS } from "./attribution.js";
-import { CONVERSION_METRICS, METRICS } from "./metrics.js";
+import { COMMERCE_METRICS, CONVERSION_METRICS, METRICS } from "./metrics.js";
 import { SOURCES } from "./source.js";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "must be a calendar date, YYYY-MM-DD");
@@ -50,7 +50,15 @@ const rfc3339 = z
     message: "must be an RFC3339 timestamp",
   });
 
-/** The canonical grain, from the `dbt_ad_reporting` hierarchy (specification section 7). */
+/**
+ * The canonical grain, from the `dbt_ad_reporting` hierarchy (specification section 7).
+ *
+ * `order` is an ADDITION to that hierarchy, made under 13.3 rule 2 by decision 11A.14. The upstream
+ * package is ad-centric and stops at `ad`; the launch connector set is three commerce sources, and
+ * a WooCommerce or Shopify feed has no grain in this list to land on. A row may be one order
+ * (`entity_id` is the order id) or a day's orders at `account` grain -- both are expressible, and
+ * which a connector chooses is the connector's decision, not the dictionary's.
+ */
 export const ENTITY_TYPES = [
   "account",
   "campaign",
@@ -63,7 +71,23 @@ export const ENTITY_TYPES = [
   "property",
   "page",
   "query",
+  "order",
 ] as const;
+
+/**
+ * The subset of the grain that describes ADVERTISING, where a commerce figure can only be an
+ * attributed one. See the second refusal in `envelopeRowSchema`.
+ *
+ * `account` is deliberately absent. An account is an ad account on Google and a shop on
+ * WooCommerce, so a day's orders at account grain is an honest unattributed count.
+ */
+export const ADVERTISING_ENTITY_TYPES = [
+  "campaign",
+  "ad_group",
+  "ad",
+  "keyword",
+  "search_term",
+] as const satisfies readonly (typeof ENTITY_TYPES)[number][];
 
 export const entitySchema = z.object({
   type: z.enum(ENTITY_TYPES),
@@ -144,6 +168,26 @@ export const envelopeRowSchema = rowShape.superRefine((row, ctx) => {
         `refusing to emit an unlabelled conversion count: ${present.join(", ")} present with no ` +
         "attribution_window (specification section 2). Use account_default or model where the " +
         "platform exposes no selectable window.",
+    });
+  }
+
+  // THE SECOND REFUSAL, and the same rule as the first applied to the commerce grain added by
+  // 11A.14. `orders`, `revenue`, `net_revenue`, `fees` and `commission` are unattributed counts of
+  // a shop's own money -- until they appear on a campaign, an ad group, an ad, a keyword or a
+  // search term, where the platform can only have produced them by attributing. A marketplace ad
+  // platform reporting "orders from this campaign" is reporting a conversion; letting it through
+  // under a name the first refusal does not cover would be the whole guarantee lost to a synonym.
+  const commerce = COMMERCE_METRICS.filter((name) => row.metrics[name] !== undefined);
+  const advertising = (ADVERTISING_ENTITY_TYPES as readonly string[]).includes(row.entity.type);
+  if (commerce.length > 0 && advertising && row.dimensions.attribution_window === null) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["dimensions", "attribution_window"],
+      message:
+        `refusing to emit an unlabelled attributed figure: ${commerce.join(", ")} present on a ` +
+        `${row.entity.type} entity with no attribution_window. A commerce metric on an ` +
+        "advertising entity is an attributed number and carries the same obligation as a " +
+        "conversion count (specification section 2, decision 11A.14).",
     });
   }
 

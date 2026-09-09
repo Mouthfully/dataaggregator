@@ -556,6 +556,168 @@ begin;
       where workspace_id = '7c000000-0000-0000-0000-000000000001' and date = '2026-08-22'));
 commit;
 
+-- ---------------------------------------------------------------------------------------------
+-- The commerce grain (11A.14)
+--
+-- `order` plus four metrics, added so the launch connector set has somewhere to land. Several of
+-- these exist because the SQL side cannot derive what the contract derives: the fx constraint
+-- writes its currency list out by hand, and the dictionary guard compares NAMES, not constraints.
+-- A metric added to the column list and forgotten in a constraint would pass every other check in
+-- this repository.
+-- ---------------------------------------------------------------------------------------------
+
+begin;
+  set local role app_ingest;
+  select app.upsert_envelope_row(
+    p_workspace_id       => '7c000000-0000-0000-0000-000000000001',
+    p_connection_id      => null,
+    p_source             => 'ga4',
+    p_account_id         => 'shop_1',
+    p_entity_id          => 'wc_10482',
+    p_entity_type        => 'order',
+    p_native_entity_type => 'shop_order',
+    p_native_id          => '10482',
+    p_date               => '2026-08-30',
+    p_currency           => 'THB',
+    p_timezone           => 'Asia/Bangkok',
+    p_attribution_window => null,
+    p_fetched_at         => '2026-08-31T06:00:00Z',
+    p_first_seen_at      => '2026-08-31T06:00:00Z',
+    p_orders             => 1,
+    p_revenue            => 1290,
+    p_net_revenue        => 1102.4,
+    p_fees               => 41.6,
+    p_commission         => 146
+  );
+  reset role;
+
+  select app_test.check('an order-grain row stores its commerce metrics',
+    (select orders = 1 and revenue = 1290 and net_revenue = 1102.4
+              and fees = 41.6 and commission = 146
+       from public.envelope_rows
+      where workspace_id = '7c000000-0000-0000-0000-000000000001' and entity_id = 'wc_10482'));
+
+  -- THE SET LIST. Four columns added to the insert and forgotten in the conflict clause would store
+  -- correctly on the first pull and never move again -- a restatement that silently does not
+  -- restate, which is the one failure this table exists to prevent.
+  set local role app_ingest;
+  select app.upsert_envelope_row(
+    p_workspace_id       => '7c000000-0000-0000-0000-000000000001',
+    p_connection_id      => null,
+    p_source             => 'ga4',
+    p_account_id         => 'shop_1',
+    p_entity_id          => 'wc_10482',
+    p_entity_type        => 'order',
+    p_native_entity_type => 'shop_order',
+    p_native_id          => '10482',
+    p_date               => '2026-08-30',
+    p_currency           => 'THB',
+    p_timezone           => 'Asia/Bangkok',
+    p_attribution_window => null,
+    p_fetched_at         => '2026-09-06T06:00:00Z',
+    p_first_seen_at      => '2026-09-06T06:00:00Z',
+    -- The order was refunded. Every commerce figure moves, and net goes negative.
+    p_orders             => 1,
+    p_revenue            => 1290,
+    p_net_revenue        => -187.6,
+    p_fees               => 41.6,
+    p_commission         => 146
+  );
+  reset role;
+
+  select app_test.check('a re-pull restates every commerce column',
+    (select net_revenue = -187.6 from public.envelope_rows
+      where workspace_id = '7c000000-0000-0000-0000-000000000001' and entity_id = 'wc_10482'));
+
+  select app_test.check('net_revenue may be negative: a refunded day really is',
+    (select net_revenue < 0 from public.envelope_rows
+      where workspace_id = '7c000000-0000-0000-0000-000000000001' and entity_id = 'wc_10482'));
+commit;
+
+begin;
+  -- `fees` and `commission` keep their non-negative checks. Only `net_revenue` is signed, and the
+  -- asymmetry is the point: a platform never charges a negative fee.
+  select app_test.check_rejected('a negative fee is refused',
+    $sql$insert into public.envelope_rows (
+      workspace_id, source, account_id, entity_id, entity_type, native_entity_type, native_id,
+      date, currency, timezone, fees, fetched_at, is_provisional, first_seen_at
+    ) values (
+      '7c000000-0000-0000-0000-000000000001', 'ga4', 'shop_1', 'neg_fee', 'order', 'shop_order',
+      '1', '2026-08-30', 'THB', 'Asia/Bangkok', -1, now(), true, now()
+    )$sql$);
+
+  -- THE SECOND REFUSAL. A marketplace ad platform reporting orders per campaign is reporting a
+  -- conversion; the first refusal only names `conversions` and `conversions_value`.
+  select app_test.check_rejected('orders on a campaign with no window are refused',
+    $sql$insert into public.envelope_rows (
+      workspace_id, source, account_id, entity_id, entity_type, native_entity_type, native_id,
+      date, currency, timezone, orders, fetched_at, is_provisional, first_seen_at
+    ) values (
+      '7c000000-0000-0000-0000-000000000001', 'meta_ads', 'act_1', 'c_1', 'campaign', 'campaign',
+      '1', '2026-08-30', 'THB', 'Asia/Bangkok', 4, now(), true, now()
+    )$sql$);
+
+  select app_test.check_rejected('and net_revenue on an ad, for the same reason',
+    $sql$insert into public.envelope_rows (
+      workspace_id, source, account_id, entity_id, entity_type, native_entity_type, native_id,
+      date, currency, timezone, net_revenue, fetched_at, is_provisional, first_seen_at
+    ) values (
+      '7c000000-0000-0000-0000-000000000001', 'meta_ads', 'act_1', 'a_1', 'ad', 'ad',
+      '1', '2026-08-30', 'THB', 'Asia/Bangkok', 900, now(), true, now()
+    )$sql$);
+
+  -- THE FX CONSTRAINT, which SQL cannot derive. A converted amount must carry the rate that
+  -- produced it, and `net_revenue` is a converted amount like any other.
+  select app_test.check_rejected('a converted net_revenue with no rate is refused',
+    $sql$insert into public.envelope_rows (
+      workspace_id, source, account_id, entity_id, entity_type, native_entity_type, native_id,
+      date, currency, timezone, net_revenue, fetched_at, is_provisional, first_seen_at,
+      fx_source, fx_rate_date
+    ) values (
+      '7c000000-0000-0000-0000-000000000001', 'ga4', 'shop_1', 'fx_1', 'order', 'shop_order',
+      '1', '2026-08-30', 'EUR', 'Asia/Bangkok', 900, now(), true, now(),
+      'ecb_reference_rates', '2026-08-29'
+    )$sql$);
+
+  select app_test.check_rejected('a converted commission with no rate is refused',
+    $sql$insert into public.envelope_rows (
+      workspace_id, source, account_id, entity_id, entity_type, native_entity_type, native_id,
+      date, currency, timezone, commission, fetched_at, is_provisional, first_seen_at,
+      fx_source, fx_rate_date
+    ) values (
+      '7c000000-0000-0000-0000-000000000001', 'ga4', 'shop_1', 'fx_2', 'order', 'shop_order',
+      '1', '2026-08-30', 'EUR', 'Asia/Bangkok', 12, now(), true, now(),
+      'ecb_reference_rates', '2026-08-29'
+    )$sql$);
+commit;
+
+begin;
+  -- The rule is narrow on purpose. An account is a shop as well as an ad account, and an order
+  -- grain is the shop's own record, so neither needs a window to be honest.
+  insert into public.envelope_rows (
+    workspace_id, source, account_id, entity_id, entity_type, native_entity_type, native_id,
+    date, currency, timezone, orders, net_revenue, fetched_at, is_provisional, first_seen_at
+  ) values (
+    '7c000000-0000-0000-0000-000000000001', 'ga4', 'shop_1', 'day_1', 'account', 'shop',
+    '1', '2026-08-31', 'THB', 'Asia/Bangkok', 37, 41200, now(), true, now()
+  );
+  select app_test.check('orders at account grain need no window',
+    (select orders = 37 from public.envelope_rows
+      where workspace_id = '7c000000-0000-0000-0000-000000000001' and entity_id = 'day_1'));
+
+  -- And the same figures on a campaign are accepted the moment the window is named.
+  insert into public.envelope_rows (
+    workspace_id, source, account_id, entity_id, entity_type, native_entity_type, native_id,
+    date, currency, timezone, attribution_window, orders, fetched_at, is_provisional, first_seen_at
+  ) values (
+    '7c000000-0000-0000-0000-000000000001', 'meta_ads', 'act_1', 'c_ok', 'campaign', 'campaign',
+    '1', '2026-08-31', 'THB', 'Asia/Bangkok', '7d_click', 4, now(), true, now()
+  );
+  select app_test.check('a labelled attributed order count is accepted',
+    (select attribution_window = '7d_click' from public.envelope_rows
+      where workspace_id = '7c000000-0000-0000-0000-000000000001' and entity_id = 'c_ok'));
+commit;
+
 begin;
   set local role app_ingest;
   select app.upsert_envelope_row(

@@ -16,4 +16,20 @@ export {
   type PayloadRef,
   type PutOptions,
   type R2Like,
+  type RedactionRecord,
 } from "./payloads.js";
+export {
+  DECLARED_SOURCES,
+  MAX_REDACTION_DEPTH,
+  PayloadNotRedactableError,
+  PayloadPolicyError,
+  REDACTION_POLICIES,
+  REDACTION_POLICY_VERSION,
+  policyFor,
+  redactJsonBytes,
+  redactValue,
+  type Disposition,
+  type PolicyTable,
+  type RedactionPolicy,
+  type RedactionResult,
+} from "./redaction.js";

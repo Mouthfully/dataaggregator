@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { envelopeRowSchema, envelopeSchema, upsertKey } from "./envelope.js";
-import { RESTATEMENT_CLOCKS, isProvisional, restatesUntil } from "./restatement.js";
+import { COMMERCE_METRICS, METRICS } from "./metrics.js";
+import { isProvisional, RESTATEMENT_CLOCKS, restatesUntil } from "./restatement.js";
 
 /** A minimal valid row. Each test bends one thing about it. */
 function row(overrides: Record<string, unknown> = {}) {
@@ -277,5 +278,154 @@ describe("the restatement clocks", () => {
         firstSeenAt: "2026-08-14T06:00:00Z",
       }),
     ).toThrow(/unparseable/);
+  });
+});
+
+describe("the commerce grain (11A.14)", () => {
+  // The dictionary gained `order` plus four metrics so the launch connector set -- WooCommerce,
+  // Shopify and a payment gateway -- has somewhere to land. These tests are the contract half of a
+  // change whose other half is a migration; `03_envelope_store.sql` asserts the same rules in SQL.
+
+  it("accepts an order-grain row", () => {
+    const result = envelopeRowSchema.safeParse(
+      row({
+        source: "ga4",
+        entity: {
+          type: "order",
+          id: "wc_10482",
+          account_id: "shop_1",
+          native_entity_type: "shop_order",
+          native_id: "10482",
+        },
+        metrics: { orders: 1, revenue: 1290, net_revenue: 1102.4, fees: 41.6, commission: 146 },
+        dimensions: { ...row().dimensions, attribution_window: null },
+      }),
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a negative net_revenue, because a refunded day really is negative", () => {
+    // The schema column deliberately carries no non-negative check. A floor of zero would be a lie
+    // the connector was forced to write.
+    const result = envelopeRowSchema.safeParse(
+      row({
+        entity: { ...row().entity, type: "account" },
+        metrics: { net_revenue: -812.4 },
+        dimensions: { ...row().dimensions, attribution_window: null },
+      }),
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it("keeps orders out of the conversion refusal: a shop's own count needs no window", () => {
+    const result = envelopeRowSchema.safeParse(
+      row({
+        entity: { ...row().entity, type: "account" },
+        metrics: { orders: 37 },
+        dimensions: { ...row().dimensions, attribution_window: null },
+      }),
+    );
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("the second refusal: a commerce figure on an advertising entity", () => {
+  // A marketplace ad platform reporting "orders from this campaign" is reporting a conversion. The
+  // first refusal only covers `conversions` and `conversions_value`, so without this one the whole
+  // guarantee is lost to a synonym.
+
+  for (const type of ["campaign", "ad_group", "ad", "keyword", "search_term"] as const) {
+    it(`rejects orders on a ${type} with no attribution window`, () => {
+      const result = envelopeRowSchema.safeParse(
+        row({
+          entity: { ...row().entity, type },
+          metrics: { orders: 12 },
+          dimensions: { ...row().dimensions, attribution_window: null },
+        }),
+      );
+      expect(result.success).toBe(false);
+      expect(JSON.stringify(result.error?.issues)).toContain("unlabelled attributed figure");
+    });
+  }
+
+  it("rejects revenue on an ad entity too, not only the metrics added this round", () => {
+    const result = envelopeRowSchema.safeParse(
+      row({
+        metrics: { revenue: 4400 },
+        dimensions: { ...row().dimensions, attribution_window: null },
+      }),
+    );
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts the same row once the window is named", () => {
+    const result = envelopeRowSchema.safeParse(row({ metrics: { orders: 12, net_revenue: 3300 } }));
+    expect(result.success).toBe(true);
+  });
+
+  it("names the metrics and the grain, so the fix is obvious", () => {
+    const result = envelopeRowSchema.safeParse(
+      row({
+        metrics: { orders: 12, commission: 400 },
+        dimensions: { ...row().dimensions, attribution_window: null },
+      }),
+    );
+    const issues = JSON.stringify(result.error?.issues);
+    expect(issues).toContain("orders");
+    expect(issues).toContain("commission");
+    expect(issues).toContain("ad_group");
+  });
+
+  it("does not fire on account grain: an account is a shop as well as an ad account", () => {
+    const result = envelopeRowSchema.safeParse(
+      row({
+        entity: { ...row().entity, type: "account" },
+        metrics: { orders: 12, net_revenue: 3300 },
+        dimensions: { ...row().dimensions, attribution_window: null },
+      }),
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it("does not fire on spend, which is a cost and is never attributed", () => {
+    expect(COMMERCE_METRICS).not.toContain("spend");
+    const result = envelopeRowSchema.safeParse(
+      row({
+        metrics: { spend: 900 },
+        dimensions: { ...row().dimensions, attribution_window: null },
+      }),
+    );
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("the fx rule reaches every currency metric", () => {
+  // The contract finds currency metrics by asking METRICS; SQL cannot, and writes the list out by
+  // hand. That asymmetry is why this is asserted on both sides.
+
+  it("rejects a converted net_revenue with a source but no rate", () => {
+    const result = envelopeRowSchema.safeParse(
+      row({
+        entity: { ...row().entity, type: "account" },
+        metrics: { net_revenue: 3300 },
+        dimensions: { ...row().dimensions, attribution_window: null },
+        fx_rate: null,
+      }),
+    );
+    expect(result.success).toBe(false);
+  });
+
+  it("agrees with METRICS about which names are currency", () => {
+    const currency = (Object.keys(METRICS) as (keyof typeof METRICS)[]).filter(
+      (name) => METRICS[name].unit === "currency",
+    );
+    expect(currency).toEqual([
+      "spend",
+      "conversions_value",
+      "revenue",
+      "net_revenue",
+      "fees",
+      "commission",
+    ]);
   });
 });

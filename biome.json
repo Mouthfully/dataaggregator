@@ -14,6 +14,7 @@
       "!**/dist",
       "!**/coverage",
       "!design",
+      "!docs/marketplane/finance/cost-model.html",
       "!pnpm-lock.yaml"
     ]
   },

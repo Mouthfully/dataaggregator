@@ -164,6 +164,18 @@ creates a *separate* artifact.
 **The document was hand-written from the script's output. There is no generator between them.**
 If you change a parameter, the HTML is immediately stale — re-check every affected figure.
 
+**Every figure in the table below was re-run against `model.py` on 10 September and reconciles
+exactly** — revenue, EBITDA, ARR and headcount across all five years, peak cash −฿19,276,720,
+cumulative cash positive M39, ฿134,855,406 at M60, gross margin 75.7%, BOI ฿17,901,994 (฿25,516,746
+routed) against a ceiling of ฿38,348,333, and the routing engine at ฿38,073,760. **EBITDA turns
+positive in month 28**, which the table does not state.
+
+Of §03's four cost levers, only the third — the routing classifier — is tracked in §7. The other
+three are implementation facts rather than projects: **lever 1** is using a cheap model for routing,
+retrieval, extraction and verification and never for advice; **lever 2** is prompt-caching the
+system prompt, action rubric and business profile, roughly 12k of the 35k input, worth 12% and
+marked verified; **lever 4** is batch, and see §9 — the published numbers already assume it.
+
 ### What it currently says (base case, no routing engine)
 
 | | Y1 | Y2 | Y3 | Y4 | Y5 |
@@ -232,11 +244,18 @@ pessimistic case survives rather than only the base case.
    source of truth for every published figure. Small fix, but it needs its own PR because making
    the parameter live means re-verifying the document against it. Workaround until then: patch the
    module globals before calling `run()`. See `30-thai-public-data-register.md` §5.
-7. **A design note for adding Google as a model vendor**, if the Gemini prep-layer saving is
+7. **Cloudflare AI Gateway, for per-workspace cost attribution.** §03 of the cost model calls
+   this "the reason to adopt it, and it is worth more than the caching" — **you cannot price a
+   metered product you cannot measure per tenant**, and §11.3 prices per connected account per
+   month plus credits. The envelope carries a `credits_used` field and *nothing aggregates cost
+   per workspace*. It is free on any Cloudflare plan, already on the stack, and needs no
+   stack-rule exception. It also buys provider failover behind one endpoint and per-workspace
+   rate limiting, which is how a fair-use cap gets enforced without writing a quota system.
+8. **A design note for adding Google as a model vendor**, if the Gemini prep-layer saving is
    taken. The stack rule requires a written reason. Three checks first: a DPA with zero
    retention; a subprocessor disclosure; and a read of the advertising platforms' terms on
    transferring platform data to third parties.
-8. **Register on the DEPA Thailand Digital Catalog** before the 2027 window closes.
+9. **Register on the DEPA Thailand Digital Catalog** before the 2027 window closes.
 
 ---
 
@@ -277,6 +296,15 @@ pessimistic case survives rather than only the base case.
   product holds bring-your-own credentials for thousands of businesses.
 - **Churn is 4.5%/month on monthly plans**, the middle of the published self-serve SMB band —
   not the flattering 3.5% B2B median an earlier draft used.
+- **The published COGS assumes the Batch API.** §02 prices the weekly action sheet at ฿11.02
+  "batched at 50% off" and monthly reports at ฿11.52 batched; lever 4 in §03 applies the same to
+  verification runs. **Every EBITDA and cash figure in §6 above depends on it.** Action sheets,
+  briefs, reports and verification runs have nobody waiting on them, so build them through the
+  batch endpoint — build any of them synchronously and those COGS lines double while the model
+  keeps reporting the old number.
+- **Route model calls through Cloudflare AI Gateway, but never its unified billing.** Unified
+  billing adds **5%** on credit purchases, the same toll OpenRouter charges. Route through the
+  gateway, pay the providers directly. Anthropic primary, Gemini and OpenRouter as failover.
 - **A hard CAC ceiling of twelve months' contribution** (฿14,532 Starter / ฿37,608 Growth /
   ฿119,520 Multi-unit). If measured CAC breaches it, stop buying rather than buy harder —
   spending through a broken funnel is the one failure mode in the model with no recovery path.

@@ -29,10 +29,24 @@
  *   putPayload            length known  -> pure streaming, ANY size, no compression
  *   putBufferedPayload    length unknown -> buffered under a hard cap, compression available
  *
- * The streaming path is the one every extractor should use, because a platform report response
- * carries `content-length`. The buffered path exists because some do not (chunked transfer), and
- * refusing those outright would mean a connector that cannot fetch. Its cap is what keeps the
- * fallback from quietly becoming the failure the repo map predicts.
+ * The streaming path is the one an extractor should reach for FIRST, because a platform report
+ * response carries `content-length`. The buffered path exists because some do not (chunked
+ * transfer), and refusing those outright would mean a connector that cannot fetch. Its cap is what
+ * keeps the fallback from quietly becoming the failure the repo map predicts.
+ *
+ * BUT LENGTH IS NOT THE ONLY AXIS, AND THIS TABLE USED TO IMPLY IT WAS. It was written before the
+ * redaction policy existed, and said the streaming path was "the one every extractor should use".
+ * That is now false for a whole class of source: `putPayload` REFUSES any source whose disposition
+ * is not `verbatim`, regardless of content-length, because a streamed payload is never parsed and
+ * therefore can never be redacted. So the real rule is two questions, in this order:
+ *
+ *   1. Does this source need redaction?   yes -> putBufferedPayload. No choice, no exceptions.
+ *   2. Is the content-length known?       yes -> putPayload. no -> putBufferedPayload.
+ *
+ * `woocommerce` is the first source to hit rule 1, and every commerce source after it will too --
+ * an order carries a named buyer. For those, the cap on the buffered path is not a fallback's
+ * consolation, it is the only path, which is why a connector must page the API narrowly enough to
+ * stay under it rather than treating the cap as someone else's problem.
  *
  * WHAT THIS COSTS. Section 7 names Supabase disk at $0.125/GB as the line most likely to break the
  * cost model. R2 Standard is $0.015/GB-month, 8.3x cheaper -- but only if `raw` is a KEY in Postgres

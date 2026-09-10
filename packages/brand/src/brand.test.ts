@@ -61,8 +61,18 @@ describe("the claims gate", () => {
     expect(positioning?.source, "positioning must cite the decision that set it").toContain(
       "11A.1",
     );
-    // The superseded text sold the audience inside the sentence: "for agencies and brands".
-    // Agencies survive as a secondary channel -- see the `agency-mode` claim -- not as the pitch.
+    // The exact string 11A.1 superseded. It names neither "agency" nor "brands" -- the audience
+    // lived in the specification's prose around it, never in the sentence -- so a keyword filter
+    // does NOT catch a straight restore from git history, which is the likeliest way the old
+    // pitch comes back. Assert the string itself.
+    expect(positioning?.text).not.toContain(
+      "Verified root cause and an operated correctness guarantee",
+    );
+    // And assert what replaced it, so a third sentence that is neither one nor the other cannot
+    // pass by being merely different from the old text.
+    expect(positioning?.text).toMatch(/small business/i);
+    // Kept as a forward guard: 11A.1 makes agencies a secondary channel, so the audience must not
+    // reappear inside the sentence either. See the `agency-mode` claim for where they do survive.
     expect(positioning?.text).not.toMatch(/\bagenc(y|ies)\b|\bbrands\b/i);
   });
 

@@ -22,7 +22,10 @@ thing to do next". This is that.
 > The business-intelligence team a small business does not have. Your own numbers, and the
 > verified reason they moved.
 
-and cites `["11A.1", "11.9"]` rather than `["0", "11.9"]`.
+and cites `["11A.1", "11.9"]` rather than `["0", "11.9"]`. **`README.md` carries the same
+sentence and changed with it** — `00-recon-reports.md` names the README as "an existing claim
+surface that must agree with the brand file", and it was the source the original claim was cited
+to. Leaving it would have left the repository with two different primary messages.
 
 Two sentences, because §11A.1 is explicit that the correctness guarantee **did not change** —
 it "stopped being the pitch and became the substance behind it: the reason an owner can trust a
@@ -128,6 +131,10 @@ governed when a page is ready to say it.
 
 ## 4. What was left out
 
+- **`00-recon-reports.md` was not rewritten**, though it quotes the superseded sentence three
+  times, once inside its own allowed-claims list. It is a dated phase-0 record of what recon found
+  in the README on 7 September, not a live claim surface; rewriting it would falsify the record.
+  The README itself, which *is* a live surface, changed.
 - **`apps/web` copy was not otherwise touched.** One claim id changed meaning; the page still
   renders the same 23 claims in the same order. Re-cutting the page against the SME customer is
   the marketing-site note's job, and doing it here would widen the PR the brief closed.
@@ -174,17 +181,42 @@ and no unresolved Meta or Google question.
 
 ### The mutations
 
-The new test is `"positions on the primary customer 11A.1 names, not the one it replaced"`. All
-three mutations were confirmed present in the file before the suite was run, per the discipline
+The new test is `"positions on the primary customer 11A.1 names, not the one it replaced"`. Each
+mutation was confirmed present in the file before the suite was run, per the discipline
 `HANDOVER.md` §4 records — twice this project has believed a survivor that never landed.
 
 | Mutation | Caught by |
 |---|---|
-| Restore the superseded agency-and-brand text | `expected '…' not to match /\bagenc(y\|ies)\b\|\bbrands\b/i` |
+| Restore the **exact** superseded string | `expected '…' not to contain 'Verified root cause and an operated c…'` |
 | Revert the citation to `["0", "11.9"]` | `expected [ '0', '11.9' ] to include '11A.1'` |
 | Delete the `positioning` claim entirely | `the positioning claim was removed rather than reconciled` |
+| Replace it with a third sentence that is neither | `expected 'Your numbers, and the verified reason…' to match /small business/i` |
 
-The third matters most. Deleting the claim is the failure mode a text assertion alone would miss:
-`claim("positioning")` already throws at build time on an unknown id, so a deletion breaks the
-site loudly — but it would break it as a *build* error with no explanation, and the next person
-would restore the old sentence from git history. The test names why it exists.
+**The first row is a correction, and it is the useful part of this note.** The test as first
+written asserted only that the claim did not match `/\bagenc(y|ies)\b|\bbrands\b/i`, and the
+mutation run against it appended *"for agencies and brands"* to the old sentence — so it tested a
+string that had never been in the file. **The real superseded text contains neither word:**
+
+> Verified root cause and an operated correctness guarantee over your own ad, analytics and search data.
+
+The audience lived in §11A.1's prose *around* the sentence, never inside it. A straight `git
+checkout` of the old line would have passed the first version of this test, which is precisely the
+route by which the old pitch comes back. Verified directly:
+
+```
+$ node -e '…/\bagenc(y|ies)\b|\bbrands\b/i.test(old)'
+old assertion would have caught it: false
+```
+
+The test now asserts the superseded string by name and asserts that the replacement says *small
+business*, which is what makes the positive half load-bearing rather than decorative. The keyword
+filter is kept as a forward guard against the audience reappearing inside the sentence.
+
+**Caught by review, not by the mutation run** — `chatgpt-codex-connector` on PR #5. The lesson is
+narrower than "mutation testing failed": the mutation was invented from the *description* of the
+old claim rather than copied from the file, so it tested a strawman. **Take the mutation from
+`git show`, not from memory of what the thing said.**
+
+The delete-the-claim row still matters most among the rest. `claim("positioning")` already throws
+at build time on an unknown id, so a deletion breaks the site loudly — but as a *build* error with
+no explanation, and the next person restores the old sentence from history.

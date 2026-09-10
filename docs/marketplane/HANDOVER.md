@@ -1,8 +1,10 @@
 # Handover
 
-Written 9 September 2026, at commit `5d5dc29` on `claude/marketplane-build-kickoff-cgbfxz`
-(PR [#3](https://github.com/Mouthfully/dataaggregator/pull/3), open). Read this before touching
-anything.
+Written 9 September 2026, last revised 10 September at commit `3774229` on
+`claude/marketplane-build-kickoff-cgbfxz`. PR [#3](https://github.com/Mouthfully/dataaggregator/pull/3)
+is **merged**; PR [#5](https://github.com/Mouthfully/dataaggregator/pull/5) is **open, green and
+mergeable**, and carries everything described below that is not yet on `main`. Read this before
+touching anything.
 
 ---
 
@@ -62,7 +64,7 @@ And the rest:
 
 ```
 docs/MARKETING-DATA-PLANE.md      the specification. §11 records decisions.
-docs/marketplane/                 design notes 01–28, one per shipped unit
+docs/marketplane/                 design notes 01–30, one per shipped unit (20 is owed)
 docs/marketplane/finance/         the financial model — see §6 below
 packages/contract/                the envelope, metric dictionary, restatement event
 packages/payloads/                raw payload store + PII redaction
@@ -78,13 +80,13 @@ scripts/check-*.mjs               brand, dictionary and token tripwires
 
 ## 4. State of the code
 
-**Green at `5d5dc29`: 396 unit tests, 178 database assertions, CI passing.**
+**Green at `3774229`: 397 unit tests, 178 database assertions, CI passing.**
 
 Verify with `pnpm test`. Note that `apps/api-edge` prints alarming `workerd` stack traces
 (`Network connection lost`, `FixedLengthStream`) during its run — **these are expected noise
 from the miniflare pool, not failures.** Read the `Test Files … passed` line, not the traces.
 
-Shipped on PR #3, in order:
+Shipped on PR #3 and now on `main`, in order:
 
 1. **Commerce grain** — `orders`, `revenue`, `net_revenue`, `fees`, `commission` in the metric
    dictionary; `order` appended to `ENTITY_TYPES`; a second refusal that rejects commerce
@@ -100,6 +102,18 @@ Shipped on PR #3, in order:
 5. **Retention and cron wiring** — `* * * * *` drain, `17 3 * * *` prune, 30-day delivered /
    90-day failed retention. The prune never touches an undelivered event.
 
+### Open on PR #5, not yet on `main`
+
+1. **The positioning claim reconciled with §11A.1** — `packages/brand/src/claims.ts` had carried
+   the agency-and-brand message for four rounds while the specification said the customer was an
+   owner-run small business. `README.md` carried the same sentence and changed with it.
+2. **`30-thai-public-data-register.md`** — a survey of Thai public data sources, sorted by whether
+   an access contract could be confirmed. Nothing adopted; see §7 item 2.
+3. **This file.**
+
+**If PR #5 is merged when you read this, all of the above is on `main` and the branch is spent —
+restart it from `origin/main` rather than stacking on merged history.**
+
 ### Two bugs mutation testing caught, and what they taught
 
 - The trigger's `when` clause is a **cost** guarantee, not a correctness one. A mutation that
@@ -112,6 +126,13 @@ Twice this session a mutation "survived" because it never actually landed — a 
 that hit both the signer and the verifier so the round-trip still agreed, and an `index()` that
 matched the wrong occurrence. **Confirm the mutation is really in the file before believing a
 survivor.**
+
+A third failure mode showed up on PR #5 and is worse, because the suite went green and stayed
+green: **the mutation was invented from a description of the old code rather than copied out of
+it.** The test asserted the positioning claim did not say "agencies" or "brands"; the real
+superseded sentence contained neither word, so a straight `git checkout` of the old line would
+have passed. A review bot caught it, not the mutation run. **Take the mutation from `git show`,
+not from memory of what the thing said.**
 
 ---
 
@@ -142,6 +163,18 @@ creates a *separate* artifact.
 
 **The document was hand-written from the script's output. There is no generator between them.**
 If you change a parameter, the HTML is immediately stale — re-check every affected figure.
+
+**Every figure in the table below was re-run against `model.py` on 10 September and reconciles
+exactly** — revenue, EBITDA, ARR and headcount across all five years, peak cash −฿19,276,720,
+cumulative cash positive M39, ฿134,855,406 at M60, gross margin 75.7%, BOI ฿17,901,994 (฿25,516,746
+routed) against a ceiling of ฿38,348,333, and the routing engine at ฿38,073,760. **EBITDA turns
+positive in month 28**, which the table does not state.
+
+Of §03's four cost levers, only the third — the routing classifier — is tracked in §7. The other
+three are implementation facts rather than projects: **lever 1** is using a cheap model for routing,
+retrieval, extraction and verification and never for advice; **lever 2** is prompt-caching the
+system prompt, action rubric and business profile, roughly 12k of the 35k input, worth 12% and
+marked verified; **lever 4** is batch, and see §9 — the published numbers already assume it.
 
 ### What it currently says (base case, no routing engine)
 
@@ -187,19 +220,42 @@ pessimistic case survives rather than only the base case.
 ## 7. What is owed, in order
 
 1. **`docs/marketplane/20-marketing-site.md`.** Still missing — notes jump 19 → 21.
-2. **`packages/brand/src/claims.ts` still carries the agency-and-brand `positioning` claim**,
-   which contradicts spec §11A.1 (the SME repositioning). 24 site assertions in `apps/web`
-   depend on it. This is a real inconsistency sitting in `main`'s path.
+2. **Swap `FX_SOURCE` from ECB to the Bank of Thailand.** `packages/fx/src/fx.ts` hardcodes
+   `FX_SOURCE = "ecb_reference_rates"`, so a Thailand-first product prices THB off a European
+   central bank. BOT is the rate a Thai auditor and the Revenue Department recognise, and
+   `fx-on-row` promises the source on the row. **This is a defect with a named fix**, small and
+   self-contained, and it is its own PR because it changes an envelope field. See
+   `30-thai-public-data-register.md`; one registration on `portal.api.bot.or.th` also carries
+   tourism indicators and payment statistics.
 3. **WooCommerce as the first commerce connector.** Needs a `SOURCES` entry *and* a redaction
    keep-list, both shipping in the same PR — the redaction policy is `verbatim` until then, by
    design.
 4. **The routing classifier** (§03 of the financial model). Highest financial return of any
    engineering work here; also required by the Ask surface.
-5. **A design note for adding Google as a model vendor**, if the Gemini prep-layer saving is
+5. **A capability gate for the claims list** — issue
+   [#6](https://github.com/Mouthfully/dataaggregator/issues/6). `allowedClaims()` gates on brand
+   fields being non-null and has no notion of whether the thing a claim describes exists. Eight of
+   the 23 claims the site renders name capabilities that are not built; `connectors` names five
+   sources when `packages/connectors/src/sources/` holds only `ga4`. Not urgent — the site is not
+   deployed — but it must land before the first deployment, and the fix belongs with item 1.
+6. **`run()` in `finance/model.py` ignores its `A` parameter.** Line 158 reads
+   `CBn,CBr=BLEND(A_now),BLEND(A_new)` from the module globals; `A` appears nowhere in the body.
+   Any sensitivity run passed through `A=` silently returns the baseline, and the model is the
+   source of truth for every published figure. Small fix, but it needs its own PR because making
+   the parameter live means re-verifying the document against it. Workaround until then: patch the
+   module globals before calling `run()`. See `30-thai-public-data-register.md` §5.
+7. **Cloudflare AI Gateway, for per-workspace cost attribution.** §03 of the cost model calls
+   this "the reason to adopt it, and it is worth more than the caching" — **you cannot price a
+   metered product you cannot measure per tenant**, and §11.3 prices per connected account per
+   month plus credits. The envelope carries a `credits_used` field and *nothing aggregates cost
+   per workspace*. It is free on any Cloudflare plan, already on the stack, and needs no
+   stack-rule exception. It also buys provider failover behind one endpoint and per-workspace
+   rate limiting, which is how a fair-use cap gets enforced without writing a quota system.
+8. **A design note for adding Google as a model vendor**, if the Gemini prep-layer saving is
    taken. The stack rule requires a written reason. Three checks first: a DPA with zero
    retention; a subprocessor disclosure; and a read of the advertising platforms' terms on
    transferring platform data to third parties.
-6. **Register on the DEPA Thailand Digital Catalog** before the 2027 window closes.
+9. **Register on the DEPA Thailand Digital Catalog** before the 2027 window closes.
 
 ---
 
@@ -240,6 +296,15 @@ pessimistic case survives rather than only the base case.
   product holds bring-your-own credentials for thousands of businesses.
 - **Churn is 4.5%/month on monthly plans**, the middle of the published self-serve SMB band —
   not the flattering 3.5% B2B median an earlier draft used.
+- **The published COGS assumes the Batch API.** §02 prices the weekly action sheet at ฿11.02
+  "batched at 50% off" and monthly reports at ฿11.52 batched; lever 4 in §03 applies the same to
+  verification runs. **Every EBITDA and cash figure in §6 above depends on it.** Action sheets,
+  briefs, reports and verification runs have nobody waiting on them, so build them through the
+  batch endpoint — build any of them synchronously and those COGS lines double while the model
+  keeps reporting the old number.
+- **Route model calls through Cloudflare AI Gateway, but never its unified billing.** Unified
+  billing adds **5%** on credit purchases, the same toll OpenRouter charges. Route through the
+  gateway, pay the providers directly. Anthropic primary, Gemini and OpenRouter as failover.
 - **A hard CAC ceiling of twelve months' contribution** (฿14,532 Starter / ฿37,608 Growth /
   ฿119,520 Multi-unit). If measured CAC breaches it, stop buying rather than buy harder —
   spending through a broken funnel is the one failure mode in the model with no recovery path.
@@ -256,5 +321,54 @@ Read in this order:
 4. The three or four most recent design notes (`26`, `27`, `28`) for the house style — a design
    note states the cost, the platform-terms check, and **what was deliberately left out**.
 
-Then pick from §7. Item 4 (the routing classifier) is worth more than the rest combined in cash
-terms; item 2 (the contradictory brand claim) is the one actually sitting wrong in the tree.
+Then pick from §7. **Item 4 (the routing classifier) is worth more than the rest combined in cash
+terms** — ฿38.1M of cumulative cash by month 60, roughly twice the raise, and the Ask surface needs
+it anyway. **Item 2 (the FX source) is the one actually sitting wrong in the tree** and is a
+half-day of work; it is the better first commit for a new session, because it is small enough to
+finish and it exercises the whole loop — envelope field, design note, platform-terms check,
+mutation testing, PR.
+
+Do not start item 3 (WooCommerce) before reading `25-payload-redaction.md`: a connector without its
+redaction keep-list in the same PR is the one thing that note exists to prevent.
+
+**And do not adopt anything from `30-thai-public-data-register.md` before item 4 ships.** §5 of that
+note works it through: public-data context is worth about ฿385,000 of cumulative cash per percentage
+point it lifts the cheap-path routing share, and costs ฿0.215 a question blended — but *before* the
+router exists it costs ฿0.493 on every question and converts none, because there is no cheap path to
+route to. It is the one piece of work in §7 whose value is negative if taken early.
+
+---
+
+## 11. Starting a new session
+
+Paste this as the opening message. It is deliberately short: everything else is in this file, and
+a long prompt competes with the file rather than pointing at it.
+
+> Read `docs/marketplane/HANDOVER.md` first, then `docs/MARKETING-DATA-PLANE.md` §11 and §11A.
+> The binding constraints in §2 of the handover are not negotiable and were set by the founder.
+> Check whether PR #5 has merged — if it has, restart `claude/marketplane-build-kickoff-cgbfxz`
+> from `origin/main` rather than stacking on merged history. Then take §7 item 2 (the FX source
+> swap) and take it all the way: design note, platform-terms check, mutation testing, PR.
+
+### What parallelises, and what does not
+
+Most of §7 is **not** safely parallel, and it is worth knowing why before fanning work out.
+
+- **Item 2 (FX source)** touches `packages/fx` and an envelope field. **Item 3 (WooCommerce)**
+  touches `SOURCES`, the metric dictionary and the redaction keep-list. Both edit
+  `packages/contract`, and `check-dictionary.mjs` fails the build if TypeScript and SQL disagree.
+  Running them concurrently produces two branches that each pass alone and conflict on merge.
+- **Item 1 (marketing site) and item 5 (capability gate)** are the one pair that genuinely belongs
+  together — the gate decides what the page renders when a claim is withheld, and `claim()`
+  currently *throws* on a withheld id rather than degrading.
+- **Research is parallel; commits are not.** Reading platform terms, pricing a source, or
+  surveying an API can fan out freely. Anything that writes to `packages/contract`,
+  `supabase/migrations/` or the dictionary should be one worker at a time.
+
+### The two things a new session gets wrong
+
+1. **It writes code before reading §11A.** The specification records decisions, and re-deciding
+   one is the most expensive mistake available here — it invalidates design notes that cite it.
+2. **It trusts a green suite.** See §4: this project has had two mutations that never landed and
+   one taken from memory instead of from `git show`. A test that has never been seen to fail is
+   not evidence.

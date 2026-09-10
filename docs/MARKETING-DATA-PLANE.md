@@ -1295,10 +1295,12 @@ reason an owner can trust a number they did not compute themselves. 11.9's narro
 "verified root cause and an operated correctness guarantee", not "joins in one call" —
 still stands and is still what the product does.
 
-**What this contradicts, and must be reconciled before launch.** The `positioning` claim
-in `packages/brand/src/claims.ts` still states the agency-and-brand message, and
-`apps/web` renders it under test. That is a code change, deliberately not made in the same
-pass as this decision. See `docs/marketplane/19-sme-repositioning.md`.
+**What this contradicted, and how it was reconciled.** The `positioning` claim in
+`packages/brand/src/claims.ts` carried the agency-and-brand message for four rounds, and
+`apps/web` rendered it under test the whole time. It was rewritten to this decision in
+`docs/marketplane/29-positioning-reconciliation.md`, with a test pinning the citation so the
+old pitch cannot drift back the next time someone writes copy. The decision itself is
+unchanged; only the string that contradicted it moved.
 
 ### 11A.2 Four product surfaces (2026-09-08)
 

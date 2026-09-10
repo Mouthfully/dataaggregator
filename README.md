@@ -1,7 +1,7 @@
 # Marketplane
 
-Verified root cause and an operated correctness guarantee over your own ad, analytics and search
-data.
+The business-intelligence team a small business does not have. Your own numbers, and the verified
+reason they moved.
 
 > The product name is **not settled** — specification section 12 only recommends it. Every
 > occurrence routes through `packages/brand/src/brand.ts` and packages use a neutral `@repo/*`

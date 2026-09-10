@@ -32,10 +32,14 @@ export interface Claim {
 
 export const CLAIMS: readonly Claim[] = [
   // --- What the product is -------------------------------------------------------------------
+  // Reconciles §11A.1, which moved the primary customer from agencies and brands to an owner-run
+  // business with no analyst and no IT function. The correctness guarantee did not change; it
+  // stopped being the pitch and became the substance behind it — the reason an owner can trust a
+  // number they did not compute themselves. 11.9's narrowing still binds the second sentence.
   {
     id: "positioning",
-    text: "Verified root cause and an operated correctness guarantee over your own ad, analytics and search data.",
-    source: ["0", "11.9"],
+    text: "The business-intelligence team a small business does not have. Your own numbers, and the verified reason they moved.",
+    source: ["11A.1", "11.9"],
   },
   { id: "tagline", text: "Know what changed. And why.", source: ["11.9", "14"] },
 

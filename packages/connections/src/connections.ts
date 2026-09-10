@@ -19,11 +19,37 @@ import { PROVIDERS, providerFor, scopesFor } from "@repo/oauth";
 
 export type ConnectionStatus = "active" | "needs_reauth" | "revoked" | "error";
 
+/**
+ * Sources whose credential the MERCHANT issues to itself and pastes in.
+ *
+ * 11A.13's first test is "who is reviewed". An OAuth source puts THIS COMPANY in front of a
+ * platform reviewer and that review is the schedule; a key-paste source has no reviewer and no
+ * calendar, because the merchant generates the key in its own admin. That is a different lifecycle,
+ * not a different flavour of the same one, and the difference is why this list exists rather than
+ * a boolean on a provider config:
+ *
+ *   - There is no authorisation server, so no scope to check and none to be missing.
+ *   - There is no refresh token, because there is nothing to refresh.
+ *   - THE CREDENTIAL NEVER EXPIRES. It stops working when the merchant deletes it or the WordPress
+ *     user behind it is removed, and neither event has a date we could hold. `expiresAt` is null
+ *     and means "no expiry", not "unknown expiry".
+ */
+export const KEY_PASTE_PROVIDERS = ["woocommerce"] as const;
+
+export type KeyPasteProvider = (typeof KEY_PASTE_PROVIDERS)[number];
+
+/** Every provider a connection can be to. `app.connection_provider` must carry the same members. */
+export type ConnectionProvider = SourceId | KeyPasteProvider;
+
+export function isKeyPasteProvider(provider: ConnectionProvider): provider is KeyPasteProvider {
+  return (KEY_PASTE_PROVIDERS as readonly string[]).includes(provider);
+}
+
 /** The row, as `20260908000500_connections.sql` defines it. */
 export interface ConnectionRow {
   readonly id: string;
   readonly workspaceId: string;
-  readonly provider: SourceId;
+  readonly provider: ConnectionProvider;
   readonly externalAccountId: string;
   readonly displayName: string | null;
   readonly credentialCiphertext: Uint8Array;
@@ -45,13 +71,31 @@ export interface ConnectionStore {
 }
 
 /**
- * What gets sealed. Both halves of the grant travel together so a refresh has everything it needs
- * without a second read, and so a rotation re-seals one blob rather than two.
+ * What gets sealed.
+ *
+ * A DISCRIMINATED UNION, because the two shapes have nothing in common but the fact that both are
+ * secret. An OAuth grant is a pair of tokens with a clock; a key-paste credential is a key and a
+ * secret with no clock at all. Modelling the second as the first -- stuffing a consumer key into
+ * `accessToken` and calling `refreshToken` null -- would compile, work, and then lie in every place
+ * that reasons about the token: `connectionHealth` would consult a provider config that does not
+ * exist for it, and a refresh path would eventually try to renew something with no issuer.
+ *
+ * `kind` is REQUIRED on new credentials and ABSENT on every one sealed before this change. See
+ * `openCredential`: a missing `kind` is read as "oauth", because that is what every existing blob
+ * is. Do not remove that fallback without re-sealing them.
  */
-export interface StoredCredential {
-  readonly accessToken: string;
-  readonly refreshToken: string | null;
-}
+export type StoredCredential =
+  | {
+      readonly kind: "oauth";
+      readonly accessToken: string;
+      readonly refreshToken: string | null;
+    }
+  | {
+      /** The merchant issued this to itself. There is no authorisation server behind it. */
+      readonly kind: "key_secret";
+      readonly key: string;
+      readonly secret: string;
+    };
 
 export class ConnectionError extends Error {
   constructor(
@@ -99,6 +143,7 @@ export async function connect(
   }
 
   const credential: StoredCredential = {
+    kind: "oauth",
     accessToken: options.tokens.accessToken,
     refreshToken: options.tokens.refreshToken,
   };
@@ -124,6 +169,87 @@ export async function connect(
     keyVersion: sealed.keyVersion,
     grantedScopes: options.tokens.grantedScopes,
     expiresAt: options.tokens.expiresAt,
+    status: "active",
+    lastError: null,
+    revokedAt: null,
+  });
+}
+
+/**
+ * Store a key-paste credential.
+ *
+ * A SIBLING OF `connect`, NOT A BRANCH INSIDE IT, and that is the decision this function records.
+ * Reusing `connect` would have meant fabricating a `TokenResponse` -- an access token that is not a
+ * token, a null refresh token, an invented expiry -- and then `connect` would call
+ * `scopesFor(providerFor(source), ...)`, which for a key-paste source is meaningless. The type
+ * system says so: `providerFor` takes `SourceId`, and `woocommerce` is not one, so that lie does
+ * not compile rather than merely being wrong.
+ *
+ * NO SCOPE CHECK, because there is nothing to check. The merchant chose the permission level when
+ * it created the key -- WooCommerce offers Read, Write and Read/Write -- and the platform reports
+ * nothing back about what was granted. `grantedScopes` is therefore empty rather than invented, and
+ * an insufficient permission surfaces as a 403 on the first pull, which `recordFailure` already
+ * turns into `needs_reauth`. That is the honest failure mode: only the merchant can widen a key,
+ * so only the merchant can fix it.
+ *
+ * `externalAccountId` HOLDS THE STORE ORIGIN for WooCommerce, e.g. "https://shop.example.com".
+ * That is not a special case dressed up: the field means "the id of the account at the provider",
+ * and for a self-hosted store the origin IS the account. Documented here rather than adding a
+ * `base_url` column for one source, and it stays out of the sealed blob because it is not a secret
+ * -- the scheduler needs it to build a URL, and re-opening an envelope to read a hostname would be
+ * a decryption on every request.
+ */
+export async function connectWithKey(
+  crypto: VaultCrypto,
+  store: ConnectionStore,
+  options: {
+    workspaceId: string;
+    connectionId: string;
+    provider: KeyPasteProvider;
+    /** The account at the provider. For a self-hosted store, its https origin. */
+    externalAccountId: string;
+    displayName?: string;
+    key: string;
+    secret: string;
+    kek: Uint8Array;
+    keyVersion: number;
+  },
+): Promise<ConnectionRow> {
+  if (options.key.trim() === "" || options.secret.trim() === "") {
+    throw new ConnectionError(
+      "a key-paste connection needs both a key and a secret. An empty half seals successfully and " +
+        "fails on the first pull, hours later, with nothing pointing at the cause.",
+      "no_credential",
+    );
+  }
+
+  const credential: StoredCredential = {
+    kind: "key_secret",
+    key: options.key,
+    secret: options.secret,
+  };
+
+  const sealed = await seal(crypto, {
+    plaintext: JSON.stringify(credential),
+    kek: options.kek,
+    keyVersion: options.keyVersion,
+    scope: { workspaceId: options.workspaceId, connectionId: options.connectionId },
+  });
+
+  return store.upsert({
+    id: options.connectionId,
+    workspaceId: options.workspaceId,
+    provider: options.provider,
+    externalAccountId: options.externalAccountId,
+    displayName: options.displayName ?? null,
+    credentialCiphertext: sealed.ciphertext,
+    credentialIv: sealed.iv,
+    wrappedDek: sealed.wrappedDek,
+    keyVersion: sealed.keyVersion,
+    // Empty, not invented. The platform reports no grant.
+    grantedScopes: [],
+    // NULL MEANS "NO EXPIRY", not "unknown". See KEY_PASTE_PROVIDERS.
+    expiresAt: null,
     status: "active",
     lastError: null,
     revokedAt: null,
@@ -161,7 +287,21 @@ export async function openCredential(
     scope: { workspaceId: row.workspaceId, connectionId: row.id },
   });
 
-  return JSON.parse(plaintext) as StoredCredential;
+  const parsed = JSON.parse(plaintext) as Partial<StoredCredential> & Record<string, unknown>;
+
+  // BACKWARDS COMPATIBILITY, and the reason it is safe. Every credential sealed before the union
+  // existed is an OAuth pair with no `kind`, so a missing discriminant is not ambiguous -- it is
+  // dated. Defaulting the other way would read a real OAuth blob as a key/secret and hand the
+  // scheduler two undefined fields. Remove this only after re-sealing, never before.
+  if (parsed.kind === undefined) {
+    return {
+      kind: "oauth",
+      accessToken: parsed.accessToken as string,
+      refreshToken: (parsed.refreshToken as string | null) ?? null,
+    };
+  }
+
+  return parsed as StoredCredential;
 }
 
 export interface ConnectionHealth {
@@ -213,6 +353,19 @@ export function connectionHealth(row: ConnectionRow, now: Date): ConnectionHealt
       usable: false,
       needsCustomerAction: true,
       reason: row.lastError ?? "The platform rejected this connection. Reconnect the account.",
+    };
+  }
+
+  // A KEY-PASTE CONNECTION HAS NO PROVIDER CONFIG AND NO CLOCK, so it must be answered before the
+  // lookup below -- `providerFor` does not accept it, and every branch after this one reasons about
+  // an expiry it does not have. Reaching the expiry logic with `expiresAt: null` would report
+  // "Connected." by accident rather than on purpose; this says it on purpose.
+  if (isKeyPasteProvider(row.provider)) {
+    return {
+      status: "active",
+      usable: true,
+      needsCustomerAction: false,
+      reason: "Connected. This key does not expire; it stops working only if you delete it.",
     };
   }
 

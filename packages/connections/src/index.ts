@@ -1,12 +1,17 @@
 export {
   ConnectionError,
+  KEY_PASTE_PROVIDERS,
   connect,
+  connectWithKey,
   connectionHealth,
   openCredential,
+  isKeyPasteProvider,
   recordFailure,
   type ConnectionHealth,
+  type ConnectionProvider,
   type ConnectionRow,
   type ConnectionStatus,
   type ConnectionStore,
+  type KeyPasteProvider,
   type StoredCredential,
 } from "./connections.js";

@@ -1,5 +1,5 @@
 import type { TokenResponse } from "@repo/oauth";
-import type { CryptoLike } from "@repo/vault";
+import { type CryptoLike, seal } from "@repo/vault";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   ConnectionError,
@@ -7,7 +7,9 @@ import {
   type ConnectionStatus,
   type ConnectionStore,
   connect,
+  connectWithKey,
   connectionHealth,
+  isKeyPasteProvider,
   openCredential,
   recordFailure,
 } from "./connections.js";
@@ -82,6 +84,10 @@ describe("connecting", () => {
   it("round-trips the credential through the vault", async () => {
     const row = await connectGoogleAds();
     const credential = await openCredential(crypto, row, KEK);
+    // Narrowing on `kind` is the point of the union: a caller cannot reach `accessToken` without
+    // first establishing that this is an OAuth credential and not a pasted key.
+    expect(credential.kind).toBe("oauth");
+    if (credential.kind !== "oauth") throw new Error("expected an oauth credential");
     expect(credential.accessToken).toBe("ya29.access");
     expect(credential.refreshToken).toBe("1//refresh");
   });
@@ -245,5 +251,141 @@ describe("recording a failed pull", () => {
       "error",
     );
     expect(await recordFailure(store, row, { message: "socket hang up" })).toBe("error");
+  });
+});
+
+describe("the key-paste lane", () => {
+  const STORE_URL = "https://shop.example.com";
+
+  async function connectWoo(overrides: { key?: string; secret?: string } = {}) {
+    return connectWithKey(crypto, store, {
+      workspaceId: WORKSPACE,
+      connectionId: CONNECTION,
+      provider: "woocommerce",
+      externalAccountId: STORE_URL,
+      key: overrides.key ?? "ck_a1b2c3d4e5f6",
+      secret: overrides.secret ?? "cs_9z8y7x6w5v4u",
+      kek: KEK,
+      keyVersion: 1,
+    });
+  }
+
+  it("seals a key and secret so neither appears on the row", async () => {
+    const row = await connectWoo();
+    const asText = JSON.stringify(row);
+    expect(asText).not.toContain("ck_a1b2c3d4e5f6");
+    expect(asText).not.toContain("cs_9z8y7x6w5v4u");
+    // And the ciphertext is real rather than an empty buffer that would trivially satisfy the above.
+    expect(row.credentialCiphertext.byteLength).toBeGreaterThan(0);
+  });
+
+  it("round-trips through the vault under its own discriminant", async () => {
+    const row = await connectWoo();
+    const credential = await openCredential(crypto, row, KEK);
+    expect(credential.kind).toBe("key_secret");
+    if (credential.kind !== "key_secret") throw new Error("expected a key_secret credential");
+    expect(credential.key).toBe("ck_a1b2c3d4e5f6");
+    expect(credential.secret).toBe("cs_9z8y7x6w5v4u");
+  });
+
+  it("records no expiry and no scopes, rather than inventing either", async () => {
+    // `expiresAt: null` MEANS "no expiry" here, where for an OAuth row it would mean "unknown".
+    // `grantedScopes: []` because WooCommerce reports nothing back about the permission level the
+    // merchant chose -- an insufficient key surfaces as a 403 on the first pull.
+    const row = await connectWoo();
+    expect(row.expiresAt).toBeNull();
+    expect(row.grantedScopes).toEqual([]);
+    expect(row.status).toBe("active");
+  });
+
+  it("refuses an empty half before writing anything", async () => {
+    // An empty secret seals successfully and fails hours later on a scheduled pull, with nothing
+    // pointing at the cause -- the same failure the OAuth scope check exists to prevent.
+    await expect(connectWoo({ secret: "   " })).rejects.toThrow(ConnectionError);
+    await expect(connectWoo({ key: "" })).rejects.toThrow(/needs both a key and a secret/);
+    expect(rows.size).toBe(0);
+  });
+
+  it("reports health without consulting a provider config it does not have", async () => {
+    // The branch under test sits BEFORE `PROVIDERS[providerFor(row.provider)]`, which cannot accept
+    // a key-paste provider at all. Reaching that lookup would throw rather than return a health.
+    const row = await connectWoo();
+    const health = connectionHealth(row, NOW);
+    expect(health.usable).toBe(true);
+    expect(health.needsCustomerAction).toBe(false);
+    expect(health.reason).toMatch(/does not expire/i);
+  });
+
+  it("still honours a revocation, which is the one thing that does stop it", async () => {
+    const row = await connectWoo();
+    const revoked = { ...row, status: "revoked" as ConnectionStatus, revokedAt: NOW.toISOString() };
+    expect(connectionHealth(revoked, NOW).usable).toBe(false);
+    await expect(openCredential(crypto, revoked, KEK)).rejects.toThrow(/revoked/);
+  });
+
+  it("routes a 401 to needs_reauth, because only the merchant can reissue a key", async () => {
+    const row = await connectWoo();
+    expect(await recordFailure(store, row, { status: 401, message: "invalid key" })).toBe(
+      "needs_reauth",
+    );
+  });
+
+  it("knows which providers are key-paste", () => {
+    expect(isKeyPasteProvider("woocommerce")).toBe(true);
+    expect(isKeyPasteProvider("ga4")).toBe(false);
+  });
+});
+
+describe("credentials sealed before the union existed", () => {
+  /**
+   * Seals the EXACT payload shape that is on disk today: an OAuth pair with no discriminant.
+   *
+   * This has to bypass `connect`, which now writes `kind`. An earlier version of this test called
+   * `connect` and then re-opened the row -- so it exercised the modern path and asserted the
+   * fallback it never reached. A test that cannot fail is not evidence.
+   */
+  async function sealLegacyBlob(payload: Record<string, unknown>): Promise<ConnectionRow> {
+    const sealed = await seal(crypto, {
+      plaintext: JSON.stringify(payload),
+      kek: KEK,
+      keyVersion: 1,
+      scope: { workspaceId: WORKSPACE, connectionId: CONNECTION },
+    });
+    return store.upsert({
+      id: CONNECTION,
+      workspaceId: WORKSPACE,
+      provider: "ga4",
+      externalAccountId: "properties/123",
+      displayName: null,
+      credentialCiphertext: sealed.ciphertext,
+      credentialIv: sealed.iv,
+      wrappedDek: sealed.wrappedDek,
+      keyVersion: sealed.keyVersion,
+      grantedScopes: [],
+      expiresAt: null,
+      status: "active",
+      lastError: null,
+      revokedAt: null,
+    });
+  }
+
+  it("reads a blob with no `kind` as an OAuth credential", async () => {
+    // A missing discriminant is dated, not ambiguous. Defaulting the other way would hand the
+    // scheduler a key_secret with two undefined fields and no error.
+    const row = await sealLegacyBlob({ accessToken: "ya29.legacy", refreshToken: "1//legacy" });
+    const credential = await openCredential(crypto, row, KEK);
+    expect(credential.kind).toBe("oauth");
+    if (credential.kind !== "oauth") throw new Error("expected an oauth credential");
+    expect(credential.accessToken).toBe("ya29.legacy");
+    expect(credential.refreshToken).toBe("1//legacy");
+  });
+
+  it("normalises a legacy blob whose refreshToken was absent rather than null", async () => {
+    // Meta issues no refresh token, and an older seal may have omitted the key entirely rather
+    // than writing null. The caller must get null either way, not undefined.
+    const row = await sealLegacyBlob({ accessToken: "EAAG.legacy" });
+    const credential = await openCredential(crypto, row, KEK);
+    if (credential.kind !== "oauth") throw new Error("expected an oauth credential");
+    expect(credential.refreshToken).toBeNull();
   });
 });

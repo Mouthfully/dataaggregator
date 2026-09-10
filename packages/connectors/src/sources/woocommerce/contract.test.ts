@@ -38,16 +38,26 @@ describe("the envelope contract", () => {
 });
 
 describe("trap 1: dates carry no timezone designator", () => {
-  it("reads a _gmt timestamp as UTC rather than as local time", () => {
-    // 23:30 UTC. Parsed as local in any positive-offset runtime it becomes the NEXT day, which is
-    // every timezone this product sells into. The bug is invisible in UTC-based CI, so it is
-    // asserted on the value rather than on the runtime.
-    expect(wooGmtToDate("2026-09-08T23:30:00", "t")).toBe("2026-09-08");
+  // THIS SUITE RUNS IN ASIA/BANGKOK -- see vitest.config.ts. In UTC these assertions are
+  // WORTHLESS: dropping the `Z` gives the identical string, so the test passes either way. That is
+  // not a hypothesis, it is what a mutation run showed. An earlier version of this comment claimed
+  // asserting "on the value rather than the runtime" was enough; it was wrong, and the mutation is
+  // what proved it.
+  it("reads a _gmt timestamp as UTC rather than as the runtime's local time", () => {
+    // 02:00 UTC. Read as Bangkok local it is 2026-09-08T19:00Z -- the PREVIOUS day. This is the
+    // only shape that separates the two readings, because the date moves only when the local
+    // interpretation crosses midnight UTC. A late-evening timestamp does not, which is why the
+    // first draft of this test could not fail.
+    expect(wooGmtToDate("2026-09-09T02:00:00", "t")).toBe("2026-09-09");
   });
 
-  it("also reads an early-morning timestamp as UTC", () => {
-    // The mirror case: parsed as local in a NEGATIVE-offset runtime, 00:30 slips to the day before.
-    expect(wooGmtToDate("2026-09-08T00:30:00", "t")).toBe("2026-09-08");
+  it("holds for a whole day of timestamps, not just the one that happens to break", () => {
+    // Every hour of one UTC day must land on that day. Under a local reading, the hours before the
+    // offset roll backwards; under the correct one, none of them do.
+    for (let hour = 0; hour < 24; hour++) {
+      const stamp = `2026-09-09T${String(hour).padStart(2, "0")}:00:00`;
+      expect(wooGmtToDate(stamp, "t"), stamp).toBe("2026-09-09");
+    }
   });
 
   it("refuses a timestamp that does carry an offset, rather than guessing", () => {

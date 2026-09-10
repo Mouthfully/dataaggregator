@@ -24,7 +24,17 @@
 
 create type app.connection_provider as enum (
   'google_ads', 'ga4', 'search_console', 'meta_ads',
-  'impact', 'awin', 'cj', 'partnerstack'
+  'impact', 'awin', 'cj', 'partnerstack',
+  -- KEY-PASTE, and the first of its kind here. Appended, never inserted: Postgres orders an enum by
+  -- definition order. A WooCommerce connection holds a merchant-issued consumer key and secret, has
+  -- no authorisation server behind it, and NEVER EXPIRES -- `expires_at` is null and means "no
+  -- expiry" rather than "unknown". See KEY_PASTE_PROVIDERS in packages/connections.
+  --
+  -- NOTE FOR WHOEVER ADDS THE NEXT ONE: no guard relates this enum to its TypeScript twin.
+  -- check-dictionary.mjs covers sources, entity types, attribution windows and metrics -- NOT
+  -- connection providers. Adding a member here and forgetting the other side fails at runtime, not
+  -- at build time, which is the failure mode that guard exists to prevent everywhere else.
+  'woocommerce'
 );
 
 create type app.connection_status as enum ('active', 'needs_reauth', 'revoked', 'error');

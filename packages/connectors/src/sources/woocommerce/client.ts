@@ -2,8 +2,20 @@
  * WooCommerce REST client.
  *
  * The `client` half of the connector unit (specification 13.3). It builds requests and reads
- * pagination; it does not normalise, and it does not read the body — `fetchWithRetry` returns the
- * `Response` so an extractor can stream it to R2 rather than materialise rows in a 128 MB isolate.
+ * pagination; it does not normalise.
+ *
+ * IT BUFFERS ONE PAGE, AND THAT IS REQUIRED RATHER THAN CONVENIENT. The usual rule here is that an
+ * extractor streams a response to R2 without materialising it, because a Worker isolate has 128 MB
+ * -- `fetchWithRetry` deliberately returns the `Response` unread so a caller can. **WooCommerce may
+ * not take that path at all.** Its redaction policy is `redact` (see `25-payload-redaction.md`), and
+ * `putPayload` REFUSES a non-`verbatim` source outright: a streamed payload is never parsed, so it
+ * can never be redacted, so streaming it would archive buyer name, email, phone and address
+ * verbatim. `putBufferedPayload` is the only path open to this source.
+ *
+ * Which makes `per_page` load-bearing twice over. Decision 5 below caps it at 100 because WooCommerce
+ * silently clamps there anyway -- but the same cap is what bounds the buffer. One page is at most a
+ * hundred orders, and a hundred orders is a size an isolate can hold and a redactor can walk. A
+ * caller that wanted an unbounded page would be asking for a payload it is not allowed to store.
  *
  * FIVE DECISIONS, each of which is a silent wrong answer if taken the other way.
  *

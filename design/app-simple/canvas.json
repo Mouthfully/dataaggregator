@@ -1,0 +1,40 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html",  "x": 0,    "y": 0, "w": 390, "h": 844, "title": "Today" },
+    { "file": "Do.dc.html",    "x": 470,  "y": 0, "w": 390, "h": 844, "title": "Do" },
+    { "file": "Ask.dc.html",   "x": 940,  "y": 0, "w": 390, "h": 844, "title": "Ask" },
+    { "file": "Setup.dc.html", "x": 1410, "y": 0, "w": 390, "h": 844, "title": "Setup" },
+    { "file": "Brief.dc.html", "x": 1880, "y": 0, "w": 390, "h": 844, "title": "The LINE brief" }
+  ],
+  "annotations": [
+    {
+      "id": "thesis",
+      "x": 0,
+      "y": -210,
+      "w": 860,
+      "text": "Owner-first client\n\nThe existing design has 8 nav items, 6 settings tabs, four equal KPI tiles, and a settings tab that asks a cafe owner to manage API tokens, env vars and a webhook URL.\n\nThis is three destinations - Today, Do, Ask - plus a Setup you touch twice a year. Phone-first, because the owner is behind a counter, not at a desk."
+    },
+    {
+      "id": "one-number",
+      "x": 0,
+      "y": -70,
+      "w": 390,
+      "text": "One number, not four. Profit after fees is the thing no platform gives them - so it is the only large figure on the screen."
+    },
+    {
+      "id": "setup-note",
+      "x": 1410,
+      "y": -70,
+      "w": 390,
+      "text": "Two connection states, not five. Prices from model.py: 1,590 / 4,190 / 13,800, VAT-inclusive. All developer surface is behind one closed door."
+    },
+    {
+      "id": "line-note",
+      "x": 1880,
+      "y": -70,
+      "w": 390,
+      "text": "Most owners will never open the app. 11A.3 makes LINE the primary channel, so the daily brief IS the product - and the reply box is the Ask surface."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

@@ -15,6 +15,7 @@
     "@repo/extract": "workspace:*"
   },
   "devDependencies": {
+    "@repo/payloads": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

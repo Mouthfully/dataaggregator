@@ -91,6 +91,29 @@ export const RESTATEMENT_CLOCKS: Record<Source, RestatementClock> = {
     perAccount: false,
     note: "Affiliate network window not established.",
   },
+
+  // NULL FOR A DIFFERENT REASON THAN EVERY OTHER NULL HERE, and the difference is worth the words.
+  // `search_console` and the affiliate networks are null because nobody has measured them: a number
+  // exists and we do not know it. WooCommerce is null because THERE IS NO NUMBER TO KNOW. The store
+  // is the merchant's own database, not a platform reporting pipeline, and a merchant can refund,
+  // edit or cancel an order a year after it was placed. No window closes.
+  //
+  // Two consequences, accepted deliberately rather than discovered later. `restatesUntil` returns
+  // null, so `isProvisional` is ALWAYS true and no WooCommerce row is ever marked final -- which is
+  // the honest answer for a row that can genuinely change forever, and exactly what 11A.4's visible
+  // provenance rule should show an owner. And the backfill planner sees no restatement ladder to
+  // climb, which is correct here for the same reason: re-pulling on D+1/D+3/D+7/D+28 would chase a
+  // window that does not exist. The incremental pull filters on `modified_after` instead, which is
+  // load-bearing and verified in WooCommerce core -- `wc_create_refund` bumps the parent order's
+  // `date_modified` unconditionally, so a refund resurfaces the order it belongs to.
+  woocommerce: {
+    windowDays: null,
+    perAccount: false,
+    note:
+      "No window closes. The store is the merchant's own database rather than a platform reporting " +
+      "pipeline, so an order can be refunded or edited at any remove and every row stays provisional. " +
+      "Restatements are caught by a `modified_after` pull, not by a ladder.",
+  },
 };
 
 const DAY_MS = 86_400_000;

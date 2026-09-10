@@ -1,0 +1,195 @@
+import { envelopeRowSchema } from "@repo/contract";
+import { REDACTION_POLICIES, redactValue } from "@repo/payloads";
+import { describe, expect, it } from "vitest";
+import { ORDER, ORDER_REFUNDED, ORDER_WITH_STRIPE_FEE, PAGE } from "./fixtures.js";
+import { WooNormalizeError, normalizeWooOrders, wooGmtToDate, wooPaymentFee } from "./normalize.js";
+
+const OPTS = {
+  storeUrl: "https://shop.example.com",
+  timezone: "Asia/Bangkok",
+  fetchedAt: "2026-09-10T02:00:00.000Z",
+  firstSeenAt: "2026-09-10T02:00:00.000Z",
+};
+
+describe("the envelope contract", () => {
+  it("emits rows the envelope accepts", () => {
+    for (const row of normalizeWooOrders({ ...OPTS, orders: PAGE })) {
+      const result = envelopeRowSchema.safeParse(row);
+      expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
+    }
+  });
+
+  it("carries commerce metrics on an `order` entity with no attribution window", () => {
+    // The second refusal rejects a commerce metric on an ADVERTISING entity with a null window. A
+    // shop's own order is attributed to nothing, so null is correct here and must stay permitted --
+    // this asserts the two rules do not collide.
+    const [row] = normalizeWooOrders({ ...OPTS, orders: [ORDER] });
+    expect(row?.entity.type).toBe("order");
+    expect(row?.dimensions.attribution_window).toBeNull();
+    expect(row?.metrics.orders).toBe(1);
+    expect(envelopeRowSchema.safeParse(row).success).toBe(true);
+  });
+
+  it("never marks a row final, because no WooCommerce window ever closes", () => {
+    const [row] = normalizeWooOrders({ ...OPTS, orders: [ORDER] });
+    expect(row?.restates_until).toBeNull();
+    expect(row?.is_provisional).toBe(true);
+  });
+});
+
+describe("trap 1: dates carry no timezone designator", () => {
+  // THIS SUITE RUNS IN ASIA/BANGKOK -- see vitest.config.ts. In UTC these assertions are
+  // WORTHLESS: dropping the `Z` gives the identical string, so the test passes either way. That is
+  // not a hypothesis, it is what a mutation run showed. An earlier version of this comment claimed
+  // asserting "on the value rather than the runtime" was enough; it was wrong, and the mutation is
+  // what proved it.
+  it("reads a _gmt timestamp as UTC rather than as the runtime's local time", () => {
+    // 02:00 UTC. Read as Bangkok local it is 2026-09-08T19:00Z -- the PREVIOUS day. This is the
+    // only shape that separates the two readings, because the date moves only when the local
+    // interpretation crosses midnight UTC. A late-evening timestamp does not, which is why the
+    // first draft of this test could not fail.
+    expect(wooGmtToDate("2026-09-09T02:00:00", "t")).toBe("2026-09-09");
+  });
+
+  it("holds for a whole day of timestamps, not just the one that happens to break", () => {
+    // Every hour of one UTC day must land on that day. Under a local reading, the hours before the
+    // offset roll backwards; under the correct one, none of them do.
+    for (let hour = 0; hour < 24; hour++) {
+      const stamp = `2026-09-09T${String(hour).padStart(2, "0")}:00:00`;
+      expect(wooGmtToDate(stamp, "t"), stamp).toBe("2026-09-09");
+    }
+  });
+
+  it("refuses a timestamp that does carry an offset, rather than guessing", () => {
+    expect(() => wooGmtToDate("2026-09-08T23:30:00+07:00", "t")).toThrow(WooNormalizeError);
+  });
+});
+
+describe("trap 2: fee_lines is a surcharge, not a payment fee", () => {
+  it("never reads a merchant surcharge as a cost", () => {
+    // ORDER carries a fee_lines entry of 40.00. Mapping it to `fees` would invert the sign on the
+    // product's headline number: a charge TO the customer counted as a cost TO the merchant.
+    const [row] = normalizeWooOrders({ ...OPTS, orders: [ORDER] });
+    expect(row?.metrics.fees).toBeUndefined();
+  });
+});
+
+describe("trap 3 and the refusal: an unknown fee is absent, never zero", () => {
+  it("omits `fees` when no gateway wrote one", () => {
+    const [row] = normalizeWooOrders({ ...OPTS, orders: [ORDER] });
+    expect(row?.metrics.fees).toBeUndefined();
+    expect(row?.metrics.fees).not.toBe(0);
+  });
+
+  it("omits `net_revenue` entirely when the fee is unknown", () => {
+    // THE REFUSAL. net_revenue means what the owner keeps; with an unknown deduction it cannot be
+    // computed, and emitting it anyway would be wrong in the flattering direction.
+    const [row] = normalizeWooOrders({ ...OPTS, orders: [ORDER] });
+    expect(row?.metrics.net_revenue).toBeUndefined();
+  });
+
+  it("emits both once a gateway fee is actually present", () => {
+    const [row] = normalizeWooOrders({ ...OPTS, orders: [ORDER_WITH_STRIPE_FEE] });
+    expect(row?.metrics.fees).toBeCloseTo(32.5, 10);
+    expect(row?.metrics.net_revenue).toBeCloseTo(1000 - 32.5, 10);
+  });
+
+  it("reads only fee keys it recognises, not anything shaped like a fee", () => {
+    // A shipping plugin's `_delivery_fee` is a charge to the CUSTOMER. Sweeping it up by pattern
+    // would repeat trap 2 through a different door.
+    expect(wooPaymentFee({ meta_data: [{ key: "_delivery_fee", value: "60.00" }] })).toBeNull();
+  });
+});
+
+describe("trap 4: refund totals arrive already negative", () => {
+  it("adds refunds rather than subtracting them", () => {
+    // 1000.00 gross, one refund of -250.00. Subtracting would give 1250, which reads as a BIGGER
+    // sale after a partial refund.
+    const [row] = normalizeWooOrders({ ...OPTS, orders: [ORDER_REFUNDED] });
+    expect(row?.metrics.revenue).toBeCloseTo(750, 10);
+  });
+
+  it("keeps the order counted after a refund", () => {
+    const [row] = normalizeWooOrders({ ...OPTS, orders: [ORDER_REFUNDED] });
+    expect(row?.metrics.orders).toBe(1);
+  });
+});
+
+describe("refusals", () => {
+  it("refuses an order with no id rather than emitting an unaddressable row", () => {
+    expect(() => normalizeWooOrders({ ...OPTS, orders: [{ ...ORDER, id: undefined }] })).toThrow(
+      /no id/,
+    );
+  });
+
+  it("refuses an order with no currency rather than defaulting one", () => {
+    expect(() =>
+      normalizeWooOrders({ ...OPTS, orders: [{ ...ORDER, currency: undefined }] }),
+    ).toThrow(/no currency/);
+  });
+
+  it("refuses an unparseable total rather than coercing it to zero", () => {
+    expect(() => normalizeWooOrders({ ...OPTS, orders: [{ ...ORDER, total: "N/A" }] })).toThrow(
+      /not a number/,
+    );
+  });
+});
+
+describe("the redaction keep-list, against the same fixture the normaliser reads", () => {
+  const policy = REDACTION_POLICIES.woocommerce;
+
+  it("is a redact policy with a keep-list", () => {
+    expect(policy.disposition).toBe("redact");
+    expect(policy.keep).toBeDefined();
+  });
+
+  it("removes everything that identifies the buyer", () => {
+    const { value } = redactValue(ORDER, policy.keep ?? new Set());
+    const kept = value as Record<string, unknown>;
+    for (const key of [
+      "billing",
+      "shipping",
+      "customer_note",
+      "customer_ip_address",
+      "customer_user_agent",
+      "customer_id",
+      "meta_data",
+    ]) {
+      expect(kept[key], `${key} survived redaction`).toBeUndefined();
+    }
+    // And nothing from the buyer survives anywhere in the serialised result, at any depth.
+    const serialised = JSON.stringify(kept);
+    for (const secret of ["Somchai", "somchai@", "0812345678", "Sukhumvit", "10110"]) {
+      expect(serialised, `${secret} survived redaction`).not.toContain(secret);
+    }
+  });
+
+  it("keeps everything the number is computed from", () => {
+    const { value } = redactValue(ORDER, policy.keep ?? new Set());
+    const kept = value as Record<string, unknown>;
+    expect(kept.id).toBe(ORDER.id);
+    expect(kept.total).toBe(ORDER.total);
+    expect(kept.currency).toBe(ORDER.currency);
+    expect(kept.date_created_gmt).toBe(ORDER.date_created_gmt);
+    expect(kept.payment_method_title).toBeDefined();
+  });
+
+  it("keeps line items with their contents, not as empty objects", () => {
+    // The depth rule: naming the collection is not enough. A keep-list with `line_items` but not
+    // `quantity` stores `line_items: [{}]` -- the right number of empty objects, which looks like
+    // data and is not.
+    const { value } = redactValue(ORDER, policy.keep ?? new Set());
+    const lines = (value as { line_items?: Array<Record<string, unknown>> }).line_items ?? [];
+    expect(lines.length).toBe(ORDER.line_items?.length);
+    expect(lines[0]?.quantity).toBeDefined();
+    expect(lines[0]?.total).toBeDefined();
+    expect(lines[0]?.name).toBeDefined();
+  });
+
+  it("drops the free text on a refund but keeps its money", () => {
+    const { value } = redactValue(ORDER_REFUNDED, policy.keep ?? new Set());
+    const refunds = (value as { refunds?: Array<Record<string, unknown>> }).refunds ?? [];
+    expect(refunds[0]?.total).toBeDefined();
+    expect(refunds[0]?.reason).toBeUndefined();
+  });
+});

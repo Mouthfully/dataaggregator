@@ -183,6 +183,9 @@ importers:
         specifier: workspace:*
         version: link:../extract
     devDependencies:
+      '@repo/payloads':
+        specifier: workspace:*
+        version: link:../payloads
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

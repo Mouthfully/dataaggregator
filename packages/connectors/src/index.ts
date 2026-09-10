@@ -32,3 +32,14 @@ export {
   type Ga4Report,
   type NormalizeOptions,
 } from "./sources/ga4/normalize.js";
+export {
+  WOO_FEE_META_KEYS,
+  WooNormalizeError,
+  normalizeWooOrders,
+  parseWooAmount,
+  wooGmtToDate,
+  wooPaymentFee,
+  type WooNormalizeErrorCode,
+  type WooNormalizeOptions,
+  type WooOrder,
+} from "./sources/woocommerce/normalize.js";

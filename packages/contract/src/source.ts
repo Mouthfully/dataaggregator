@@ -17,6 +17,13 @@ export const SOURCES = [
   "partnerstack",
   "dataforseo_serp",
   "ai_answers",
+
+  // 11A.14 substituted the LAUNCH SET, not the vocabulary. `woocommerce` is APPENDED, never
+  // inserted, and nothing above it is removed: Postgres orders an enum by definition order, so a
+  // mid-list insert would silently rewrite every ORDER BY on the column, and dropping a value is
+  // a migration hazard with no upside. Google Ads, Meta and Search Console stay in the dictionary
+  // and move behind the fifth-connector gate -- a build order is not a vocabulary.
+  "woocommerce",
 ] as const;
 
 export type Source = (typeof SOURCES)[number];

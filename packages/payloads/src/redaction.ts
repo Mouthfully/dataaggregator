@@ -108,6 +108,107 @@ export const REDACTION_POLICIES: Readonly<Record<Source, RedactionPolicy>> = {
   partnerstack: { disposition: "verbatim", reason: "aggregate affiliate reporting" },
   dataforseo_serp: { disposition: "verbatim", reason: "bought public data under a company key" },
   ai_answers: { disposition: "verbatim", reason: "bought public data under a company key" },
+
+  // THE FIRST `redact` SOURCE. Every entry above is `verbatim` because its response is aggregate
+  // reporting; a WooCommerce order is a record of one named person buying something, and 11A.12
+  // settled that `raw` cannot be stored as returned for any commerce source.
+  //
+  // WHAT IS DROPPED BY NOT BEING NAMED, which is the whole allow-list argument working: `billing`
+  // and `shipping` (each one key, carrying name, company, street, city, postcode, country, email
+  // and phone), `customer_note`, `customer_ip_address`, `customer_user_agent`, `customer_id` and
+  // `meta_data`.
+  //
+  // `customer_id` IS DROPPED DELIBERATELY, and it is the one a reviewer will query. It is only a
+  // WordPress user id -- but the header above is explicit that a pseudonym is still personal data,
+  // and an archive of order-to-customer-id mappings is a re-identification table with no consumer.
+  // 11A.5's matched class hashes on the ROW path when that path is designed; it does not inherit an
+  // identifier from an archive that once happened to fetch it.
+  //
+  // `meta_data` IS THE SHARPEST CALL HERE. It is an unbounded bag of arbitrary {key, value} pairs
+  // that ANY WordPress plugin may write to, and the payment fee we want -- `_stripe_fee`,
+  // `_wcpay_transaction_fee` -- lives in it. Keeping it would mean naming `key` and `value`, which
+  // at every depth admits EVERY plugin's meta, including whatever a shipping or CRM plugin decided
+  // to stash there. That is a leak with an unknowable shape, which is exactly what an allow-list
+  // exists to refuse. So the bag is dropped whole, and the normaliser reads the named fee keys it
+  // understands out of the LIVE response before the archive ever sees it. The fee reaches the row
+  // as a typed metric; the bag does not reach the archive at all.
+  //
+  // `reason` on a refund is free text a human typed -- "customer said it arrived broken" -- and is
+  // dropped for the same reason `customer_note` is. The refund's `id` and `total` are what the
+  // number needs.
+  //
+  // AND THE LIMIT, restated because this is the first policy where it bites: this removes KEYS, not
+  // VALUES. `line_items[].name` is a product name and is kept, because without it the archive
+  // cannot say what was sold -- and a merchant who names a product after its buyer has put personal
+  // data somewhere no keep-list can reach. The header says a value-level rule is different work.
+  woocommerce: {
+    disposition: "redact",
+    keep: new Set([
+      // Identity of the order itself.
+      "id",
+      "parent_id",
+      "number",
+      "status",
+      "currency",
+      "prices_include_tax",
+      "created_via",
+      "version",
+      // The clocks. Only the _gmt variants: WooCommerce returns both, the non-GMT pair is in the
+      // merchant's WordPress timezone, and keeping both invites a reader to use the wrong one.
+      "date_created_gmt",
+      "date_modified_gmt",
+      "date_paid_gmt",
+      "date_completed_gmt",
+      // The money, at order and at line level. `total` is kept once and survives at every depth,
+      // which is what makes refunds[].total and line_items[].total come through.
+      "total",
+      "total_tax",
+      "subtotal",
+      "subtotal_tax",
+      "shipping_total",
+      "shipping_tax",
+      "discount_total",
+      "discount_tax",
+      "amount",
+      "price",
+      "quantity",
+      // The line collections. Naming the collection is not enough -- the keys INSIDE each element
+      // must be named too, or the array survives as the right number of empty objects.
+      "line_items",
+      "refunds",
+      "fee_lines",
+      "tax_lines",
+      "shipping_lines",
+      "coupon_lines",
+      "taxes",
+      // Line-level detail. `name` is a product, fee or method label; `code` is a coupon code.
+      "name",
+      "sku",
+      "product_id",
+      "variation_id",
+      "tax_class",
+      "tax_status",
+      "rate_id",
+      "rate_code",
+      "rate_percent",
+      "label",
+      "compound",
+      "method_id",
+      "method_title",
+      "code",
+      "discount",
+      // How it was paid. Kept because it is the only way to tell an owner WHICH gateway is opaque
+      // about its fee, which is a thing the product has to be able to say out loud.
+      "payment_method",
+      "payment_method_title",
+      "transaction_id",
+    ]),
+    reason:
+      "an order is a record of one named person buying something: billing and shipping carry name, " +
+      "address, email and phone, customer_note and the refund reason are free text, and meta_data is " +
+      "an unbounded bag any plugin may write to. Ids, money, quantities, dates and product labels " +
+      "survive; identity does not.",
+  },
 };
 
 export class PayloadPolicyError extends Error {

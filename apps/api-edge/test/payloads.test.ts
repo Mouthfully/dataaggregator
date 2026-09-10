@@ -354,12 +354,14 @@ describe("the redaction path, against a real bucket", () => {
     ).rejects.toThrow(/cannot be redacted/);
   });
 
+  // `shopify`, not `woocommerce`: the latter is declared now that its connector has shipped.
+  // The name must be one the dictionary genuinely lacks, or this stops testing anything.
   it("refuses a source nobody has declared a policy for, on both paths", async () => {
     const key = payloadKey({ ...PARTS, date: "2026-09-02" });
     await expect(
       putPayload({
         bucket: bucket(),
-        source: "woocommerce" as never,
+        source: "shopify" as never,
         key,
         body: textStream(ORDER),
         contentLength: ORDER.length,
@@ -368,7 +370,7 @@ describe("the redaction path, against a real bucket", () => {
 
     const body = textStream(ORDER);
     await expect(
-      putBufferedPayload({ bucket: bucket(), source: "woocommerce" as never, key, body }),
+      putBufferedPayload({ bucket: bucket(), source: "shopify" as never, key, body }),
     ).rejects.toThrow(/no redaction policy declared/);
     // AND THE BODY WAS NEVER READ. The policy is resolved before the stream is touched, so an
     // undeclared source's bytes never enter the isolate at all.

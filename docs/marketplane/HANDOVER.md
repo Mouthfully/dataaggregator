@@ -226,11 +226,17 @@ pessimistic case survives rather than only the base case.
    the 23 claims the site renders name capabilities that are not built; `connectors` names five
    sources when `packages/connectors/src/sources/` holds only `ga4`. Not urgent — the site is not
    deployed — but it must land before the first deployment, and the fix belongs with item 1.
-6. **A design note for adding Google as a model vendor**, if the Gemini prep-layer saving is
+6. **`run()` in `finance/model.py` ignores its `A` parameter.** Line 158 reads
+   `CBn,CBr=BLEND(A_now),BLEND(A_new)` from the module globals; `A` appears nowhere in the body.
+   Any sensitivity run passed through `A=` silently returns the baseline, and the model is the
+   source of truth for every published figure. Small fix, but it needs its own PR because making
+   the parameter live means re-verifying the document against it. Workaround until then: patch the
+   module globals before calling `run()`. See `30-thai-public-data-register.md` §5.
+7. **A design note for adding Google as a model vendor**, if the Gemini prep-layer saving is
    taken. The stack rule requires a written reason. Three checks first: a DPA with zero
    retention; a subprocessor disclosure; and a read of the advertising platforms' terms on
    transferring platform data to third parties.
-7. **Register on the DEPA Thailand Digital Catalog** before the 2027 window closes.
+8. **Register on the DEPA Thailand Digital Catalog** before the 2027 window closes.
 
 ---
 
@@ -296,6 +302,12 @@ mutation testing, PR.
 
 Do not start item 3 (WooCommerce) before reading `25-payload-redaction.md`: a connector without its
 redaction keep-list in the same PR is the one thing that note exists to prevent.
+
+**And do not adopt anything from `30-thai-public-data-register.md` before item 4 ships.** §5 of that
+note works it through: public-data context is worth about ฿385,000 of cumulative cash per percentage
+point it lifts the cheap-path routing share, and costs ฿0.215 a question blended — but *before* the
+router exists it costs ฿0.493 on every question and converts none, because there is no cheap path to
+route to. It is the one piece of work in §7 whose value is negative if taken early.
 
 ---
 

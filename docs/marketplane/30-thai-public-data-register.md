@@ -172,7 +172,126 @@ Department of Land Transport; BOI (relevant to us as a company, not to the produ
 
 Listed so the register says where it stops. Calling them candidates would overstate what is known.
 
-## 5. What was left out
+## 5. What the register is worth against the cost model
+
+The founder asked that this be read against `finance/cost-model.html` and the routing engine. It
+changes the note's conclusion, so it is recorded here rather than left as conversation.
+
+**The register is not a cost line. It is an input to the most valuable lever in the financial
+model.** §03 of the cost model decomposes a ฿9.87 founder question and finds four levers; lever 3,
+"route by shape", carries 66% of the total cut. Its mechanism is that **most of what an owner asks
+is a lookup, not advice** — a lookup is answered from SQL plus a cheap model at ฿0.14, and only
+genuine judgement reaches the frontier model at ฿8.18.
+
+That ratio is the assumption the whole thing rests on. It is marked `assumed` in the document, at
+**60% cheap-path**, and ฿38.1M of cumulative cash by month 60 rides on it.
+
+**Public data moves that ratio, in the right direction.** "Why were sales down on Saturday?" is a
+judgement question today, because the evidence for the answer does not exist in any table we hold.
+With weather, air quality and a commodity price series joined in, the evidence becomes rows — *40 mm
+fell between 18:00 and 21:00; PM2.5 was 89; the egg price moved 18% week-on-week* — and the
+question collapses into the shape the cheap path already handles.
+
+### What a percentage point is worth
+
+Re-run through `model.py` with the routing engine shipped in month 15, varying only the cheap-path
+share. The 60% row reproduces the published ฿38.1M exactly, which is the check that the rest of the
+column means anything.
+
+| Cheap-path share | ฿/question | Cumulative cash M60 | vs no routing |
+|---|---|---|---|
+| 40% | ฿4.96 | ฿165.2M | +฿30.4M |
+| 50% | ฿4.16 | ฿169.1M | +฿34.2M |
+| **60%** *(published)* | **฿3.36** | **฿172.9M** | **+฿38.1M** |
+| 70% | ฿2.55 | ฿176.8M | +฿41.9M |
+| 75% | ฿2.15 | ฿178.7M | +฿43.9M |
+
+**Each percentage point of cheap-path share is worth about ฿385,000** of cumulative cash by month
+60. Moving 60% → 70% is worth **฿3.85M** — a sixth of the entire raise, from context that costs
+nothing to buy.
+
+### What it costs, and the break-even
+
+Context is not free: it lands in the *uncached* half of the prompt. Lever 2 works because ~12k of
+the 35k input is stable methodology; a weather observation is not stable.
+
+Attaching **3k tokens** of public-data context to every question, at Opus 5 input ($5/Mtok) and
+Gemini 3.5 Flash-Lite ($0.30/Mtok):
+
+| | Cost per question |
+|---|---|
+| On the frontier path | ฿0.493 |
+| On the cheap path | ฿0.030 |
+| Blended at 60% cheap-path | **฿0.215** |
+
+**Break-even is a 2.7 percentage point lift** in cheap-path share. Below that, always-on context
+loses money; above it, it pays. Modelled end to end:
+
+| Scenario | ฿/question | Cumulative cash M60 |
+|---|---|---|
+| Routed 60%, no public data | ฿3.36 | ฿172.9M |
+| Routed 60%, context on every question, no lift | ฿3.57 | ฿171.9M |
+| Context lifts cheap-path to 68% | ฿2.89 | ฿175.2M |
+| Context lifts cheap-path to 75% | ฿2.30 | ฿178.0M |
+
+2.7 points is a low bar for turning "why was Saturday bad" from reasoning into a join. **It is not a
+bar anyone has measured**, which is why the row above it — costing ฿1.0M for no lift — is in the
+table.
+
+### The sequencing trap, which is the actionable part
+
+**Do not adopt any of these sources before the routing classifier exists.** Before the router,
+every question reaches the frontier model, so context costs ฿0.493 on *all* of them and converts
+*none* to a cheap path that is not yet built: pure cost, zero benefit. After the router, the cost
+falls to ฿0.215 blended and the benefit becomes available.
+
+This inverts the intuitive order. The register looks like cheap early work — free APIs, no vendor
+negotiation — and it is worth less than nothing until §7 item 4 ships.
+
+### Where it lives on Cloudflare
+
+**Public data is the one dataset in this system that may be cached globally.** Gate 7 above says
+why: one FX rate for one date, or one weather observation for one station-hour, serves every
+workspace. That is a legitimate shared cache, and it is the exact shape §15 forbids for platform
+data — so the boundary must be explicit in code: **public-data rows are shared; any join that
+combines them with tenant rows is workspace-scoped.**
+
+The volume is small enough that KV is genuinely the right home, which is unusual here — the design
+note template warns that "an envelope cache keyed per row is a cost line, not a cache", and that
+warning does not apply at these volumes:
+
+| Source | Write rate | Writes/month |
+|---|---|---|
+| TMD, ~120 stations hourly | 2,880/day | ~86,000 |
+| Air4Thai, ~80 stations hourly | 1,920/day | ~58,000 |
+| MOC, ~200 products daily | 200/day | ~6,000 |
+| BOT FX, ~10 pairs daily | 10/day | ~300 |
+| **Total** | **~5,000/day** | **~152,000** |
+
+At $5 per million KV writes that is **$0.76 a month**, about ฿25 — against the ฿2,006–8,224/month
+the model already books for R2, KV, domain and DNS. It disappears into the rounding. *Station counts
+are order-of-magnitude estimates, not counted; the conclusion survives being wrong by 5×.*
+
+**Cloudflare AI Gateway gains a new cache class from this.** §03 notes its response caching has
+"real hit rate on repeated prep over unchanged data; near zero on questions, which are all
+different." Public-data prep is the counter-example: *"summarise the weather impact for Bangkok,
+week of 8 September"* is **identical across every Bangkok customer who asks that week**. That is a
+deterministic call over shared data — the one prompt shape where the gateway's cache does real work
+— and it exists only because the data is not tenant-scoped.
+
+### A defect found while checking this
+
+`run()` in `model.py` takes a parameter `A`, documented as the allowance and cost profile, and
+**never uses it**: line 158 reads `CBn,CBr=BLEND(A_now),BLEND(A_new)` from the module globals, and
+`A` appears nowhere in the function body. Every sensitivity run passed through `A=` silently
+returns the baseline. The figures above were produced by patching the globals instead, and the
+60% row reproducing the published ฿38.1M is the evidence that they are sound.
+
+**Not fixed here.** `model.py` is the source of truth for every published number, so making a dead
+parameter live means re-verifying the document against it — that is its own PR. Recorded in
+`HANDOVER.md` §7.
+
+## 6. What was left out
 
 - **No source was adopted, and no `SOURCES` entry was added.** Adding one means a connector, a
   redaction keep-list and a design note, per the standing rule from `25-payload-redaction.md`.
@@ -188,7 +307,7 @@ Listed so the register says where it stops. Calling them candidates would overst
 - **Nothing was said about LINE.** The LINE Official Account Insight API is a commercial platform
   API under 11A.3, not public data, and belongs with the connector roadmap.
 
-## 6. Open or unverified spec items this builds on
+## 7. Open or unverified spec items this builds on
 
 **Two, and both are named rather than assumed away.**
 
@@ -208,7 +327,7 @@ returns.** Every source here is derived from its own terms, never from the fact 
 data.** These are context sources. They explain a number; they do not produce one. Revenue still
 comes from Shopee, Lazada, Meta, Google and the point of sale, all bring-your-own-credential.
 
-## 7. Verification
+## 8. Verification
 
 | | |
 |---|---|

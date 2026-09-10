@@ -45,7 +45,13 @@
 create type app.envelope_source as enum (
   'google_ads', 'meta_ads', 'ga4', 'search_console',
   'impact', 'awin', 'cj', 'partnerstack',
-  'dataforseo_serp', 'ai_answers'
+  'dataforseo_serp', 'ai_answers',
+  -- Appended by the WooCommerce connector. Edited in place rather than added by a later
+  -- `alter type`, because check-dictionary.mjs fails the build the moment a second migration
+  -- touches a dictionary enum -- deliberately, so the guard cannot silently compare a stale file.
+  -- The day a real database has applied these, that guard must learn to fold later migrations in
+  -- FIRST; its own error message says so.
+  'woocommerce'
 );
 
 -- `order` is an addition to the ad-centric `dbt_ad_reporting` grain, made under 13.3 rule 2 by

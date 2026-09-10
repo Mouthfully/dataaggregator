@@ -193,9 +193,15 @@ describe("the redaction policy table", () => {
     }
   });
 
+  // THE NAME HERE MUST BE A SOURCE THAT IS GENUINELY NOT IN THE DICTIONARY, and keeping that true
+  // is a real maintenance obligation. This test read `woocommerce` until its connector shipped, at
+  // which point it inverted: the source became declared and the refusal it asserts stopped
+  // happening. `shopify` is slot 3 of 11A.14's launch set and is next in line to do the same, so
+  // whoever ships it re-points this at the next undeclared name rather than deleting the test --
+  // the fail-closed path is the reason this module exists and must never go unexercised.
   it("refuses a source nobody has decided about, and says where to decide it", () => {
-    expect(() => policyFor("woocommerce")).toThrow(PayloadPolicyError);
-    expect(() => policyFor("woocommerce")).toThrow(/redaction\.ts/);
+    expect(() => policyFor("shopify")).toThrow(PayloadPolicyError);
+    expect(() => policyFor("shopify")).toThrow(/redaction\.ts/);
   });
 
   it("refuses a redact policy with no keep-list, which would remove everything", () => {

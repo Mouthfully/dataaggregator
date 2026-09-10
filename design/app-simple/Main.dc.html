@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; background: #F4F6FA; color: #0F172A; font-family: "Figtree", "Noto Sans Thai", "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #2563EB; text-decoration: none; } a:hover { color: #1D4ED8; }
+  </style>
+</helmet>
+
+<div style="width: 390px; min-height: 844px; background: #F4F6FA; display: flex; flex-direction: column;">
+
+  <!-- header: who and when. nothing else. -->
+  <div style="padding: 20px 20px 0 20px; display: flex; align-items: baseline; justify-content: space-between;">
+    <div style="font-size: 15px; font-weight: 600; color: #0F172A;">Nimman Roasters</div>
+    <div style="font-size: 12.5px; color: #64748B;">Tue 10 Sep</div>
+  </div>
+
+  <!-- THE NUMBER. one figure, the one nobody else computes. -->
+  <div style="padding: 24px 20px 0 20px;">
+    <div style="font-size: 13px; color: #475569; font-weight: 500;">You kept, last 7 days</div>
+    <div style="font-family: 'Young Serif', Georgia, serif; font-size: 52px; line-height: 1.05; color: #0F172A; margin-top: 8px; letter-spacing: -0.5px;">฿97,400</div>
+    <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
+      <span style="display: inline-flex; align-items: center; gap: 5px; background: #CCFBF1; color: #0F766E; border-radius: 999px; padding: 5px 11px; font-size: 12.5px; font-weight: 600;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+        ฿8,200
+      </span>
+      <span style="font-size: 12.5px; color: #64748B;">more than last week</span>
+    </div>
+  </div>
+
+  <!-- the plain sentence. this is the product. -->
+  <div style="padding: 20px 20px 0 20px;">
+    <div style="background: #FFFFFF; border-radius: 16px; box-shadow: 0 18px 44px rgba(15,23,42,0.08); padding: 18px;">
+      <div style="font-size: 14px; line-height: 1.55; color: #0F172A;">Delivery sold more this week, but GrabFood's commission took <span style="font-weight: 600;">฿12,400</span> of it. Your shop-front margin did not change.</div>
+      <div style="display: flex; align-items: center; gap: 6px; margin-top: 12px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        <span style="font-size: 11.5px; color: #64748B;">Counted from your POS and GrabFood. Checked 06:40 today.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- where the money went. a bar, not a chart. -->
+  <div style="padding: 16px 20px 0 20px;">
+    <div style="background: #FFFFFF; border-radius: 16px; box-shadow: 0 18px 44px rgba(15,23,42,0.08); padding: 18px;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between;">
+        <div style="font-size: 13px; font-weight: 600; color: #0F172A;">Sales ฿112,380</div>
+        <div style="font-size: 12.5px; color: #64748B;">what came off</div>
+      </div>
+      <div style="display: flex; gap: 3px; margin-top: 12px; height: 10px;">
+        <div style="flex-grow: 86.7; background: #0F766E; border-radius: 999px;"></div>
+        <div style="flex-grow: 8.1; background: #F97316; border-radius: 999px;"></div>
+        <div style="flex-grow: 3.8; background: #2563EB; border-radius: 999px;"></div>
+        <div style="flex-grow: 1.4; background: #CBD5E1; border-radius: 999px;"></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 14px;">
+        <div style="display: flex; align-items: center; gap: 9px;">
+          <span style="width: 8px; height: 8px; border-radius: 999px; background: #F97316;"></span>
+          <span style="font-size: 13px; color: #475569; flex-grow: 1;">Platform fees and commission</span>
+          <span style="font-size: 13px; color: #0F172A; font-weight: 600;">฿9,100</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 9px;">
+          <span style="width: 8px; height: 8px; border-radius: 999px; background: #2563EB;"></span>
+          <span style="font-size: 13px; color: #475569; flex-grow: 1;">Ads</span>
+          <span style="font-size: 13px; color: #0F172A; font-weight: 600;">฿4,300</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 9px;">
+          <span style="width: 8px; height: 8px; border-radius: 999px; background: #CBD5E1;"></span>
+          <span style="font-size: 13px; color: #475569; flex-grow: 1;">Refunds</span>
+          <span style="font-size: 13px; color: #0F172A; font-weight: 600;">฿1,580</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- one thing to do. not a sheet of eight. -->
+  <div style="padding: 16px 20px 0 20px;">
+    <div style="background: #0F172A; border-radius: 16px; padding: 18px;">
+      <div style="font-size: 11.5px; font-weight: 700; color: #94A3B8; letter-spacing: 0.6px; text-transform: uppercase;">Worth doing this week</div>
+      <div style="font-size: 15px; font-weight: 600; color: #FFFFFF; margin-top: 10px; line-height: 1.45;">Raise your two best delivery items by ฿5</div>
+      <div style="font-size: 13px; color: #CBD5E1; margin-top: 8px; line-height: 1.5;">They sell just as well at ฿5 more on GrabFood. About ฿3,100 a month back.</div>
+      <div style="display: flex; gap: 10px; margin-top: 16px;">
+        <button style="cursor: pointer; flex-grow: 1; min-height: 44px; border-radius: 999px; border: none; background: #FFFFFF; color: #0F172A; font-family: inherit; font-size: 13.5px; font-weight: 600;">Show me how</button>
+        <button style="cursor: pointer; min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid #475569; background: transparent; color: #CBD5E1; font-family: inherit; font-size: 13.5px; font-weight: 500;">Not now</button>
+      </div>
+    </div>
+    <div style="text-align: center; margin-top: 12px;">
+      <span style="font-size: 12.5px; color: #64748B;">2 more suggestions</span>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1;"></div>
+
+  <!-- three destinations. that is the whole app. -->
+  <div style="display: flex; border-top: 1px solid #E2E8F0; background: #FFFFFF; padding: 8px 0 20px 0;">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; min-height: 44px; padding-top: 8px;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      <span style="font-size: 11px; font-weight: 600; color: #2563EB;">Today</span>
+    </div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; min-height: 44px; padding-top: 8px;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 12H3"/><path d="M16 6H3"/><path d="M16 18H3"/><path d="m17 12 3 3 5-6"/></svg>
+      <span style="font-size: 11px; font-weight: 500; color: #64748B;">Do</span>
+    </div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; min-height: 44px; padding-top: 8px;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a10 10 0 1 0-9.5-6.9L2 22l6.9-.5A10 10 0 0 0 12 22z"/></svg>
+      <span style="font-size: 11px; font-weight: 500; color: #64748B;">Ask</span>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {}
+</script>
+</body>
+</html>

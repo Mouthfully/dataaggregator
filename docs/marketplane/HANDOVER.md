@@ -1,10 +1,19 @@
 # Handover
 
-Written 9 September 2026, last revised 10 September at commit `3774229` on
-`claude/marketplane-build-kickoff-cgbfxz`. PR [#3](https://github.com/Mouthfully/dataaggregator/pull/3)
-is **merged**; PR [#5](https://github.com/Mouthfully/dataaggregator/pull/5) is **open, green and
-mergeable**, and carries everything described below that is not yet on `main`. Read this before
-touching anything.
+Written 9 September 2026, last revised 10 September at commit `0ce44a6`. **Everything described
+below is on `main`** — PRs [#3](https://github.com/Mouthfully/dataaggregator/pull/3),
+[#5](https://github.com/Mouthfully/dataaggregator/pull/5),
+[#7](https://github.com/Mouthfully/dataaggregator/pull/7),
+[#8](https://github.com/Mouthfully/dataaggregator/pull/8),
+[#10](https://github.com/Mouthfully/dataaggregator/pull/10) and
+[#11](https://github.com/Mouthfully/dataaggregator/pull/11) are merged, and nothing is in flight.
+Read this before touching anything.
+
+**One PR is open and cannot merge.**
+[#4](https://github.com/Mouthfully/dataaggregator/pull/4) carries a competing rewrite of the
+`positioning` claim that #5 landed differently: it would conflict on
+`packages/brand/src/claims.ts` and break a test asserting a sentence no longer in the tree. Its one
+genuinely useful file, `20-marketing-site.md`, was salvaged. **It should be closed as superseded.**
 
 ---
 
@@ -64,12 +73,16 @@ And the rest:
 
 ```
 docs/MARKETING-DATA-PLANE.md      the specification. §11 records decisions.
-docs/marketplane/                 design notes 01–30, one per shipped unit (20 is owed)
+docs/marketplane/                 design notes 01–34, one per shipped unit. None owed.
 docs/marketplane/finance/         the financial model — see §6 below
+design/app/                       the product application design of record
+design/app-simple/                the owner-first proposal against it (§4). A direction, not a decision.
+design/marketplane/               the marketing artboard, predating §11A.1
 packages/contract/                the envelope, metric dictionary, restatement event
-packages/payloads/                raw payload store + PII redaction
+packages/payloads/                raw payload store + PII redaction. `woocommerce` is the first `redact`.
 packages/webhooks/                HMAC signing and at-least-once delivery
-packages/connectors/              GA4 today; WooCommerce is next
+packages/connections/             OAuth AND key-paste credentials — a discriminated union (§4)
+packages/connectors/              ga4 and woocommerce; shopify is slot 3
 packages/{brand,tokens}/          the one brand file, the one stylesheet
 apps/api-edge/                    Cloudflare Worker: /v1/performance, drain, prune
 supabase/migrations/              schema. No database has ever applied these.
@@ -80,7 +93,7 @@ scripts/check-*.mjs               brand, dictionary and token tripwires
 
 ## 4. State of the code
 
-**Green at `3774229`: 397 unit tests, 178 database assertions, CI passing.**
+**Green at `0ce44a6`: 444 unit tests, 178 database assertions, CI passing.**
 
 Verify with `pnpm test`. Note that `apps/api-edge` prints alarming `workerd` stack traces
 (`Network connection lost`, `FixedLengthStream`) during its run — **these are expected noise
@@ -102,17 +115,34 @@ Shipped on PR #3 and now on `main`, in order:
 5. **Retention and cron wiring** — `* * * * *` drain, `17 3 * * *` prune, 30-day delivered /
    90-day failed retention. The prune never touches an undelivered event.
 
-### Open on PR #5, not yet on `main`
+### Shipped 10 September, PRs #5, #7, #8, #10 and #11, all merged
 
-1. **The positioning claim reconciled with §11A.1** — `packages/brand/src/claims.ts` had carried
-   the agency-and-brand message for four rounds while the specification said the customer was an
-   owner-run small business. `README.md` carried the same sentence and changed with it.
-2. **`30-thai-public-data-register.md`** — a survey of Thai public data sources, sorted by whether
-   an access contract could be confirmed. Nothing adopted; see §7 item 2.
-3. **This file.**
+1. **The positioning claim reconciled with §11A.1**, and `30-thai-public-data-register.md`. The
+   claim had carried the agency-and-brand message for four rounds; `README.md` changed with it.
+2. **The owner-first client design** — `design/app-simple/`, five phone artboards. Eight nav items
+   become three, five connection states become two, the developer surface goes behind one closed
+   door, and LINE is treated as the primary surface per §11A.3. `design/app/` remains the design
+   of record. **It also corrects a price**: the old design carried ฿990/฿2,490 gated on source
+   count and marked *"excludes 7% VAT"*, against `model.py`'s ฿1,590/฿4,190/฿13,800 **inclusive**.
+   See `31-owner-first-client.md` §2.
+3. **WooCommerce, end to end** — slot 2 of §11A.14. Dictionary entry in TypeScript and SQL, a
+   restatement clock, **the repository's first `redact` keep-list**, a normaliser and a client.
+   Notes `32` and `34`.
+4. **The key-paste credential lane** — `StoredCredential` becomes a discriminated union and
+   `connectWithKey` is a sibling of `connect`. This unblocked Shopify, Opn and ZORT as much as
+   WooCommerce: every remaining launch slot was behind it. Note `33`.
+5. **`20-marketing-site.md`**, owed since the numbering first jumped 19 → 21, salvaged from the
+   unmergeable PR #4 with two now-false paragraphs corrected in place.
 
-**If PR #5 is merged when you read this, all of the above is on `main` and the branch is spent —
-restart it from `origin/main` rather than stacking on merged history.**
+**Adding a source is a four-place act, and three of the four enforce themselves.** `SOURCES`,
+the Postgres enum (`check-dictionary.mjs` compares them), `RESTATEMENT_CLOCKS` and
+`REDACTION_POLICIES` — the last two are total `Record<Source, …>`, so `tsc` fails if you skip one.
+Which settles a question that used to come up every round: **the dictionary change cannot ship
+ahead of the connector.** `redaction.ts` says so in its own comment.
+
+**`app.connection_provider` is the exception, and it is a trap.** No guard relates it to its
+TypeScript twin — `check-dictionary.mjs` covers sources, entity types, attribution windows and
+metrics, not connection providers. A one-sided edit fails at runtime, not at build time.
 
 ### Two bugs mutation testing caught, and what they taught
 
@@ -134,16 +164,58 @@ superseded sentence contained neither word, so a straight `git checkout` of the 
 have passed. A review bot caught it, not the mutation run. **Take the mutation from `git show`,
 not from memory of what the thing said.**
 
+**Two more from 10 September, out of 22 mutations run across three connector PRs.** All 22 were
+eventually caught; these two survived first, and both were worth more than the twenty that did not.
+
+**Fourth: the test could not fail, because CI runs in UTC.** Deleting the `Z` that `wooGmtToDate`
+appends to WooCommerce's designator-less `_gmt` timestamps — the exact defect the code exists to
+prevent — left the whole suite green. In UTC the wrong reading and the right reading produce the
+**identical string**. The comment above the assertion claimed that asserting "on the value rather
+than the runtime" was enough; it was not. **The connectors suite now runs in `Asia/Bangkok`**,
+pinned in `packages/connectors/vitest.config.ts`, so every connector added after inherits it. A
+Thailand-first product whose tests only ever run in UTC is structurally blind to this.
+
+**Fifth: a mutation run cannot fail a comment.** Two documentation defects were found on PR #11 by
+re-reading the diff, invisible to all 22 mutations. The client's own module note said it "does not
+read the body — so an extractor can stream it to R2", pointing at a path that **throws for that
+source**: `putPayload` refuses any non-`verbatim` source, and WooCommerce is the first `redact`
+one. Grepping for that mistake rather than assuming it was unique found the same claim in
+`packages/payloads/src/payloads.ts` — *"the streaming path is the one every extractor should
+use"* — sitting eleven lines above the code that enforces the opposite, wrong since the redaction
+policy landed. **A wrong comment survives every test in the suite, and the more confidently it is
+written the longer it survives.**
+
 ---
 
 ## 5. Blockers
 
-1. **There is no Supabase project.** Three finished surfaces — `/v1/performance`, the webhook
-   drain, and the prune — are written, tested against a local Postgres, and *unbound*. This is
-   the single largest blocker and it needs the founder, not an agent.
+1. **There is no Supabase project for this product, and this was checked rather than assumed.**
+   The account holds exactly one project, `SO.Reporting` in org `MWS HK LTD` — an affiliate
+   reporting database for a **different** product (80k orders, Impact.com partner data, leads and
+   outreach). **It must not be touched.** So three finished surfaces — `/v1/performance`, the
+   webhook drain and the prune — are still written, tested against local Postgres in CI, and
+   *unbound*. Still the single largest blocker, and it still needs the founder: creating a project
+   costs money.
+
+   **Two defects will bite on the first apply**, filed as issue
+   [#9](https://github.com/Mouthfully/dataaggregator/issues/9) and verified against the files.
+   One is potentially **total denial**: `app.current_user_id()` and `app.api_key_workspace_id()`
+   read `request.jwt.claim.sub`, the *pre-PostgREST-9 singular* GUC, while Supabase's own docs say
+   claims now arrive as `request.jwt.claims` JSON. If the singular form is unset every RLS
+   predicate is false and **every authenticated read returns zero rows** — not an error, an empty
+   result. The fix is the coalesce-over-both pattern Supabase's own `auth.uid()` uses. The other:
+   `MAX_LIMIT` (1000) exactly equals PostgREST's `max_rows` (1000), so a `limit + 1` next-page
+   probe silently never sees a next page. **The database suite cannot catch either** — it sets
+   those GUCs by hand, so it tests the helpers against its own assumption.
+
+   **A security finding on the OTHER project, surfaced because it was seen and not because it is
+   ours:** 16 tables in `SO.Reporting` have RLS disabled, including `orders` (80,642 rows),
+   `impact_actions` (11,532) and `leads` (232). Anyone with that project's anon key can read or
+   modify every row. Not this repository's to fix; worth knowing.
 2. **Founder decisions still open:** the domain; the data region and whether any EU claim is
    made given the Thai entity; which legal entity owns platform credentials; FlowAccount's API
-   access model (`developer_support@flowaccount.com`).
+   access model (`developer_support@flowaccount.com`). **Plus the two in §7 item 1**, which are
+   larger than any of these because they change what the launch set is.
 3. The seven open questions in spec §11A.9 are unanswered.
 
 ---
@@ -219,7 +291,20 @@ pessimistic case survives rather than only the base case.
 
 ## 7. What is owed, in order
 
-1. **`docs/marketplane/20-marketing-site.md`.** Still missing — notes jump 19 → 21.
+1. **Two founder decisions, and they outrank the engineering below because they change what the
+   launch set IS.** Both are new evidence against a premise of §11A.14, not a wish to re-decide it,
+   and both were deliberately left unwritten so they arrive as decisions rather than side effects.
+   - **WooCommerce does not deliver profit after fees.** Core exposes **no payment-processor fee**;
+     `fee_lines` is a merchant *surcharge* that ADDS to the total, so reading it as a cost inverts
+     the sign on the headline number. The real fee lives in gateway-specific `meta_data` that some
+     gateways write and many do not. For an opaque gateway — the common case — WooCommerce delivers
+     revenue, orders and refunds, and the fee waits for slot 4. See `32` §1 and §6.
+   - **Nothing blocks BUILDING any ad platform today**, and **Google Ads and Search Console are one
+     shared approval, not two** (the same GCP consent-screen verification; the Ads developer-token
+     half is now documented as minutes, not weeks). Microsoft issues a universal token with no
+     review at all. Every one of the six has a sandbox or test-account path, so the calendar and
+     the build order are independent — which undercuts the arithmetic that spent three of four
+     launch slots on commerce. The research is verified but unwritten; ask for it as a §11A.17.
 2. **Swap `FX_SOURCE` from ECB to the Bank of Thailand.** `packages/fx/src/fx.ts` hardcodes
    `FX_SOURCE = "ecb_reference_rates"`, so a Thailand-first product prices THB off a European
    central bank. BOT is the rate a Thai auditor and the Revenue Department recognise, and
@@ -227,12 +312,19 @@ pessimistic case survives rather than only the base case.
    self-contained, and it is its own PR because it changes an envelope field. See
    `30-thai-public-data-register.md`; one registration on `portal.api.bot.or.th` also carries
    tourism indicators and payment statistics.
-3. **WooCommerce as the first commerce connector.** Needs a `SOURCES` entry *and* a redaction
-   keep-list, both shipping in the same PR — the redaction policy is `verbatim` until then, by
-   design.
-4. **The routing classifier** (§03 of the financial model). Highest financial return of any
+3. **Finish WooCommerce's read path.** The connector is built and readable, but three pieces are
+   named in `34` §4 and not done: **the page loop** (the client fetches one page and reports
+   `totalPages`; nothing walks them), **window bisection** for a store large enough that deep
+   `OFFSET` paging hurts the merchant's own MySQL, and **the connect-time probe** — one
+   `GET /orders?per_page=1` that validates store URL, key, permission level, WordPress-user
+   capability and pretty-permalinks at once. Note that `rest_no_route` means permalinks are off,
+   **not** a bad credential, and the probe belongs where a human is looking at the screen.
+4. **Shopify, slot 3.** The credential lane now exists, so this is a `SOURCES` entry, a keep-list
+   read against real responses, a normaliser and a client — the same five surfaces WooCommerce
+   took, minus the foundation work.
+5. **The routing classifier** (§03 of the financial model). Highest financial return of any
    engineering work here; also required by the Ask surface.
-5. **A capability gate for the claims list** — issue
+6. **A capability gate for the claims list** — issue
    [#6](https://github.com/Mouthfully/dataaggregator/issues/6). `allowedClaims()` gates on brand
    fields being non-null and has no notion of whether the thing a claim describes exists. Eight of
    the 23 claims the site renders name capabilities that are not built; `connectors` names five
@@ -346,21 +438,28 @@ a long prompt competes with the file rather than pointing at it.
 
 > Read `docs/marketplane/HANDOVER.md` first, then `docs/MARKETING-DATA-PLANE.md` §11 and §11A.
 > The binding constraints in §2 of the handover are not negotiable and were set by the founder.
-> Check whether PR #5 has merged — if it has, restart `claude/marketplane-build-kickoff-cgbfxz`
-> from `origin/main` rather than stacking on merged history. Then take §7 item 2 (the FX source
-> swap) and take it all the way: design note, platform-terms check, mutation testing, PR.
+> Start your branch from `origin/main`. **§7 item 1 is two founder decisions, not work** — put
+> them to me and do not decide them yourself. Then take §7 item 2 (the FX source swap) and take it
+> all the way: design note, platform-terms check, mutation testing, PR.
+
+**Item 2 is still the right first commit** for the reason it always was — small enough to finish,
+and it exercises the whole loop. Item 3 (finishing WooCommerce's read path) is the larger and more
+useful piece of work, and the foundation it needs now exists.
 
 ### What parallelises, and what does not
 
 Most of §7 is **not** safely parallel, and it is worth knowing why before fanning work out.
 
-- **Item 2 (FX source)** touches `packages/fx` and an envelope field. **Item 3 (WooCommerce)**
-  touches `SOURCES`, the metric dictionary and the redaction keep-list. Both edit
-  `packages/contract`, and `check-dictionary.mjs` fails the build if TypeScript and SQL disagree.
-  Running them concurrently produces two branches that each pass alone and conflict on merge.
-- **Item 1 (marketing site) and item 5 (capability gate)** are the one pair that genuinely belongs
-  together — the gate decides what the page renders when a claim is withheld, and `claim()`
-  currently *throws* on a withheld id rather than degrading.
+- **Item 2 (FX source)** touches `packages/fx` and an envelope field. **Item 4 (Shopify)** touches
+  `SOURCES`, the metric dictionary and the redaction keep-list. Both edit `packages/contract`, and
+  `check-dictionary.mjs` fails the build if TypeScript and SQL disagree. Running them concurrently
+  produces two branches that each pass alone and conflict on merge. **This is now proven rather
+  than predicted**: WooCommerce touched four of those places on 10 September and three of them
+  fail the build if you miss one.
+- **`20-marketing-site.md` (now landed) and item 6 (capability gate)** are the one pair that
+  genuinely belongs together — the gate decides what the page renders when a claim is withheld, and
+  `claim()` currently *throws* on a withheld id rather than degrading. Note `20` §3 gate 18 now
+  states the problem in full.
 - **Research is parallel; commits are not.** Reading platform terms, pricing a source, or
   surveying an API can fan out freely. Anything that writes to `packages/contract`,
   `supabase/migrations/` or the dictionary should be one worker at a time.

@@ -67,6 +67,92 @@ exception
 end;
 $$;
 
+-- Record verdicts that must survive the rollback the test itself needs.
+--
+-- `app_test.check()` records a verdict by INSERTING a row, so a `begin ... rollback` block throws
+-- away its own evidence: the assertions run, the rows vanish, and the summary counts what
+-- survived. Nothing reports the loss, so a suite that stopped running is indistinguishable from a
+-- suite that passed. That is issue #17, and the last block of this file is where it was live --
+-- two assertions about whether "delete my data" removes access, discarded on every run since they
+-- were written, never once counted.
+--
+-- `commit` is the fix only when the block's changes are harmless to leave behind, which is how
+-- 06_jwt_claims.sql was repaired. Here the rollback is LOAD-BEARING: the block marks a workspace
+-- deleted, and files 02 through 07 run against the same database.
+--
+-- So the change and the probes go inside a PL/pgSQL EXCEPTION block -- which PostgreSQL implements
+-- as a savepoint -- and that block is aborted on purpose. What survives the abort is PL/pgSQL
+-- VARIABLES: they are memory, not database state, and a subtransaction rollback does not restore
+-- them. The verdicts are therefore COMPUTED inside the doomed subtransaction and INSERTED after
+-- it, in the outer transaction, which commits. Both shapes the issue sketched, at once.
+--
+-- Rejected: recording through `dblink`. It is the only true out-of-transaction write, and it costs
+-- an extension in the production schema so that the test harness can write rows. The harness does
+-- not get to change what is deployed.
+--
+-- `p_undone` is not an assertion, it is the harness checking itself. If the setup is still in
+-- place after the abort, the run STOPS -- because the alternative is leaking a soft-deleted
+-- workspace into five later files and reporting the leak as a pass, which is the same failure
+-- mode in a different costume.
+create or replace function app_test.check_undone(
+  p_setup     text,
+  p_undone    text,
+  p_probes    text[][],
+  p_role      text default null,
+  p_claim_sub text default null
+)
+returns void language plpgsql as $$
+declare
+  v_verdicts boolean[] := '{}';
+  v_error    text;
+  v_clean    boolean;
+  v_i        integer;
+  v_val      boolean;
+begin
+  begin
+    execute p_setup;
+
+    -- After the setup, not before it: the setup is the owner's to make, and the probes are the
+    -- whole point of not being the owner.
+    if p_role is not null then
+      execute format('set local role %I', p_role);
+    end if;
+    if p_claim_sub is not null then
+      perform set_config('request.jwt.claim.sub', p_claim_sub, true);
+    end if;
+
+    for v_i in 1 .. array_length(p_probes, 1) loop
+      execute p_probes[v_i][2] into v_val;
+      v_verdicts := v_verdicts || coalesce(v_val, false);
+    end loop;
+
+    -- The abort IS the rollback. Nothing after this line runs.
+    raise exception using errcode = 'ZZ001', message = 'app_test.check_undone: deliberate abort';
+  exception
+    when sqlstate 'ZZ001' then
+      null;
+    when others then
+      -- An error before the verdicts were computed has to read as a FAILURE. Swallowing it into an
+      -- absence is the bug this function exists to stop.
+      v_error := sqlerrm;
+  end;
+
+  execute p_undone into v_clean;
+  if not coalesce(v_clean, false) then
+    raise exception 'app_test.check_undone: the setup was NOT undone, later suites are now dirty: %',
+      p_setup;
+  end if;
+
+  for v_i in 1 .. array_length(p_probes, 1) loop
+    perform app_test.check(
+      p_probes[v_i][1],
+      v_error is null and coalesce(v_verdicts[v_i], false),
+      case when v_error is not null then 'error inside the undone block: ' || v_error end
+    );
+  end loop;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------------------------
 -- Fixture, created as the owner so RLS does not interfere with setup.
 -- ---------------------------------------------------------------------------------------------
@@ -316,47 +402,76 @@ commit;
 
 -- ---------------------------------------------------------------------------------------------
 -- Spend budgets. Specification section 8: a hard cap, not an alert, and failed calls are unbilled.
+--
+-- Every charge is addressed by the key's SHA-256 hash, not by `api_key_id`. That is issue #19: the
+-- function writes, `anon` may call it, and the anon key is public -- so gating a write to a
+-- tenant's budget on a uuid that appears in logs and support tickets made "knowing an identifier"
+-- the whole authorisation. The hash is the credential, so passing it is the proof of possession.
+-- 07_anon_grants.sql holds the other half: what the same call can do WITHOUT the hash.
 -- ---------------------------------------------------------------------------------------------
 begin;
   set local role anon;
 
   select app_test.check('a charge inside the budget is accepted',
-    (select consume_api_key_credits('f0000000-0000-0000-0000-000000000001', 60)));
+    (select consume_api_key_credits(digest('mp_live_aaaaaaaa_secret_one', 'sha256'), 60)));
   select app_test.check('a charge that would exceed the budget is refused',
-    (select not consume_api_key_credits('f0000000-0000-0000-0000-000000000001', 50)));
+    (select not consume_api_key_credits(digest('mp_live_aaaaaaaa_secret_one', 'sha256'), 50)));
   -- Read back through the function rather than the table: anon cannot select api_keys, which is
   -- itself the point, so an assertion that reads the table directly would be testing the test.
   select app_test.check('a refused charge does not consume credits',
     (select (verify_api_key(digest('mp_live_aaaaaaaa_secret_one', 'sha256'))).credits_remaining = 40));
   select app_test.check('a charge that exactly reaches the budget is accepted',
-    (select consume_api_key_credits('f0000000-0000-0000-0000-000000000001', 40)));
+    (select consume_api_key_credits(digest('mp_live_aaaaaaaa_secret_one', 'sha256'), 40)));
   select app_test.check('a key with no budget is uncapped',
-    (select consume_api_key_credits('f0000000-0000-0000-0000-000000000002', 100000)));
+    (select consume_api_key_credits(digest('mp_live_bbbbbbbb_secret_two', 'sha256'), 100000)));
   select app_test.check('a revoked key cannot be charged',
-    (select not consume_api_key_credits('f0000000-0000-0000-0000-000000000003', 1)));
+    (select not consume_api_key_credits(digest('mp_live_cccccccc_secret_three', 'sha256'), 1)));
   select app_test.check('a negative charge is refused',
-    (select not consume_api_key_credits('f0000000-0000-0000-0000-000000000001', -10)));
+    (select not consume_api_key_credits(digest('mp_live_aaaaaaaa_secret_one', 'sha256'), -10)));
 commit;
 
 -- ---------------------------------------------------------------------------------------------
 -- Soft deletion has to actually remove access, or "delete my data" means nothing.
+--
+-- These two assertions are the ones issue #17 is about. They ran inside `begin ... rollback`, so
+-- every verdict they recorded was rolled away with the soft delete that made them meaningful: the
+-- file reported 52 and had written 54, and no output anywhere said that two assertions about the
+-- product's deletion promise had vanished. They are recorded now, and they pass.
+--
+-- The rollback stays because it is load-bearing, not because it is tidy -- without it a deleted
+-- workspace leaks into files 02 through 07. See `app_test.check_undone` above for how a verdict
+-- outlives it.
 -- ---------------------------------------------------------------------------------------------
 begin;
-  update public.workspaces set deleted_at = now()
-   where id = 'c0000000-0000-0000-0000-000000000002';
-
-  set local role authenticated;
-  select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
-
-  select app_test.check('a soft-deleted workspace disappears for its owner',
-    (select count(*) = 1 from public.workspaces));
-  select app_test.check('a soft-deleted workspace''s connections disappear too',
-    (select count(*) = 0 from public.connections
-      where workspace_id = 'c0000000-0000-0000-0000-000000000002'));
-rollback;
+  select app_test.check_undone(
+    p_setup => $setup$
+      update public.workspaces set deleted_at = now()
+       where id = 'c0000000-0000-0000-0000-000000000002'
+    $setup$,
+    p_undone => $undone$
+      select deleted_at is null from public.workspaces
+       where id = 'c0000000-0000-0000-0000-000000000002'
+    $undone$,
+    p_role => 'authenticated',
+    p_claim_sub => '11111111-1111-1111-1111-111111111111',
+    p_probes => array[
+      ['a soft-deleted workspace disappears for its owner',
+       $probe$select count(*) = 1 from public.workspaces$probe$],
+      ['a soft-deleted workspace''s connections disappear too',
+       $probe$select count(*) = 0 from public.connections
+                where workspace_id = 'c0000000-0000-0000-0000-000000000002'$probe$]
+    ]
+  );
+commit;
 
 -- ---------------------------------------------------------------------------------------------
 -- Summary
+--
+-- THE COUNT IS ASSERTED, NOT JUST PRINTED. Zero failures is not the same as having run: a block
+-- that stops executing -- a rollback that eats its verdicts, an early `\q`, a `do $$` that returns
+-- on the first branch -- takes the total down with it and reports success. The floor turns that
+-- into a red build. It is a floor rather than an exact count so that adding an assertion does not
+-- mean editing two places.
 -- ---------------------------------------------------------------------------------------------
 \o
 
@@ -371,10 +486,13 @@ select count(*) filter (where passed) as passed,
 from app_test.results;
 
 do $$
-declare v_failed integer;
+declare v_failed integer; v_total integer;
 begin
-  select count(*) into v_failed from app_test.results where not passed;
+  select count(*) filter (where not passed), count(*) into v_failed, v_total from app_test.results;
   if v_failed > 0 then
     raise exception 'RLS isolation: % assertion(s) failed', v_failed;
+  end if;
+  if v_total < 54 then
+    raise exception 'RLS isolation: only % assertion(s) ran; expected at least 54', v_total;
   end if;
 end $$;

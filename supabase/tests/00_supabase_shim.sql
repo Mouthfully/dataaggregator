@@ -25,3 +25,18 @@ create table if not exists auth.users (
   id    uuid primary key default gen_random_uuid(),
   email text unique
 );
+
+-- SUPABASE'S DEFAULT PRIVILEGES ON `public`, WHICH ARE WHY THIS FILE IS NOT OPTIONAL DETAIL.
+--
+-- A hosted project ships `alter default privileges in schema public grant all on tables to anon,
+-- authenticated, service_role`. A stock postgres:16 container ships nothing of the kind, so every
+-- table created by a migration is reachable by `anon` on Supabase and by nobody locally.
+--
+-- Without these three lines the suite cannot see a whole class of defect: a `revoke ... on all
+-- tables ... from anon` only affects tables that exist when it runs, so any table created by a
+-- LATER migration silently keeps the default grant. That is not hypothetical -- it was live on the
+-- first real project for envelope_rows, restatement_events and webhook_endpoints, and CI was green
+-- throughout. Model the platform, or test against a fiction.
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema public grant all on functions to anon, authenticated, service_role;

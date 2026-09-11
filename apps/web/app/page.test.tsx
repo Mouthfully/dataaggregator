@@ -163,17 +163,19 @@ describe("every promise on the page comes from the claims list", () => {
   });
 });
 
-describe("the unsettled product name", () => {
-  it("is not printed anywhere, because it is not settled", () => {
-    // A name on a marketing site is the most expensive place to put an unsettled one. The brand
-    // guard already bans it in source; this asserts the RENDERED page too, which is what a
-    // customer and a search engine actually see.
-    expect(brand.productNameSettled).toBe(false);
-    expect(productName()).toBeNull();
-    expect(text).not.toContain(brand.productName);
+describe("the settled product name", () => {
+  it("is printed, and it is the brand file's string rather than a copy of it", () => {
+    // This assertion used to say the opposite, and the reason it flipped is a founder decision
+    // rather than a code change: §12 recommended a name, and one was chosen. What it asserts is
+    // the same property either way -- the page shows what the brand file holds and never a literal
+    // typed here. `scripts/check-brand.mjs` bans the string everywhere outside that one file, so a
+    // hardcoded copy fails the build rather than this test.
+    expect(brand.productNameSettled).toBe(true);
+    expect(productName()).toBe(brand.productName);
+    expect(text).toContain(brand.productName);
   });
 
-  it("leads with the tagline instead, which is true whatever it ends up being called", () => {
+  it("still leads with the tagline, which was never contingent on the name", () => {
     expect(text).toContain("Know what changed. And why.");
   });
 });

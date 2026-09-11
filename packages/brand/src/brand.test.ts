@@ -26,12 +26,19 @@ describe("the brand file", () => {
     // would be worse than a null: null withholds a claim, a placeholder ships a false one.
     expect(brand.domain).toBeNull(); // support is on one domain, the artboard hard-codes another
     expect(brand.vatNumber).toBeNull(); // not supplied; a wrong VAT number is worse than none
-    expect(brand.dataRegion).toBeNull(); // no project provisioned yet
+    // ap-southeast-1: a project IS now provisioned, in the nearest Supabase region to Thailand.
+    // The `data-region` claim stays withheld anyway -- see the capability test below.
+    expect(brand.dataRegion).toBe("ap-southeast-1");
     expect(brand.euRepresentative).toBeNull(); // GDPR Art. 27, not yet appointed
   });
 
-  it("does not treat the product name as settled", () => {
-    expect(brand.productNameSettled).toBe(false);
+  it("treats the product name as settled, and it is the one the brand file holds", () => {
+    // §12 only RECOMMENDED a name; this one is the founder's. What matters for the repository is
+    // unchanged: the string lives in exactly one file, and `scripts/check-brand.mjs` both bans it
+    // everywhere else and match-tests the infrastructure files that must carry it.
+    expect(brand.productNameSettled).toBe(true);
+    expect(brand.productName).toBe("numbadee");
+    expect(brand.productName.trim()).toBe(brand.productName);
   });
 });
 
@@ -95,6 +102,24 @@ describe("the claims gate", () => {
     expect(allowedClaims(brand, withPartialBilling).map((c) => c.id)).not.toContain(
       "pricing-two-units",
     );
+  });
+
+  it("records a data region without promising the customer chose it", () => {
+    // The brand-fact gate is now satisfied -- dataRegion is set -- so this claim would render on
+    // that axis alone. It must not: "the region you choose" describes a choice nobody is offered.
+    // `organisations.data_region` is a column with no picker behind it and nothing that populates
+    // it. Withheld on the capability axis until region choice actually ships.
+    expect(brand.dataRegion).not.toBeNull();
+
+    const withheld = withheldClaims().find((entry) => entry.claim.id === "data-region");
+    expect(
+      withheld,
+      "data-region must stay withheld while region choice does not exist",
+    ).toBeDefined();
+    expect(withheld?.missing).toEqual([]);
+    expect(withheld?.missingCapabilities).toContain("surface:region-choice");
+
+    expect(allowedClaims().map((c) => c.id)).not.toContain("data-region");
   });
 
   it("derives the connector claim from the guarded implemented-source list", () => {

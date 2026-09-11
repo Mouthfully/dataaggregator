@@ -10,20 +10,23 @@
  * That remains the build-time boundary. `optionalClaim(id)` is the page boundary: it returns null
  * for a known claim withheld by a brand fact or capability, while still throwing on an unknown id.
  *
- * Brand facts withhold three claims today:
+ * Brand facts withhold two claims today, and a capability withholds a third:
  *
- *   data-region   requires brand.dataRegion   -- not chosen
  *   gdpr          requires brand.euRepresentative -- the entity is Thai and no Article 27
  *                 representative is appointed
  *   dpa           requires brand.dpaAvailable -- no click-through Article 28 DPA exists
+ *   data-region   brand.dataRegion IS set (ap-southeast-1), so the fact gate passes. It is held
+ *                 back on the capability axis instead: the sentence promises "the region you
+ *                 choose" and there is one region, chosen for the customer. See claims.ts.
  *
  * Each is a promise a European buyer would rely on. `00-repo-map.md` section 7 lists exactly these
  * under "Delete or substantiate", and the artboard made all three.
  *
- * THE PRODUCT NAME IS NOT SETTLED, so it appears nowhere. `brand.productNameSettled` is false, and
- * a name printed across a marketing site is expensive to take back -- so the site leads with the
- * tagline and the positioning claim, both of which are true regardless of what the thing ends up
- * being called. `productName()` returns null until that changes.
+ * THE PRODUCT NAME IS NOW SETTLED, and the machinery around it did not change. `productName()`
+ * still reads `brand.productNameSettled` and still returns null when it is false, so the gate that
+ * kept the name off the page is intact rather than removed -- a name can be un-settled again by
+ * flipping one boolean. The site leads with the tagline regardless, which was never contingent on
+ * what the thing is called.
  */
 
 import { CLAIMS, type Claim, allowedClaims, brand } from "@repo/brand";

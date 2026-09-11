@@ -48,6 +48,7 @@ const CAPABILITY_IDS = [
   "surface:ai-answer-monitoring",
   "surface:cost-preview",
   "surface:agency-switching",
+  "surface:region-choice",
   "source:dataforseo",
   "billing:connected-account",
   "billing:credits",
@@ -134,11 +135,19 @@ export const CLAIMS: readonly Claim[] = [
   },
 
   // --- Data protection. Gated: the entity is Thai (see 01-brand-identity.md). -----------------
+  // TWO GATES, AND THE SECOND IS THE ONE THAT BINDS. `brand.dataRegion` is now set --
+  // ap-southeast-1 -- so the brand-fact gate would let this render. It must not: the sentence
+  // promises the customer a CHOICE, and there is one region, chosen by us.
+  // `organisations.data_region` exists as a column and nothing populates it or offers a picker.
+  // Region choice is a product capability that has not launched, so this stays withheld on the
+  // capability axis until it has. Recording where the data actually lives and promising the
+  // customer a say in it are different claims; only the first is true today.
   {
     id: "data-region",
     text: "Your data is held in the region you choose.",
     source: ["3.2", "15"],
     requires: ["dataRegion"],
+    requiresCapabilities: ["surface:region-choice"],
   },
   {
     id: "gdpr",

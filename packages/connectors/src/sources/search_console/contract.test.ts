@@ -81,6 +81,12 @@ describe("the contract: every row must satisfy the envelope", () => {
     // A null window means the row may always still change, so `is_provisional` is true today at any
     // fetched_at. It is still DERIVED: the day somebody measures the window and sets a number, a
     // hard-coded `true` would keep claiming the old answer for every row ever emitted.
+    //
+    // THIS TEST CANNOT CATCH THAT, AND SAYING SO IS THE POINT. Replacing the derivation with a
+    // literal `true` passes the whole suite, because with windowDays null the two agree at every
+    // fetch time there is. The mutation is unkillable from here and becomes killable the moment
+    // RESTATEMENT_CLOCKS.search_console carries a measured number -- which is exactly when a
+    // hard-coded `true` would start lying. The derivation stays because of that day, not this one.
     for (const at of ["2026-08-14T06:00:00Z", "2036-01-01T00:00:00Z"]) {
       const [row] = normalizeSearchAnalytics({
         response: DAILY_TOTALS,
@@ -279,6 +285,11 @@ describe("refusing rather than coercing", () => {
       expect(error).toBeInstanceOf(SearchConsoleNormalizeError);
       expect((error as SearchConsoleNormalizeError).code).toBe("unparseable_value");
       expect((error as Error).message).toContain("impressions");
+      // The MESSAGE is asserted, not only the code. Deleting the absent-value branch left the
+      // later finite-number check to refuse `undefined` anyway, so the row was still refused and
+      // the test still passed -- for the wrong reason, and with an error that no longer says what
+      // the caller did wrong. Mutation testing found that; this line is the fix.
+      expect((error as Error).message).toContain("reading it as zero");
     }
   });
 

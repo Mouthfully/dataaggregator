@@ -435,7 +435,13 @@ export async function* fetchOrdersPages(
     // merchant the remaining requests; the count check below decides whether it was a real end.
     if (current.orders.length === 0) break;
 
-    const fresh = current.orders;
+    const fresh = current.orders.filter((order) => {
+      const id = orderId(order);
+      if (id === null) return true;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
     unique += fresh.length;
 
     // `totalPages` and `totalOrders` are page 1's, not this page's. Reporting the header this page
@@ -545,7 +551,7 @@ async function* bisect(
   // non-negative integer that strictly decreases with every split, so it reaches zero. At zero the
   // window is one second, WooCommerce cannot express anything narrower, and splitting it would hand
   // both children the same filter and the same answer forever.
-  const divisible = before > after;
+  const divisible = before >= after;
 
   let reason = "";
   try {

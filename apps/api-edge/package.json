@@ -23,7 +23,6 @@
     "@repo/extract": "workspace:*",
     "@repo/oauth": "workspace:*",
     "@repo/payloads": "workspace:*",
-    "@repo/store": "workspace:*",
     "@repo/vault": "workspace:*",
     "@repo/webhooks": "workspace:*"
   }

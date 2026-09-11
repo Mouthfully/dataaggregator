@@ -40,34 +40,6 @@ declare namespace Cloudflare {
      * where the real requirement is enforced.
      */
     readonly WEBHOOK_SIGNING_KEY?: string;
-
-    /**
-     * THE THREE BINDINGS `/v1/performance` READS FROM (`39-store-adapter.md`).
-     *
-     * All three are OPTIONAL IN THE TYPE for the same reason `WEBHOOK_SIGNING_KEY` is: they are
-     * supplied per deployment rather than committed, so they are absent in local development and in
-     * every test, and a required type would force each of those to invent a value. The requirement
-     * is enforced where it belongs -- the route answers 503 NAMING THE MISSING BINDING rather than
-     * failing somewhere further in with a null.
-     *
-     * `SUPABASE_URL` and `SUPABASE_ANON_KEY` are vars, not secrets: the publishable key ships in
-     * browsers by design, and after `20260911000100_anon_has_nothing.sql` it reaches no row in
-     * `public` at all. They are not committed anyway, because a project ref in `wrangler.jsonc`
-     * would be a guess about which project a deployment talks to -- the same mistake
-     * `supabase/config.toml` refuses to make about `site_url`.
-     */
-    readonly SUPABASE_URL?: string;
-    readonly SUPABASE_ANON_KEY?: string;
-    /**
-     * HS256 signing material for the short-lived workspace token the Worker mints after verifying
-     * an API key (`20260908000800_api_key_verification.sql`).
-     *
-     * A WORKER SECRET. `wrangler secret put SUPABASE_JWT_SECRET`, never a `var`, never in
-     * `wrangler.jsonc`, never in a fixture. It is the one binding here that is worth stealing:
-     * anything that can mint tokens can mint one for any workspace, which is the residual risk the
-     * migration states plainly and bounds with a one-minute TTL.
-     */
-    readonly SUPABASE_JWT_SECRET?: string;
   }
 }
 

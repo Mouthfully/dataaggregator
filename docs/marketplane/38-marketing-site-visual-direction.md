@@ -1,14 +1,20 @@
-# 35. Two reference sites, and the half of each we can actually use
+# 38. Two reference sites, and the half of each we can actually use
 
-**PR:** #TBD &nbsp;·&nbsp; **Date:** 2026-09-11 &nbsp;·&nbsp; **Status:** proposed — **direction only, no code, no artboard**
+**PR:** #15 &nbsp;·&nbsp; **Date:** 2026-09-11 &nbsp;·&nbsp; **Status:** proposed — **direction only, no code, no artboard**
 
 ---
 
 ## 0. Numbering
 
-**Numbered 35.** `34-woocommerce-client.md` is the last note on `main` and nothing is in flight, so
-35 is free. This note is a *direction*, not a shipped unit: it is the first note in the sequence
-that describes work not yet done, and it says so rather than pretending to be retrospective.
+**Numbered 38.** This note was written as 35 while `34-woocommerce-client.md` was the last on
+`main`. Three notes landed while it sat open — 35 (the capability gate), 36 (the JWT claim forms and
+the paging cap) and 37 (the first real Supabase project) — so it was renumbered to 38 on the merge
+that brought `main` in. The renumber is mechanical; §4 and §5 below are not, because two of the
+things this note filed as open were fixed by those three notes, and the corrections are marked
+inline rather than quietly deleted.
+
+This note is a *direction*, not a shipped unit: it is the first note in the sequence that describes
+work not yet done, and it says so rather than pretending to be retrospective.
 
 ## 1. What this is, and the decision taken
 
@@ -102,26 +108,36 @@ exists in the layout and renders nothing until the fact behind it exists.
 11. Security and data — withheld claims stay withheld; the strip renders short.
 12. Footer — legal entity, registration and support address, from the brand file.
 
-**Four of those twelve — 2, 3, 6 and 9 — are where issue #6 bites**, and item 3 is the one it
-would be easiest to miss. `31-owner-first-client.md` §4 gate 18 lists *"the whole after-fees
+**Four of those twelve — 2, 3, 6 and 9 — are where issue #6 bit**, and item 3 is the one it would
+be easiest to miss. **Issue #6 has since been fixed** (#14, note 35): `allowedClaims()` now gates on
+a second axis, `requiresCapabilities`, which is absent by default, so a claim describing an unbuilt
+surface is withheld rather than rendered. The four items below are therefore governed rather than
+merely flagged — but read the paragraph after them, because the gate governs *claims* and a page
+can still assert something in its JSX that never passes through `claim()`. `31-owner-first-client.md` §4 gate 18 lists *"the whole after-fees
 number"* among the surfaces that are depicted but not built: *"a mockup may draw an unbuilt
 surface; a claim may not assert one."* Putting that figure at the top of a public page, as the one
 number the page is about, is exactly the assertion that note refused. Item 2's device and item 3's
 headline number are the same fact twice, so both are inside the capability gate's scope, not just
-the sections that obviously list capabilities. The claims list governs *whether a sentence may be
-said*, never *whether the thing it describes has been built*; this direction does not fix that, and
-the next change to this page should not ship without it.
+the sections that obviously list capabilities. What the gate does **not** do is notice a promise
+typed directly into the JSX: `claim()` and `optionalClaim()` throw only for ids passed to them, and
+nothing detects a new inline sentence. That remains a requirement on whoever rebuilds this page.
 
-**A second defect sits underneath issue #6 and survives fixing it.** The `connectors` claim reads
-*"Reads Google Ads, GA4, Search Console, Meta and your affiliate network on your own credentials"*
-and cites `["9", "11.9"]` — but §11A.14 **overrides 11.9 on first connectors**, substituting GA4,
-WooCommerce, Shopify and a partner-named payments source and moving Google Ads, Search Console and
-Meta behind the fifth-connector gate. So the claim is provenance-valid and *superseded*: a
-capability gate alone would still let the page advertise the abandoned roadmap, because every
-source it names would eventually be built. Fixing the sentence is a change to `claims.ts` and to
-the dependent assertion in `page.test.tsx`, which is code, not this note — recorded here and filed
-rather than widened into this PR: issue
-[#16](https://github.com/Mouthfully/dataaggregator/issues/16).
+**A second defect sat underneath issue #6, and it was fixed too.** When this note was written the
+`connectors` claim read *"Reads Google Ads, GA4, Search Console, Meta and your affiliate network on
+your own credentials"* and cited `["9", "11.9"]` — but §11A.14 **overrides 11.9 on first
+connectors**, so the claim was provenance-valid and *superseded*, advertising an abandoned roadmap
+that a capability gate alone would not have caught, because every source it named would eventually
+be built. Filed as [#16](https://github.com/Mouthfully/dataaggregator/issues/16); fixed by #14,
+which did better than the one-string correction the issue proposed. The sentence is now **composed**
+from `IMPLEMENTED_SOURCE_IDS`, cites `["11A.14"]`, and `scripts/check-capabilities.mjs` fails the
+build if that list drifts from the connector directories holding both a `client.ts` and a
+`normalize.ts`. It reads *"Reads GA4 and WooCommerce on your own credentials."*
+
+**The generalisation #16 raised is still open, and this note still wants it.** Every claim cites
+specification sections; the changelog records which sections override which; nothing cross-checks
+the two. `connectors` was caught because someone read it. A guard that failed the build when a claim
+cites an overridden section would catch the class — and this page, which is mostly claims, is
+exactly where the next instance would surface.
 
 ## 4. What this would cost to build, and what it would touch
 
@@ -236,9 +252,10 @@ one. So the rule for the rebuild is a requirement rather than an observation: **
 claim-shaped sentence in a new section resolves through `claim()`**, and structural words stay
 structural. Anything stronger needs a check that does not exist today.
 
-**But the note does not close issue #6 and must not be read as doing so.** The capability gate is
-still missing, `connectors` still names five sources against a tree holding two, and §3's slots are
-a convention rather than a mechanism. The next change to this page is where that gets built.
+**What this note does not close, restated after the fixes.** Issue #6 is closed and `connectors`
+now names what exists — but neither was closed by this note, and one gap it identified is untouched:
+§3's slots are a convention rather than a mechanism, and no check detects a promise typed straight
+into the JSX. The next change to this page is where that gets built.
 
 **Result:** `5 PASS, 13 N/A, 0 FAIL`
 
@@ -251,8 +268,10 @@ a convention rather than a mechanism. The next change to this page is where that
   prose is the wrong order of operations. `Brief.dc.html` is the precedent.
 - **A motion specification.** Named as a constraint (`prefers-reduced-motion`, no
   motion-only facts) rather than designed.
-- **The capability gate of issue #6.** Named twice, deliberately not attempted, for the same reason
-  `20-marketing-site.md` gave: it belongs with the code change to this page.
+- **The capability gate of issue #6, and the `connectors` citation of #16.** Both named here,
+  deliberately not attempted, for the reason `20-marketing-site.md` gave: they belong with the code
+  change to this page. Both shipped separately in #14 while this note sat open, which is the
+  outcome the split was for.
 - **Signup, analytics, lead capture, a competitor comparison page.** Each is a separate privacy or
   legal decision; none is needed to settle a visual direction.
 
@@ -269,13 +288,13 @@ a convention rather than a mechanism. The next change to this page is where that
   all. §3 takes detrics' table *shape*, which survives either answer; the rows do not.
 - **MCP as a delivery surface is addressed by no reviewed platform policy.** That is why the
   destination-card pattern is refused rather than adapted.
-- **Whether a claims list can be trusted without a capability gate** — issue #6, unchanged and
-  still the sharpest open item on this page.
-- **§11A.14 supersedes §11.9's connector set, and the `connectors` claim still cites §11.9** —
-  issue [#16](https://github.com/Mouthfully/dataaggregator/issues/16), raised by this note and
-  fixed elsewhere. If the sentence is rewritten before the rebuild, section 6 of §3's order names
-  the new set; if not, the rebuild inherits a sentence advertising an abandoned roadmap. Either way
-  the layout is unaffected, which is the whole value of resolving copy by identifier.
+- **Whether a claims list can be trusted without a capability gate** — issue #6, now answered: it
+  cannot, and the gate exists. What replaces it as the sharpest open item is narrower and still
+  unbuilt: nothing detects a promise written directly into the JSX, bypassing `claim()` entirely.
+- **§11A.14 supersedes §11.9's connector set.** The `connectors` claim cited §11.9 when this note
+  was written; it now cites §11A.14 and composes its text from the implemented source list (#14).
+  The general problem #16 raised is untouched: nothing cross-checks a claim's citations against the
+  changelog's record of which sections were overridden.
 
 ## 10. Verification
 

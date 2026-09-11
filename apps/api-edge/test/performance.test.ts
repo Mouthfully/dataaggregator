@@ -1,3 +1,6 @@
+// Vite resolves `?raw` to the file's text at build time. It is the only way this test can see
+// config.toml: it runs inside workerd, where there is no filesystem.
+import supabaseConfig from "../../../supabase/config.toml?raw";
 import { envelopeSchema } from "@repo/contract";
 import { describe, expect, it } from "vitest";
 import {
@@ -341,5 +344,46 @@ describe("the refusal, at the last place a customer can see it", () => {
       { ...CTX, auth: ok, store: store([row({ metrics: { sessions: 1, bounce_rate: 0.4 } })]) },
     );
     expect(response.status).toBe(500);
+  });
+});
+
+describe("the paging limit and PostgREST's row cap, which live in different files", () => {
+  /**
+   * Issue #9, defect 2. `MAX_LIMIT` is a TypeScript constant in this Worker; `max_rows` is a
+   * PostgREST setting in supabase/config.toml. Nothing in the build relates them, and when they
+   * are equal a `limit + 1` next-page probe at the maximum limit asks for one more row than
+   * PostgREST will ever return -- so the probe sees no extra row, `next_cursor` stays null, and a
+   * caller paging at the maximum is told it has everything after one page.
+   *
+   * There is no store adapter yet, so this is a trap rather than a live bug, and it is laid for
+   * exactly the person who writes that adapter. Asserting the relationship is what makes the trap
+   * spring at build time instead of looking like "pagination doesn't work at high limits".
+   */
+  function maxRows(): number {
+    // config.toml's [api] table is the only place `max_rows` appears; match it at line start so a
+    // commented-out or nested occurrence cannot satisfy this.
+    const match = supabaseConfig.match(/^max_rows\s*=\s*(\d+)\s*$/m);
+    if (match === null) {
+      throw new Error("supabase/config.toml no longer declares max_rows; this guard is blind");
+    }
+    return Number(match[1]);
+  }
+
+  it("finds max_rows in config.toml at all", () => {
+    expect(maxRows()).toBeGreaterThan(0);
+  });
+
+  it("leaves room for a limit + 1 next-page probe at the maximum limit", () => {
+    expect(MAX_LIMIT + 1).toBeLessThanOrEqual(maxRows());
+  });
+
+  it("still accepts the maximum limit it advertises", () => {
+    const query = parseQuery(
+      new URL(
+        `https://api.test/v1/performance?source=ga4&from=2026-08-01&to=2026-08-07&limit=${MAX_LIMIT}`,
+      ),
+      WORKSPACE,
+    );
+    expect(query.limit).toBe(MAX_LIMIT);
   });
 });

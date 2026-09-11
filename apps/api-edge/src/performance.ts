@@ -34,8 +34,22 @@ import { type EnvelopeRow, type Source, envelopeRowSchema, SOURCES } from "@repo
 
 /** The longest range one request may ask for. */
 export const MAX_RANGE_DAYS = 400;
-/** Rows per response. A caller wanting more pages; a caller wanting all of it uses an export. */
-export const MAX_LIMIT = 1000;
+/**
+ * Rows per response. A caller wanting more pages; a caller wanting all of it uses an export.
+ *
+ * 999, NOT 1000, AND THE MISSING ONE IS LOAD-BEARING. PostgREST caps every response at
+ * `max_rows` in supabase/config.toml, which is 1000. The ordinary way to answer "is there another
+ * page?" is to ask for `limit + 1` rows and look for the extra one. At a limit of 1000 that asks
+ * PostgREST for 1001, PostgREST silently returns 1000, the probe never sees its extra row, and
+ * `nextCursor` is always null -- so a caller paging at the maximum limit stops after one page and
+ * is told, with `ok: true`, that it has everything.
+ *
+ * Leaving room for the probe costs one row and removes the collision. `test/performance.test.ts`
+ * reads `max_rows` out of config.toml and fails if the two ever meet again: they live in different
+ * files in different languages, nothing else relates them, and the symptom -- "pagination doesn't
+ * work at high limits" -- does not look like a configuration collision to whoever hits it.
+ */
+export const MAX_LIMIT = 999;
 export const DEFAULT_LIMIT = 100;
 
 export interface PerformanceQuery {

@@ -123,10 +123,23 @@ describe("the claims gate", () => {
   });
 
   it("derives the connector claim from the guarded implemented-source list", () => {
-    expect(IMPLEMENTED_SOURCE_IDS).toEqual(["ga4", "woocommerce"]);
+    // Five sources now, and the negative assertion had to change with them -- which is the point
+    // of this test rather than an inconvenience. It used to prove the sentence could NOT say
+    // "Google Ads" or "Search Console", because neither existed and saying so would have been the
+    // abandoned-roadmap claim of issue #16. They exist, so the sentence names them. What must stay
+    // unsayable is a source with no module behind it.
+    expect(IMPLEMENTED_SOURCE_IDS).toEqual([
+      "ga4",
+      "google_ads",
+      "meta_ads",
+      "search_console",
+      "woocommerce",
+    ]);
     const connectors = allowedClaims().find((claim) => claim.id === "connectors");
-    expect(connectors?.text).toBe("Reads GA4 and WooCommerce on your own credentials.");
-    expect(connectors?.text).not.toMatch(/Google Ads|Search Console|Meta|affiliate/i);
+    expect(connectors?.text).toBe(
+      "Reads GA4, Google Ads, Meta Ads, Search Console and WooCommerce on your own credentials.",
+    );
+    expect(connectors?.text).not.toMatch(/affiliate|Shopify|TikTok|DataForSEO|Impact|Awin/i);
   });
 
   // §11A.1 moved the primary customer from agencies and brands to an owner-run business with no

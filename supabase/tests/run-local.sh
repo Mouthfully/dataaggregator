@@ -49,3 +49,9 @@ psql -d "$DB" -q -f "$HERE/04_restatement_events.sql"
 
 echo "==> webhook delivery suite"
 psql -d "$DB" -q -f "$HERE/05_webhook_delivery.sql"
+
+echo "==> jwt claims suite"
+psql -d "$DB" -q -f "$HERE/06_jwt_claims.sql"
+
+echo "==> anon grants suite"
+psql -d "$DB" -q -f "$HERE/07_anon_grants.sql"

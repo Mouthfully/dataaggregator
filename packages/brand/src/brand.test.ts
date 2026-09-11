@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { apiUrl, brand, formatAddress, siteUrl } from "./brand.ts";
-import { CLAIMS, FORBIDDEN_CLAIMS, allowedClaims, withheldClaims } from "./claims.ts";
+import {
+  AVAILABLE_CAPABILITIES,
+  CLAIMS,
+  FORBIDDEN_CLAIMS,
+  IMPLEMENTED_SOURCE_IDS,
+  allowedClaims,
+  withheldClaims,
+  type Capability,
+} from "./claims.ts";
 
 describe("the brand file", () => {
   it("has every field a page, email or invoice needs to render", () => {
@@ -18,12 +26,19 @@ describe("the brand file", () => {
     // would be worse than a null: null withholds a claim, a placeholder ships a false one.
     expect(brand.domain).toBeNull(); // support is on one domain, the artboard hard-codes another
     expect(brand.vatNumber).toBeNull(); // not supplied; a wrong VAT number is worse than none
-    expect(brand.dataRegion).toBeNull(); // no project provisioned yet
+    // ap-southeast-1: a project IS now provisioned, in the nearest Supabase region to Thailand.
+    // The `data-region` claim stays withheld anyway -- see the capability test below.
+    expect(brand.dataRegion).toBe("ap-southeast-1");
     expect(brand.euRepresentative).toBeNull(); // GDPR Art. 27, not yet appointed
   });
 
-  it("does not treat the product name as settled", () => {
-    expect(brand.productNameSettled).toBe(false);
+  it("treats the product name as settled, and it is the one the brand file holds", () => {
+    // §12 only RECOMMENDED a name; this one is the founder's. What matters for the repository is
+    // unchanged: the string lives in exactly one file, and `scripts/check-brand.mjs` both bans it
+    // everywhere else and match-tests the infrastructure files that must carry it.
+    expect(brand.productNameSettled).toBe(true);
+    expect(brand.productName).toBe("numbadee");
+    expect(brand.productName.trim()).toBe(brand.productName);
   });
 });
 
@@ -51,6 +66,69 @@ describe("the claims gate", () => {
     expect(allowed).toContain("attribution-required");
   });
 
+  it("withholds every claim whose product capability has not launched", () => {
+    const allowed = allowedClaims().map((c) => c.id);
+    for (const id of [
+      "positioning",
+      "byoc",
+      "audit-log",
+      "diagnose",
+      "second-pass",
+      "verified-alerts",
+      "reconcile",
+      "ai-confidence",
+      "cost-preview",
+      "serp-bought",
+      "pricing-two-units",
+      "billing-fairness",
+      "agency-mode",
+    ]) {
+      expect(allowed, `${id} describes an unlaunched capability`).not.toContain(id);
+    }
+  });
+
+  it("turns on a capability-gated claim only when every requirement is present", () => {
+    const withDiagnose = new Set<Capability>([...AVAILABLE_CAPABILITIES, "surface:diagnose"]);
+    const allowed = allowedClaims(brand, withDiagnose).map((c) => c.id);
+    expect(allowed).toContain("diagnose");
+    expect(allowed).toContain("second-pass");
+    expect(allowed).not.toContain("reconcile");
+    expect(allowed).not.toContain("pricing-two-units");
+
+    const withPartialBilling = new Set<Capability>([
+      ...AVAILABLE_CAPABILITIES,
+      "billing:connected-account",
+    ]);
+    expect(allowedClaims(brand, withPartialBilling).map((c) => c.id)).not.toContain(
+      "pricing-two-units",
+    );
+  });
+
+  it("records a data region without promising the customer chose it", () => {
+    // The brand-fact gate is now satisfied -- dataRegion is set -- so this claim would render on
+    // that axis alone. It must not: "the region you choose" describes a choice nobody is offered.
+    // `organisations.data_region` is a column with no picker behind it and nothing that populates
+    // it. Withheld on the capability axis until region choice actually ships.
+    expect(brand.dataRegion).not.toBeNull();
+
+    const withheld = withheldClaims().find((entry) => entry.claim.id === "data-region");
+    expect(
+      withheld,
+      "data-region must stay withheld while region choice does not exist",
+    ).toBeDefined();
+    expect(withheld?.missing).toEqual([]);
+    expect(withheld?.missingCapabilities).toContain("surface:region-choice");
+
+    expect(allowedClaims().map((c) => c.id)).not.toContain("data-region");
+  });
+
+  it("derives the connector claim from the guarded implemented-source list", () => {
+    expect(IMPLEMENTED_SOURCE_IDS).toEqual(["ga4", "woocommerce"]);
+    const connectors = allowedClaims().find((claim) => claim.id === "connectors");
+    expect(connectors?.text).toBe("Reads GA4 and WooCommerce on your own credentials.");
+    expect(connectors?.text).not.toMatch(/Google Ads|Search Console|Meta|affiliate/i);
+  });
+
   // §11A.1 moved the primary customer from agencies and brands to an owner-run business with no
   // analyst and no IT function, and recorded in the specification that the claim contradicting it
   // could not be changed in the same pass. It sat contradicted for four rounds. This is the pin
@@ -76,13 +154,13 @@ describe("the claims gate", () => {
     expect(positioning?.text).not.toMatch(/\bagenc(y|ies)\b|\bbrands\b/i);
   });
 
-  it("names the field that would turn each withheld claim on", () => {
+  it("names the field or capability that would turn each withheld claim on", () => {
     const withheld = withheldClaims();
     expect(withheld.length).toBeGreaterThan(0);
-    for (const { claim, missing } of withheld) {
+    for (const { claim, missing, missingCapabilities } of withheld) {
       expect(
-        missing.length,
-        `"${claim.id}" is withheld but names no missing field`,
+        missing.length + missingCapabilities.length,
+        `"${claim.id}" is withheld but names no missing requirement`,
       ).toBeGreaterThan(0);
     }
   });

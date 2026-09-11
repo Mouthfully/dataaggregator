@@ -13,9 +13,14 @@ export {
   type PostalAddress,
 } from "./brand.ts";
 export {
+  AVAILABLE_CAPABILITIES,
   CLAIMS,
   FORBIDDEN_CLAIMS,
+  IMPLEMENTED_SOURCE_IDS,
   allowedClaims,
   withheldClaims,
+  type Capability,
   type Claim,
+  type ImplementedSourceId,
+  type WithheldClaim,
 } from "./claims.ts";

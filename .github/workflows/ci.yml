@@ -1,12 +1,12 @@
 # The repository's own gate. Everything the kickoff requires before a push -- lint, typecheck,
-# unit tests, build -- plus the two repository guards.
+# unit tests, build -- plus the repository guards.
 #
 # CI verifies; the platforms deploy. Vercel's Git integration builds apps/web and Cloudflare
 # Workers Builds builds each Worker from its own root directory, so there is no deploy job here.
 #
-# BOTH GUARDS ENFORCE. They are the reason the two single-source non-negotiables are properties
-# of the repository rather than promises in a document, so they fail the build like any other
-# check. Each has a documented escape hatch for the cases where a literal is the point:
+# ALL GUARDS ENFORCE. They make the repository's single-source and cross-package invariants
+# executable rather than promises in a document, so they fail the build like any other check.
+# The brand and token guards have documented escape hatches for cases where a literal is the point:
 # `brand-guard-ignore:` and `tokens-guard-ignore:`, on the offending line or the one above it.
 # Reach for the hatch with a reason, never by widening an exempt list.
 
@@ -88,7 +88,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: node scripts/check-tokens.mjs
 
-      # The third guard. The canonical vocabulary exists twice -- packages/contract as TypeScript,
+      # Brand is intentionally a leaf, so it cannot import connectors to build its source claim.
+      # This guard keeps the claim's source mirror equal to directories with a client + normaliser.
+      - name: Capability guard
+        if: ${{ !cancelled() }}
+        run: node scripts/check-capabilities.mjs
+
+      # The dictionary guard. The canonical vocabulary exists twice -- packages/contract as TypeScript,
       # the schema as PostgreSQL enums -- and neither can import the other, so drift between them
       # is invisible until a customer's number goes missing rather than a build going red.
       - name: Dictionary guard

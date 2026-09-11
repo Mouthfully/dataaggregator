@@ -7,28 +7,43 @@
  * site physically unable to say anything else.
  *
  * `claim(id)` resolves text from `allowedClaims()` and THROWS when the id is unknown or withheld.
- * That is deliberate: a withheld claim -- one whose `requires` fields are still null on the brand
- * file -- is not rendered as an empty string or quietly skipped. It fails the build.
+ * That remains the build-time boundary. `optionalClaim(id)` is the page boundary: it returns null
+ * for a known claim withheld by a brand fact or capability, while still throwing on an unknown id.
  *
- * Three claims are withheld today, and it matters that the site cannot reach them:
+ * Brand facts withhold two claims today, and a capability withholds a third:
  *
- *   data-region   requires brand.dataRegion   -- not chosen
  *   gdpr          requires brand.euRepresentative -- the entity is Thai and no Article 27
  *                 representative is appointed
  *   dpa           requires brand.dpaAvailable -- no click-through Article 28 DPA exists
+ *   data-region   brand.dataRegion IS set (ap-southeast-1), so the fact gate passes. It is held
+ *                 back on the capability axis instead: the sentence promises "the region you
+ *                 choose" and there is one region, chosen for the customer. See claims.ts.
  *
  * Each is a promise a European buyer would rely on. `00-repo-map.md` section 7 lists exactly these
  * under "Delete or substantiate", and the artboard made all three.
  *
- * THE PRODUCT NAME IS NOT SETTLED, so it appears nowhere. `brand.productNameSettled` is false, and
- * a name printed across a marketing site is expensive to take back -- so the site leads with the
- * tagline and the positioning claim, both of which are true regardless of what the thing ends up
- * being called. `productName()` returns null until that changes.
+ * THE PRODUCT NAME IS NOW SETTLED, and the machinery around it did not change. `productName()`
+ * still reads `brand.productNameSettled` and still returns null when it is false, so the gate that
+ * kept the name off the page is intact rather than removed -- a name can be un-settled again by
+ * flipping one boolean. The site leads with the tagline regardless, which was never contingent on
+ * what the thing is called.
  */
 
-import { type Claim, allowedClaims, brand } from "@repo/brand";
+import { CLAIMS, type Claim, allowedClaims, brand } from "@repo/brand";
 
 const ALLOWED = new Map(allowedClaims().map((c: Claim) => [c.id, c]));
+const DECLARED = new Map(CLAIMS.map((c: Claim) => [c.id, c]));
+
+function declaredClaim(id: string): Claim {
+  const found = DECLARED.get(id);
+  if (found === undefined) {
+    throw new Error(
+      `copy: "${id}" does not exist in @repo/brand. Add the claim with its specification ` +
+        "citation -- do not write a fallback sentence here.",
+    );
+  }
+  return found;
+}
 
 /**
  * The text of an allowed claim.
@@ -37,19 +52,25 @@ const ALLOWED = new Map(allowedClaims().map((c: Claim) => [c.id, c]));
  * nobody approved, and a build failure is how it does not.
  */
 export function claim(id: string): string {
+  declaredClaim(id);
   const found = ALLOWED.get(id);
   if (found === undefined) {
     throw new Error(
-      `copy: "${id}" is not an allowed claim. Either it does not exist in @repo/brand, or it is ` +
-        "withheld because a brand field it requires is still null. Add the claim with its " +
-        "specification citation, or fill in the field -- do not write the sentence here.",
+      `copy: "${id}" is withheld because a brand fact or product capability it requires is ` +
+        "missing. Satisfy the declared requirement -- do not write a fallback sentence here.",
     );
   }
   return found.text;
 }
 
-/** The claims this page is built from, in the order it uses them. Exported so a test can check. */
-export const USED_CLAIMS = [
+/** A known claim's text when publishable, or null when a declared requirement withholds it. */
+export function optionalClaim(id: string): string | null {
+  declaredClaim(id);
+  return ALLOWED.get(id)?.text ?? null;
+}
+
+/** Every claim the page may use, including known claims that are currently withheld. */
+export const PAGE_CLAIMS = [
   "tagline",
   "positioning",
   "connectors",
@@ -74,6 +95,9 @@ export const USED_CLAIMS = [
   "pricing-two-units",
   "billing-fairness",
 ] as const;
+
+/** Claims that survive both gates and therefore must occur in the rendered page. */
+export const USED_CLAIMS = PAGE_CLAIMS.filter((id) => ALLOWED.has(id));
 
 /**
  * The product's name, or null while it is unsettled.

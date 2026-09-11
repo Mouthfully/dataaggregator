@@ -20,13 +20,38 @@
 -- `search_path` -- without it a caller can create a shadowing `public.members` and capture the
 -- function's privileges.
 
+-- BOTH CLAIM GUCS ARE READ, AND THE ORDER IS NOT ARBITRARY.
+--
+-- PostgREST before version 9 exposed each JWT claim as its own GUC -- `request.jwt.claim.sub`.
+-- Current PostgREST exposes the claims as one JSON object in `request.jwt.claims`, and Supabase's
+-- own documentation is internally inconsistent about which of the two a project actually sets.
+-- That inconsistency is precisely why Supabase's shipped `auth.uid()` coalesces over both rather
+-- than trusting either, and these functions now do the same thing for the same reason.
+--
+-- THE FAILURE THIS PREVENTS IS SILENT. Every RLS policy in 20260908000700_rls.sql is built on
+-- these two functions. If the only form a project sets is the one a function does not read, the
+-- function returns NULL, every predicate evaluates false, and every authenticated read returns
+-- ZERO ROWS -- not an error a customer can report, an empty result they mistake for lost data.
+-- Reading both forms makes the helpers correct on either PostgREST without knowing which is live.
+--
+-- The singular GUC is read FIRST so that the shape the RLS suite has always exercised keeps
+-- winning where both are present; `06_jwt_claims.sql` pins that precedence, and pins the JSON
+-- path the suite could not previously reach.
+--
+-- A malformed `request.jwt.claims` raises on the ::jsonb cast rather than resolving to NULL. That
+-- is deliberate and matches `auth.uid()`: a claims object PostgREST could not build is a broken
+-- session, and an error names it where a null would re-create the silent denial above.
+
 -- The human behind the request, or null for an API-key session.
 create or replace function app.current_user_id()
 returns uuid
 language sql
 stable
 as $$
-  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
+  select coalesce(
+    nullif(current_setting('request.jwt.claim.sub', true), ''),
+    nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'
+  )::uuid;
 $$;
 
 -- The workspace an API-key session is bound to, or null for a human session.
@@ -39,7 +64,10 @@ returns uuid
 language sql
 stable
 as $$
-  select nullif(current_setting('request.jwt.claim.workspace_id', true), '')::uuid;
+  select coalesce(
+    nullif(current_setting('request.jwt.claim.workspace_id', true), ''),
+    nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'workspace_id'
+  )::uuid;
 $$;
 
 -- The caller's role in an organisation, or null if they are not a member.

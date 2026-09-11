@@ -1,7 +1,7 @@
 import { CLAIMS, FORBIDDEN_CLAIMS, allowedClaims, brand, withheldClaims } from "@repo/brand";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { USED_CLAIMS, claim, productName } from "./_content";
+import { PAGE_CLAIMS, USED_CLAIMS, claim, optionalClaim, productName } from "./_content";
 import Page from "./page";
 
 /**
@@ -77,7 +77,8 @@ describe("the three claims a European buyer would rely on, and why none of them 
   });
 
   it("throws on a claim that does not exist at all, rather than rendering nothing", () => {
-    expect(() => claim("we-are-soc2-certified")).toThrow(/not an allowed claim/);
+    expect(() => claim("we-are-soc2-certified")).toThrow(/does not exist/);
+    expect(() => optionalClaim("we-are-soc2-certified")).toThrow(/does not exist/);
   });
 
   it("says nothing about hosting region, GDPR or a DPA in the footer either", () => {
@@ -85,6 +86,40 @@ describe("the three claims a European buyer would rely on, and why none of them 
     for (const word of ["gdpr", "data protection agreement", "frankfurt", "eu region"]) {
       expect(lower).not.toContain(word);
     }
+  });
+});
+
+describe("capabilities that have not launched", () => {
+  const withheld = new Map(withheldClaims().map((entry) => [entry.claim.id, entry]));
+  const unavailablePageClaims = [
+    "positioning",
+    "byoc",
+    "audit-log",
+    "diagnose",
+    "second-pass",
+    "verified-alerts",
+    "reconcile",
+    "agency-mode",
+    "serp-bought",
+    "pricing-two-units",
+    "billing-fairness",
+  ];
+
+  it.each(unavailablePageClaims)("withholds and omits %s", (id) => {
+    const entry = withheld.get(id);
+    expect(entry?.missingCapabilities.length, `${id} has no missing capability`).toBeGreaterThan(0);
+    expect(optionalClaim(id)).toBeNull();
+    expect(() => claim(id)).toThrow(/withheld/);
+    expect(text).not.toContain(entry?.claim.text);
+  });
+
+  it("renders only the source connector that exists instead of the planned launch set", () => {
+    expect(text).toContain("Reads GA4 and WooCommerce on your own credentials.");
+    expect(text).not.toMatch(/Google Ads|Search Console|Meta|affiliate network/i);
+  });
+
+  it("omits a whole section when every claim in it is withheld", () => {
+    expect(text).not.toContain("How it is priced");
   });
 });
 
@@ -108,6 +143,17 @@ describe("every promise on the page comes from the claims list", () => {
     expect(unrendered).toEqual([]);
   });
 
+  it("declares every known withheld page claim without rendering fallback copy", () => {
+    const withheldIds = new Set(withheldClaims().map((entry) => entry.claim.id));
+    const omitted = PAGE_CLAIMS.filter((id) => withheldIds.has(id));
+    expect(omitted.length).toBeGreaterThan(0);
+    for (const id of omitted) {
+      const declared = CLAIMS.find((candidate) => candidate.id === id);
+      expect(declared).toBeDefined();
+      expect(text).not.toContain(declared?.text);
+    }
+  });
+
   it("cites a specification section for every claim it renders", () => {
     // Rule 1 of the claims module: "a claim with no citation is not a claim, it is copywriting."
     const allowed = new Map(allowedClaims().map((c) => [c.id, c]));
@@ -117,17 +163,19 @@ describe("every promise on the page comes from the claims list", () => {
   });
 });
 
-describe("the unsettled product name", () => {
-  it("is not printed anywhere, because it is not settled", () => {
-    // A name on a marketing site is the most expensive place to put an unsettled one. The brand
-    // guard already bans it in source; this asserts the RENDERED page too, which is what a
-    // customer and a search engine actually see.
-    expect(brand.productNameSettled).toBe(false);
-    expect(productName()).toBeNull();
-    expect(text).not.toContain(brand.productName);
+describe("the settled product name", () => {
+  it("is printed, and it is the brand file's string rather than a copy of it", () => {
+    // This assertion used to say the opposite, and the reason it flipped is a founder decision
+    // rather than a code change: §12 recommended a name, and one was chosen. What it asserts is
+    // the same property either way -- the page shows what the brand file holds and never a literal
+    // typed here. `scripts/check-brand.mjs` bans the string everywhere outside that one file, so a
+    // hardcoded copy fails the build rather than this test.
+    expect(brand.productNameSettled).toBe(true);
+    expect(productName()).toBe(brand.productName);
+    expect(text).toContain(brand.productName);
   });
 
-  it("leads with the tagline instead, which is true whatever it ends up being called", () => {
+  it("still leads with the tagline, which was never contingent on the name", () => {
     expect(text).toContain("Know what changed. And why.");
   });
 });

@@ -78,8 +78,8 @@ export interface Brand {
 export const brand: Brand = {
   legalEntity: "Now On Company Limited",
 
-  productName: "Marketplane",
-  productNameSettled: false,
+  productName: "numbadee",
+  productNameSettled: true,
   tagline: "Know what changed. And why.",
 
   domain: null,
@@ -109,7 +109,11 @@ export const brand: Brand = {
   defaultLocale: "en",
   defaultCurrency: "EUR",
 
-  dataRegion: null,
+  // ap-southeast-1 (Singapore). The nearest Supabase region to Thailand and the one the schema's
+  // own `organisations.data_region` CHECK already allows. Recording it does NOT publish the
+  // `data-region` claim: that claim says "the region you choose", and there is one region, chosen
+  // here. It stays withheld behind `surface:region-choice` until a customer can actually choose.
+  dataRegion: "ap-southeast-1",
   euRepresentative: null,
   dpaAvailable: false,
 };

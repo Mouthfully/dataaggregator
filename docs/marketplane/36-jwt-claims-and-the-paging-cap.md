@@ -19,6 +19,8 @@ helpers do not read, both return `NULL`, every predicate evaluates false, and **
 read returns zero rows** — not an error, an empty result a customer mistakes for lost data.
 
 **The decision was to coalesce over both forms rather than to pick one and be right by luck.**
+This has since been measured against a real project, and the JSON form is the only one PostgREST
+sets there — see §5 — so the pre-fix helpers were total denial in fact and not only in principle.
 Supabase's own documentation contradicts itself on which form a project sets — the Realtime
 Authorization page demonstrates `request.jwt.claims`, the RAG with Permissions page still describes
 `auth.uid()` as reading `request.jwt.claim.sub` — and that contradiction is precisely why Supabase's
@@ -154,10 +156,8 @@ any claim, and the capability gate added in #14 is untouched.
 - **Keyset paging.** The better fix for defect 2 and explicitly deferred, per §1: the adapter that
   would implement it does not exist, and designing a cursor against an unmeasured PostgREST is the
   kind of premature decision the `PerformanceStore` port exists to avoid.
-- **Settling which GUC form this product's project actually sets.** It still needs one query against
-  a live project, and there is no project. The coalesce is what makes the answer non-load-bearing;
-  it is not a substitute for observing it. Issue #9 should stay open until it is observed, and this
-  PR does not close it.
+- **Closing #9.** The GUC question is now observed (§5) and this PR fixes both defects, so #9 closes
+  when this merges. Its remaining value is the record of the measurement, not open work.
 - **The same `rollback`-discards-its-own-assertions hazard in `01_rls_isolation.sql`.** Its final
   block asserts two things about soft deletion and then rolls them away, so the suite's reported
   total is two lower than the assertions it wrote. It is real, it is not this PR's, and fixing it
@@ -176,10 +176,16 @@ any claim, and the capability gate added in #14 is untouched.
 
 ## 5. Open or unverified spec items this builds on
 
-- **Which JWT claim form a live Supabase project sets is unobserved, and deliberately so.** If it
-  turns out to set the per-claim GUCs, nothing here changes: that path is read first and is pinned
-  by assertion. If it sets only the JSON object, this PR is the difference between a working product
-  and every authenticated read returning zero rows.
+- **Which JWT claim form a live Supabase project sets is no longer unobserved. It was measured, and
+  the answer is the bad one.** A project now exists (`vxcrzaxcdctmibampskv`, `ap-southeast-2`,
+  Postgres 17.6.1). A temporary `stable` function granted to `anon`, called over real PostgREST with
+  the project's anon JWT and then dropped, returned `request.jwt.claims` populated and
+  `request.jwt.claim.sub`, `.role` and `.workspace_id` all **null**. PostgREST here sets only the
+  JSON form. Against this project the pre-fix helpers would have resolved `NULL` for every session
+  and every authenticated read would have returned zero rows, silently. The severity claim in #9 is
+  now observed rather than conditional, and **the migrations must not be applied from a tree without
+  this fix**. Recorded in
+  [#9](https://github.com/Mouthfully/dataaggregator/issues/9#issuecomment-5637227773).
 - **PostgREST's `max_rows` is read from `supabase/config.toml`, which describes a local stack.** A
   hosted project's effective cap is a project setting, and if it is ever configured below 1000 the
   guard compares against a stale number. The guard fails loudly if `max_rows` disappears from the

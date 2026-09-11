@@ -286,7 +286,9 @@ function candidates(text) {
       if (enclosing(code, context.at).kind !== "jsx-text") continue;
       found.push({ start: literal.start, raw: literal.value, what: "JSX child literal" });
     } else if (context.kind === "tag") {
-      const attribute = flat.slice(Math.max(0, literal.start - 40), literal.start).match(/([A-Za-z-]+)\s*=\s*\{?\s*$/);
+      const attribute = flat
+        .slice(Math.max(0, literal.start - 40), literal.start)
+        .match(/([A-Za-z-]+)\s*=\s*\{?\s*$/);
       if (attribute === null || !VISIBLE_ATTRIBUTES.has(attribute[1].toLowerCase())) continue;
       found.push({ start: literal.start, raw: literal.value, what: `${attribute[1]} attribute` });
     }
@@ -330,7 +332,7 @@ function main() {
         line,
         column,
         message:
-          `${candidate.what} is a ${shape.words}-word sentence written into the page: ` +
+          `${candidate.what} carries a sentence of ${shape.words} words written into the page: ` +
           `"${shape.value.length > 80 ? `${shape.value.slice(0, 77)}...` : shape.value}" -- ` +
           "a promise reaches the site through claim() or optionalClaim(), so add it to CLAIMS in " +
           "packages/brand/src/claims.ts with its specification citation and resolve it by id",

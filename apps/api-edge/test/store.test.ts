@@ -128,9 +128,16 @@ function decodeSegment(segment: string): Record<string, unknown> {
   return JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0))));
 }
 
+/** The minted token off one recorded call. Throws rather than defaults: a call with no identity
+ * header is a defect, and `?? ""` would quietly assert claims about an empty string. */
+function tokenOf(call: Call): string {
+  const header = call.headers.authorization;
+  if (header === undefined) throw new Error("the adapter sent no authorization header");
+  return header.replace(/^Bearer /, "");
+}
+
 function claimsOf(call: Call): Record<string, unknown> {
-  const token = call.headers.authorization.replace(/^Bearer /, "");
-  const [, payload] = token.split(".");
+  const [, payload] = tokenOf(call).split(".");
   if (payload === undefined) throw new Error("not a JWT");
   return decodeSegment(payload);
 }
@@ -178,7 +185,7 @@ describe("the minted token is the whole authority, and its absences are load-bea
     const f = fake([{ body: [] }]);
     await createPerformanceStore(config(f.impl)).read(query());
 
-    const token = (f.calls[0] as Call).headers.authorization.replace(/^Bearer /, "");
+    const token = tokenOf(f.calls[0] as Call);
     expect(await signatureVerifies(token, SECRET)).toBe(true);
     expect(await signatureVerifies(token, `${SECRET}-tampered`)).toBe(false);
   });
@@ -204,8 +211,8 @@ describe("the minted token is the whole authority, and its absences are load-bea
 
     const call = f.calls[0] as Call;
     expect(call.headers.apikey).toBe(API_KEY);
-    expect(call.headers.authorization.startsWith("Bearer eyJ")).toBe(true);
-    expect(call.headers.authorization).not.toContain(API_KEY);
+    expect(tokenOf(call).startsWith("eyJ")).toBe(true);
+    expect(tokenOf(call)).not.toContain(API_KEY);
   });
 });
 

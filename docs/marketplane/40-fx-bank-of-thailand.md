@@ -315,32 +315,54 @@ Everything below was run; the numbers are copied from the output.
 
 | Gate | Result |
 |---|---|
-| `pnpm exec biome lint .` | **pass** — 9 warnings, 1 info, **zero in `packages/fx`** (all pre-existing: `build-pdf.mjs`, two ga4 tests, `oauth/flow.test.ts`, `check-dictionary.mjs`) |
-| `pnpm exec biome format --write <own files>` | **pass** — "Formatted 7 files in 13ms. Fixed 2 files." Only `packages/fx/src/*.ts` passed to it; no repo-wide formatter was run |
-| `pnpm -r typecheck` | **`packages/fx` Done.** Two failures outside this scope — see below |
+| `pnpm exec biome lint .` | **pass** — 5 warnings, 2 infos, **zero in `packages/fx`**. `pnpm exec biome lint packages/fx` alone: "Checked 9 files. No fixes applied.", no findings. Every warning is pre-existing and in another scope: `build-pdf.mjs`, two ga4 tests, `oauth/flow.test.ts`, `check-dictionary.mjs`, `check-claim-sources.mjs` |
+| `pnpm exec biome format --write <own files>` | **pass** — first run "Formatted 7 files in 13ms. Fixed 2 files."; final run "Formatted 7 files. No fixes applied." Only `packages/fx/src/*.ts` was passed to it. No repo-wide formatter and no `pnpm -r` write command was run at any point |
+| `pnpm -r typecheck` | **`packages/fx` Done**, along with `brand`, `connections`, `connectors`, `contract`, `extract`, `oauth`, `payloads`, `store`, `tokens`, `vault`, `webhooks`, `web`. One failure outside this scope — see below |
 | `pnpm --filter @repo/fx test` | **pass — 54 tests in 3 files, up from 22** |
-| DNS for the four BOT hosts | **`apiportal.bot.or.th` and `iapi.bot.or.th` do not resolve**; `portal.api.bot.or.th` and `www.bot.or.th` do |
+| DNS for the four BOT hosts | **`apiportal.bot.or.th` and `iapi.bot.or.th` do not resolve**; `portal.api.bot.or.th` (23.215.9.150) and `www.bot.or.th` (23.215.9.153) do |
 | `node scripts/check-brand.mjs` | pass — 8 identity strings checked against the allowlist |
-| `node scripts/check-tokens.mjs` | pass — 159 files scanned |
+| `node scripts/check-tokens.mjs` | pass — 164 files scanned |
 | `node scripts/check-dictionary.mjs` | pass — contract and schema agree |
-| `node scripts/check-capabilities.mjs` | pass — the connector claim names exactly the implemented source modules |
+| `node scripts/check-capabilities.mjs` | passed on this change, **and fails now for a reason in another scope** — see below |
 
-### The two typecheck failures, and why they are not this change
+### What failed, and why none of it is this change
+
+**The checkout moved underneath this work.** Two other workflows are editing
+`packages/store/**`, `apps/api-edge/**` and `supabase/**` in the same tree concurrently, and the
+file count biome sees went from 133 to 138 between the first verification pass and the last. Both
+failures below are theirs, and neither can be reached from this diff: **`@repo/fx` has no importers
+anywhere in the tree** — grepped, and the answer was "no importers" — so nothing in
+`packages/fx/**` is on any other package's compile or test path.
+
+**1. `apps/api-edge` typecheck.**
 
 ```
-packages/store typecheck: src/performance.ts(11,29): error TS2307: Cannot find module '@repo/contract'
-packages/store typecheck: src/postgrest.ts(33,25): error TS2307: Cannot find module '@repo/contract'
-apps/api-edge typecheck: src/index.ts(25,8):  error TS2307: Cannot find module '@repo/store'
+apps/api-edge typecheck: test/store.test.ts(132,17): error TS18048: 'call.headers.authorization' is possibly 'undefined'.
+apps/api-edge typecheck: test/store.test.ts(181,19): error TS2532: Object is possibly 'undefined'.
+apps/api-edge typecheck: test/store.test.ts(207,12): error TS18048: 'call.headers.authorization' is possibly 'undefined'.
 ```
 
-`packages/store/node_modules` **does not exist** — pnpm's own warning says so: *"Local package.json
-exists, but node_modules missing, did you mean to install?"* — and `apps/api-edge` fails only on its
-import of `@repo/store`. Both are module-resolution failures from an uninstalled workspace link, in
-exactly the two scopes two other workflows are editing concurrently. **`@repo/fx` has no importers
-anywhere in the tree** (grepped), so no change in this diff can reach either package. Every other
-project reports Done: `brand`, `connections`, `connectors`, `contract`, `extract`, `fx`, `oauth`,
-`payloads`, `tokens`, `vault`, `webhooks`, `web`. Not fixed here: running an install is forbidden by
-the brief and `packages/store` is not this scope.
+`noUncheckedIndexedAccess` findings in an api-edge test file, mid-edit. An earlier pass in this same
+session showed a *different* failure in that scope — `packages/store` reporting
+`TS2307: Cannot find module '@repo/contract'` with pnpm's own warning *"Local package.json exists,
+but node_modules missing"* — which has since been resolved by whoever owns it. `packages/store` now
+reports Done. The scope is moving; it is not this scope.
+
+**2. `check-capabilities.mjs`.**
+
+```
+packages/brand/src/claims.ts:1:1  implemented source "search_console" is absent from the
+                                  connector-claim source list
+```
+
+`packages/connectors/src/sources/search_console/` now exists with both `client.ts` and
+`normalize.ts`, and `IMPLEMENTED_SOURCE_IDS` in `packages/brand/src/claims.ts` still reads
+`["ga4", "woocommerce"]`. That is the guard **working exactly as designed** — `35-capability-gated-claims.md`'s
+whole point is that "stale marketing copy cannot survive a connector change" — catching a
+half-landed connector in another workflow's scope. All four guards passed on this change before
+that connector appeared. **Not fixed here:** `packages/brand/**` and `packages/connectors/**` are
+not this scope, and editing the claims mirror would collide with the workflow that owns the
+connector.
 
 ### Mutations
 

@@ -58,7 +58,15 @@
  * line or the one above it. The reason is mandatory; a bare pragma silences nothing.
  */
 
-import { hasIgnorePragma, lineAt, parseArgs, positionAt, pragmaScope, readText, report } from "./lib/scan.mjs";
+import {
+  hasIgnorePragma,
+  lineAt,
+  parseArgs,
+  positionAt,
+  pragmaScope,
+  readText,
+  report,
+} from "./lib/scan.mjs";
 
 const SPEC_FILE = "docs/MARKETING-DATA-PLANE.md";
 const CLAIMS_FILE = "packages/brand/src/claims.ts";
@@ -75,7 +83,7 @@ const SECTION = String.raw`\d+[A-Za-z]?(?:\.\d+)*`;
 const OVERRIDE_RE = new RegExp(
   String.raw`\b(?:overrid(?:es?|ing)|supersed(?:es?|ing))\s+` +
     String.raw`(§?\s*${SECTION}(?:\s*(?:,|and|&)\s*§?\s*${SECTION})*)` +
-    String.raw`([^.|]*)`,
+    "([^.|]*)",
   "gi",
 );
 
@@ -169,7 +177,10 @@ function overrideRecords(spec) {
       const isRow = line.trimStart().startsWith("|");
       let by = heading;
       if (isRow) {
-        const cells = line.split("|").map((cell) => cell.trim()).filter((cell) => cell.length > 0);
+        const cells = line
+          .split("|")
+          .map((cell) => cell.trim())
+          .filter((cell) => cell.length > 0);
         const entry = cells.at(-1) ?? "";
         by = entry.match(ENTRY_RE)?.[1] ?? null;
       }
@@ -299,7 +310,9 @@ function main() {
         const shared = [...scopeTokens].filter((token) => idTokens.has(token));
         const scopeText = override.scopes.map((s) => `"${s}"`).join(" / ");
         if (!override.total && shared.length === 0) {
-          outOfScope.push(`${claim.id} cites ${cited}, overridden by ${override.by} on ${scopeText}`);
+          outOfScope.push(
+            `${claim.id} cites ${cited}, overridden by ${override.by} on ${scopeText}`,
+          );
           continue;
         }
         if (hasIgnorePragma(pragmaScope(claimsSource, claim.index), "claim-source-guard")) continue;

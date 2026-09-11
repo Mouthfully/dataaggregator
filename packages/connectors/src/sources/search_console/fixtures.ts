@@ -162,7 +162,9 @@ export const EMPTY_QUERY: SearchAnalyticsResponse = {
 
 /** A negative click count is physically impossible; it means a positional mix-up upstream. */
 export const NEGATIVE_CLICKS: SearchAnalyticsResponse = {
-  rows: [{ keys: ["2026-08-14", "running shoes"], clicks: -3, impressions: 100, ctr: 0, position: 4 }],
+  rows: [
+    { keys: ["2026-08-14", "running shoes"], clicks: -3, impressions: 100, ctr: 0, position: 4 },
+  ],
   responseAggregationType: "byProperty",
 };
 

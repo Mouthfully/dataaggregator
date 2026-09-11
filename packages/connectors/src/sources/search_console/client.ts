@@ -144,7 +144,12 @@ export const SEARCH_CONSOLE_REPORTS = {
 export class SearchConsoleClientError extends Error {
   constructor(
     message: string,
-    readonly code: "bad_row_limit" | "bad_start_row" | "bad_date_range" | "unparseable_body" | "page_cap",
+    readonly code:
+      | "bad_row_limit"
+      | "bad_start_row"
+      | "bad_date_range"
+      | "unparseable_body"
+      | "page_cap",
   ) {
     super(message);
     this.name = "SearchConsoleClientError";
@@ -300,8 +305,10 @@ export async function querySearchAnalytics(
     searchType: SEARCH_CONSOLE_SEARCH_TYPE,
     responseAggregationType: parsed.responseAggregationType ?? null,
     // A SHORT PAGE IS THE ONLY END-OF-REPORT SIGNAL THIS PLATFORM SENDS. A full page may be the
-    // last one; there is no total to check it against and no cursor to be absent.
-    mayHaveMore: rows === rowLimit,
+    // last one; there is no total to check it against and no cursor to be absent. `>=` rather than
+    // `===` because a page that came back LONGER than the limit is a platform this connector does
+    // not model, and guessing that such a report has ended would drop whatever follows it.
+    mayHaveMore: rows >= rowLimit,
   };
 }
 

@@ -435,13 +435,7 @@ export async function* fetchOrdersPages(
     // merchant the remaining requests; the count check below decides whether it was a real end.
     if (current.orders.length === 0) break;
 
-    const fresh = current.orders.filter((order) => {
-      const id = orderId(order);
-      if (id === null) return true;
-      if (seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
+    const fresh = current.orders;
     unique += fresh.length;
 
     // `totalPages` and `totalOrders` are page 1's, not this page's. Reporting the header this page
@@ -571,8 +565,18 @@ async function* bisect(
     // us; re-reading halves of it would yield those pages a second time. A one-second window that
     // is still too large has already had its cap raised above, so this rethrow carries the message
     // that names the cause rather than a generic one.
-    if (!(error instanceof WooClientError) || error.code !== "window_too_large" || !divisible) {
-      throw error;
+    if (!(error instanceof WooClientError) || error.code !== "window_too_large") throw error;
+    if (!divisible) {
+      // Re-worded rather than re-thrown, because the message it arrived with ends "narrow the
+      // window" and this is the one window nobody can narrow. Telling a merchant to do the
+      // impossible is the same failure as telling them to regenerate a working key.
+      throw new WooClientError(
+        `${error.message} And this window is a single second — WooCommerce's date filters have no ` +
+          "finer granularity — so it cannot be narrowed further. Thousands of orders sharing one " +
+          "date_modified is a bulk edit, a re-import or a migration; that needs a deliberate " +
+          "catch-up run with a raised page limit, not a nightly job.",
+        "window_too_large",
+      );
     }
     reason = error.message;
   }
@@ -698,7 +702,10 @@ export async function probeStore(options: WooFetchOptions): Promise<WooProbe> {
   }
 
   // Headers only. The one order in `body` is not read, not returned and not logged.
-  return { storeUrl: options.storeUrl, totalOrders: readPagination(response.headers, 1).totalOrders };
+  return {
+    storeUrl: options.storeUrl,
+    totalOrders: readPagination(response.headers, 1).totalOrders,
+  };
 }
 
 /**

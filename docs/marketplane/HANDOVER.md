@@ -73,7 +73,9 @@ And the rest:
 
 ```
 docs/MARKETING-DATA-PLANE.md      the specification. §11 records decisions.
-docs/marketplane/                 design notes 01–34, one per shipped unit. None owed.
+docs/marketplane/                 design notes 01–35, one per shipped unit. None owed.
+                                  35 is the exception: a direction for the marketing site, not
+                                  a shipped unit. It asks one question — see its §5.
 docs/marketplane/finance/         the financial model — see §6 below
 design/app/                       the product application design of record
 design/app-simple/                the owner-first proposal against it (§4). A direction, not a decision.

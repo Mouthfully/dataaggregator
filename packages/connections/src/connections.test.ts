@@ -7,8 +7,10 @@ import {
   type ConnectionStatus,
   type ConnectionStore,
   connect,
+  connectWithApiKey,
   connectWithKey,
   connectionHealth,
+  isApiKeyProvider,
   isKeyPasteProvider,
   openCredential,
   recordFailure,
@@ -333,6 +335,49 @@ describe("the key-paste lane", () => {
   it("knows which providers are key-paste", () => {
     expect(isKeyPasteProvider("woocommerce")).toBe(true);
     expect(isKeyPasteProvider("ga4")).toBe(false);
+  });
+});
+
+describe("the single API-key lane", () => {
+  async function connectStripe(key = "rk_test_a1b2c3d4") {
+    return connectWithApiKey(crypto, store, {
+      workspaceId: WORKSPACE,
+      connectionId: CONNECTION,
+      provider: "stripe",
+      externalAccountId: "acct_123",
+      key,
+      kek: KEK,
+      keyVersion: 1,
+    });
+  }
+
+  it("seals one key without inventing a secret half", async () => {
+    const row = await connectStripe();
+    expect(JSON.stringify(row)).not.toContain("rk_test_a1b2c3d4");
+    const credential = await openCredential(crypto, row, KEK);
+    expect(credential).toEqual({ kind: "api_key", key: "rk_test_a1b2c3d4" });
+  });
+
+  it("refuses an empty key before writing and records no fictional scope or expiry", async () => {
+    await expect(connectStripe("   ")).rejects.toThrow(/needs a key/);
+    expect(rows.size).toBe(0);
+    const row = await connectStripe();
+    expect(row.grantedScopes).toEqual([]);
+    expect(row.expiresAt).toBeNull();
+  });
+
+  it("refuses a broad Stripe secret key even though the client only sends GET", async () => {
+    await expect(connectStripe("sk_test_broad123")).rejects.toMatchObject({
+      code: "overprivileged_credential",
+      message: expect.stringMatching(/restricted/),
+    });
+    expect(rows.size).toBe(0);
+  });
+
+  it("has healthy key semantics without entering the OAuth clock path", async () => {
+    const row = await connectStripe();
+    expect(isApiKeyProvider(row.provider)).toBe(true);
+    expect(connectionHealth(row, NOW)).toMatchObject({ usable: true, needsCustomerAction: false });
   });
 });
 

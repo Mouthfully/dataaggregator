@@ -72,6 +72,8 @@ export const ENTITY_TYPES = [
   "page",
   "query",
   "order",
+  // Appended because persisted Postgres enums are ordered and cannot be safely reordered later.
+  "transaction",
 ] as const;
 
 /**

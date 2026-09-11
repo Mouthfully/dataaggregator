@@ -209,6 +209,34 @@ export const REDACTION_POLICIES: Readonly<Record<Source, RedactionPolicy>> = {
       "an unbounded bag any plugin may write to. Ids, money, quantities, dates and product labels " +
       "survive; identity does not.",
   },
+  stripe: {
+    disposition: "redact",
+    keep: new Set([
+      "object",
+      "data",
+      "has_more",
+      "url",
+      "id",
+      "amount",
+      "available_on",
+      "created",
+      "currency",
+      "exchange_rate",
+      "fee",
+      "fee_details",
+      "net",
+      "reporting_category",
+      "source",
+      "status",
+      "type",
+      "application",
+    ]),
+    reason:
+      "Balance Transactions are financial records, but Stripe may expand `source` into a charge " +
+      "that carries billing name, email, phone, address and metadata. The allow-list keeps only " +
+      "settlement arithmetic, clocks, classifications and object ids; descriptions and customer " +
+      "details are dropped.",
+  },
 };
 
 export class PayloadPolicyError extends Error {

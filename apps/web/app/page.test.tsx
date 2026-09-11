@@ -114,7 +114,7 @@ describe("capabilities that have not launched", () => {
   });
 
   it("renders only the source connector that exists instead of the planned launch set", () => {
-    expect(text).toContain("Reads GA4 and WooCommerce on your own credentials.");
+    expect(text).toContain("Reads GA4, Stripe and WooCommerce on your own credentials.");
     expect(text).not.toMatch(/Google Ads|Search Console|Meta|affiliate network/i);
   });
 

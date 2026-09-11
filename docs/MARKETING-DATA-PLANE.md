@@ -1483,6 +1483,7 @@ by number from the design notes and the findings document.
 | 2026-09-08 | 11A.14 **Launch connector set substituted.** GA4, WooCommerce, Shopify and a partner-named payments source; Google Ads, Search Console and Meta move behind the fifth-connector gate. Overrides 11.9 and 11A.6 on first connectors. LINE OA as a source added to 11A.9 as question 7 |
 | 2026-09-08 | 11A.15 The payload archive **drops** contact data rather than hashing it; an allow-list per source, fail closed on an undeclared source; a source needing redaction may not use the streaming path |
 | 2026-09-08 | 11A.16 Webhook egress: platform data leaves a workspace only to an endpoint that workspace's own operator configured; signing secrets are derived and never stored; delivery is at-least-once with the event id as the idempotency key |
+| 2026-09-11 | 11A.17 **Stripe precedes Shopify.** Stripe supplies the settlement fee WooCommerce cannot; Shopify remains in scope but is deliberately deferred until the routing classifier and customer surfaces exist |
 
 ### 11A.12 The verified Thai shortlist, and what the bank portals do not publish (2026-09-08)
 
@@ -1722,6 +1723,24 @@ twice and recorded once — losing an outcome and retrying neither. Fan-out need
 endpoint) delivery row, which is not built; the configuration is made impossible rather than allowed
 to half-work. Section 4.2 promises a webhook, not fan-out, so nothing in the specification is
 narrowed by this.
+
+### 11A.17 Stripe precedes Shopify (2026-09-11)
+
+11A.14 names both Shopify and a partner-named payment source in the launch set but does not require
+Shopify to precede the payment source. WooCommerce subsequently established that its core API does
+not expose the processor fee for the common case (`32-woocommerce-connector.md`), making the
+payment leg load-bearing for 11A.2's after-fees number.
+
+**Decision. Build Stripe next and defer Shopify.** Stripe is the partner-named payment source for
+this sequence. It reads the merchant's own Balance Transactions with a restricted, read-only key;
+the reporting category distinguishes charges and refunds from payouts and transfers, and Stripe's
+own `amount - fee = net` relationship supplies the fee truth the shop feed lacks. Shopify remains
+in the launch set and is not removed from the vocabulary or roadmap. It simply does not consume the
+next connector slot.
+
+After Stripe, build the routing classifier and then the four customer surfaces. This is sequencing,
+not a change to 11A.2: a surface may render against typed fixtures before a production data store is
+bound, but it may not become a marketing claim until its real read path works end to end.
 
 ## 12. Naming candidates
 

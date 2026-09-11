@@ -114,6 +114,13 @@ export const RESTATEMENT_CLOCKS: Record<Source, RestatementClock> = {
       "pipeline, so an order can be refunded or edited at any remove and every row stays provisional. " +
       "Restatements are caught by a `modified_after` pull, not by a ladder.",
   },
+  stripe: {
+    windowDays: null,
+    perAccount: false,
+    note:
+      "The Balance Transaction carries its own available_on clock. Stripe rows derive finality " +
+      "from that field instead of inventing a source-wide restatement window.",
+  },
 };
 
 const DAY_MS = 86_400_000;

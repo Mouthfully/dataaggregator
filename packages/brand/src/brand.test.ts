@@ -98,9 +98,9 @@ describe("the claims gate", () => {
   });
 
   it("derives the connector claim from the guarded implemented-source list", () => {
-    expect(IMPLEMENTED_SOURCE_IDS).toEqual(["ga4", "woocommerce"]);
+    expect(IMPLEMENTED_SOURCE_IDS).toEqual(["ga4", "stripe", "woocommerce"]);
     const connectors = allowedClaims().find((claim) => claim.id === "connectors");
-    expect(connectors?.text).toBe("Reads GA4 and WooCommerce on your own credentials.");
+    expect(connectors?.text).toBe("Reads GA4, Stripe and WooCommerce on your own credentials.");
     expect(connectors?.text).not.toMatch(/Google Ads|Search Console|Meta|affiliate/i);
   });
 

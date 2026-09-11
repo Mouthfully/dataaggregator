@@ -1,10 +1,13 @@
 export {
   ConnectionError,
+  API_KEY_PROVIDERS,
   KEY_PASTE_PROVIDERS,
   connect,
+  connectWithApiKey,
   connectWithKey,
   connectionHealth,
   openCredential,
+  isApiKeyProvider,
   isKeyPasteProvider,
   recordFailure,
   type ConnectionHealth,
@@ -12,6 +15,7 @@ export {
   type ConnectionRow,
   type ConnectionStatus,
   type ConnectionStore,
+  type ApiKeyProvider,
   type KeyPasteProvider,
   type StoredCredential,
 } from "./connections.js";

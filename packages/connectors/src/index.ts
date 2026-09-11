@@ -43,3 +43,26 @@ export {
   type WooNormalizeOptions,
   type WooOrder,
 } from "./sources/woocommerce/normalize.js";
+export {
+  STRIPE_API_BASE,
+  STRIPE_API_VERSION,
+  STRIPE_PAGE_LIMIT,
+  StripeClientError,
+  balanceTransactionsUrl,
+  fetchBalanceTransactions,
+  fetchBalanceTransactionsPage,
+  probeStripeConnection,
+  stripeAuthorization,
+  type StripeAccountProbe,
+  type StripeBalanceQuery,
+  type StripeFetchOptions,
+  type StripeListPage,
+} from "./sources/stripe/client.js";
+export {
+  STRIPE_REVENUE_CATEGORIES,
+  StripeNormalizeError,
+  normalizeStripeBalanceTransactions,
+  stripeMajorAmount,
+  type StripeBalanceTransaction,
+  type StripeNormalizeOptions,
+} from "./sources/stripe/normalize.js";

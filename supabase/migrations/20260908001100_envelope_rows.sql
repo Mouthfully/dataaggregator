@@ -51,16 +51,17 @@ create type app.envelope_source as enum (
   -- touches a dictionary enum -- deliberately, so the guard cannot silently compare a stale file.
   -- The day a real database has applied these, that guard must learn to fold later migrations in
   -- FIRST; its own error message says so.
-  'woocommerce'
+  'woocommerce',
+  'stripe'
 );
 
--- `order` is an addition to the ad-centric `dbt_ad_reporting` grain, made under 13.3 rule 2 by
--- decision 11A.14: the launch connector set is three commerce sources and a WooCommerce or Shopify
--- feed has no grain in this list to land on. Appended, never inserted -- PostgreSQL sorts an enum
--- by definition order, so placing it mid-list would silently rewrite every ORDER BY on the column.
+-- `order` and `transaction` are narrow additions to the ad-centric `dbt_ad_reporting` grain under
+-- 13.3 rule 2: silently mapping commerce and settlement entities to an ad-shaped member would be
+-- false. Appended, never inserted -- PostgreSQL sorts an enum by definition order, so placing them
+-- mid-list would silently rewrite every ORDER BY on the column.
 create type app.entity_type as enum (
   'account', 'campaign', 'ad_group', 'ad', 'keyword', 'search_term',
-  'url', 'geo', 'property', 'page', 'query', 'order'
+  'url', 'geo', 'property', 'page', 'query', 'order', 'transaction'
 );
 
 -- `account_default` and `model` are labels for what a platform actually did, not absences. There is

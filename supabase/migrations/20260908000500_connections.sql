@@ -33,8 +33,10 @@ create type app.connection_provider as enum (
   -- NOTE FOR WHOEVER ADDS THE NEXT ONE: no guard relates this enum to its TypeScript twin.
   -- check-dictionary.mjs covers sources, entity types, attribution windows and metrics -- NOT
   -- connection providers. Adding a member here and forgetting the other side fails at runtime, not
-  -- at build time, which is the failure mode that guard exists to prevent everywhere else.
-  'woocommerce'
+  -- at build time, which is the failure mode that guard exists to prevent everywhere else. New
+  -- providers append because this enum will be persisted and its ordering must remain stable.
+  'woocommerce',
+  'stripe'
 );
 
 create type app.connection_status as enum ('active', 'needs_reauth', 'revoked', 'error');

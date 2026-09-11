@@ -28,12 +28,13 @@ type BrandField = keyof Brand;
  * import the connectors package, so scripts/check-capabilities.mjs keeps this mirror exact. Claim
  * copy is composed from this list; no hand-written connector sentence can outrun the source tree.
  */
-export const IMPLEMENTED_SOURCE_IDS = ["ga4", "woocommerce"] as const;
+export const IMPLEMENTED_SOURCE_IDS = ["ga4", "stripe", "woocommerce"] as const;
 
 export type ImplementedSourceId = (typeof IMPLEMENTED_SOURCE_IDS)[number];
 
 const SOURCE_LABELS: Readonly<Record<ImplementedSourceId, string>> = {
   ga4: "GA4",
+  stripe: "Stripe",
   woocommerce: "WooCommerce",
 };
 

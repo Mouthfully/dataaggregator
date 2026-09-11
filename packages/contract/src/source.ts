@@ -22,8 +22,10 @@ export const SOURCES = [
   // inserted, and nothing above it is removed: Postgres orders an enum by definition order, so a
   // mid-list insert would silently rewrite every ORDER BY on the column, and dropping a value is
   // a migration hazard with no upside. Google Ads, Meta and Search Console stay in the dictionary
-  // and move behind the fifth-connector gate -- a build order is not a vocabulary.
+  // and move behind the fifth-connector gate -- a build order is not a vocabulary. Stripe is
+  // appended for the same enum-migration reason when settlement truth precedes another shop feed.
   "woocommerce",
+  "stripe",
 ] as const;
 
 export type Source = (typeof SOURCES)[number];

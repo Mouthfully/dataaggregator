@@ -35,14 +35,20 @@ export type ConnectionStatus = "active" | "needs_reauth" | "revoked" | "error";
  *     and means "no expiry", not "unknown expiry".
  */
 export const KEY_PASTE_PROVIDERS = ["woocommerce"] as const;
+export const API_KEY_PROVIDERS = ["stripe"] as const;
 
 export type KeyPasteProvider = (typeof KEY_PASTE_PROVIDERS)[number];
+export type ApiKeyProvider = (typeof API_KEY_PROVIDERS)[number];
 
 /** Every provider a connection can be to. `app.connection_provider` must carry the same members. */
-export type ConnectionProvider = SourceId | KeyPasteProvider;
+export type ConnectionProvider = SourceId | KeyPasteProvider | ApiKeyProvider;
 
 export function isKeyPasteProvider(provider: ConnectionProvider): provider is KeyPasteProvider {
   return (KEY_PASTE_PROVIDERS as readonly string[]).includes(provider);
+}
+
+export function isApiKeyProvider(provider: ConnectionProvider): provider is ApiKeyProvider {
+  return (API_KEY_PROVIDERS as readonly string[]).includes(provider);
 }
 
 /** The row, as `20260908000500_connections.sql` defines it. */
@@ -95,12 +101,22 @@ export type StoredCredential =
       readonly kind: "key_secret";
       readonly key: string;
       readonly secret: string;
+    }
+  | {
+      /** A single server-side API key, restricted to read operations at the provider. */
+      readonly kind: "api_key";
+      readonly key: string;
     };
 
 export class ConnectionError extends Error {
   constructor(
     message: string,
-    readonly code: "missing_scope" | "no_credential" | "revoked" | "expired",
+    readonly code:
+      | "missing_scope"
+      | "no_credential"
+      | "overprivileged_credential"
+      | "revoked"
+      | "expired",
   ) {
     super(message);
     this.name = "ConnectionError";
@@ -256,6 +272,62 @@ export async function connectWithKey(
   });
 }
 
+/** Store a single provider API key without fabricating a second credential field. */
+export async function connectWithApiKey(
+  crypto: VaultCrypto,
+  store: ConnectionStore,
+  options: {
+    workspaceId: string;
+    connectionId: string;
+    provider: ApiKeyProvider;
+    externalAccountId: string;
+    displayName?: string;
+    key: string;
+    kek: Uint8Array;
+    keyVersion: number;
+  },
+): Promise<ConnectionRow> {
+  if (options.key.trim() === "") {
+    throw new ConnectionError(
+      "an API-key connection needs a key. An empty value seals successfully and fails on the " +
+        "first pull, hours later, with nothing pointing at the cause.",
+      "no_credential",
+    );
+  }
+  if (options.provider === "stripe" && !/^rk_(?:test|live)_[A-Za-z0-9]+$/.test(options.key)) {
+    throw new ConnectionError(
+      "Stripe connections require a restricted rk_test_ or rk_live_ key. Secret and publishable " +
+        "keys are refused so a read integration never holds write authority.",
+      "overprivileged_credential",
+    );
+  }
+
+  const credential: StoredCredential = { kind: "api_key", key: options.key };
+  const sealed = await seal(crypto, {
+    plaintext: JSON.stringify(credential),
+    kek: options.kek,
+    keyVersion: options.keyVersion,
+    scope: { workspaceId: options.workspaceId, connectionId: options.connectionId },
+  });
+
+  return store.upsert({
+    id: options.connectionId,
+    workspaceId: options.workspaceId,
+    provider: options.provider,
+    externalAccountId: options.externalAccountId,
+    displayName: options.displayName ?? null,
+    credentialCiphertext: sealed.ciphertext,
+    credentialIv: sealed.iv,
+    wrappedDek: sealed.wrappedDek,
+    keyVersion: sealed.keyVersion,
+    grantedScopes: [],
+    expiresAt: null,
+    status: "active",
+    lastError: null,
+    revokedAt: null,
+  });
+}
+
 /**
  * Open a stored credential, for the scheduler.
  *
@@ -360,12 +432,12 @@ export function connectionHealth(row: ConnectionRow, now: Date): ConnectionHealt
   // lookup below -- `providerFor` does not accept it, and every branch after this one reasons about
   // an expiry it does not have. Reaching the expiry logic with `expiresAt: null` would report
   // "Connected." by accident rather than on purpose; this says it on purpose.
-  if (isKeyPasteProvider(row.provider)) {
+  if (isKeyPasteProvider(row.provider) || isApiKeyProvider(row.provider)) {
     return {
       status: "active",
       usable: true,
       needsCustomerAction: false,
-      reason: "Connected. This key does not expire; it stops working only if you delete it.",
+      reason: "Connected. This key does not expire; it stops working only if you revoke it.",
     };
   }
 

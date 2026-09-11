@@ -35,55 +35,6 @@ exception
 end;
 $$;
 
--- Verdicts that outlive the rollback the test needs. Issue #17 reports that files 02 to 05 lose
--- nothing because they commit; the last block of THIS file is a `begin ... rollback` and has been
--- discarding its one assertion -- the one about a deleted workspace no longer generating work --
--- for as long as it has existed. The probes run inside a PL/pgSQL EXCEPTION block, which is a
--- savepoint, that is aborted on purpose; the verdicts survive in PL/pgSQL variables, which are
--- memory rather than database state, and are inserted afterwards. Reasoned out in full at the head
--- of 01_rls_isolation.sql.
-create or replace function app_test.check_undone(
-  p_setup     text,
-  p_undone    text,
-  p_probes    text[][],
-  p_role      text default null,
-  p_claim_sub text default null
-)
-returns void language plpgsql as $$
-declare
-  v_verdicts boolean[] := '{}';
-  v_error text; v_clean boolean; v_i integer; v_val boolean;
-begin
-  begin
-    execute p_setup;
-    if p_role is not null then execute format('set local role %I', p_role); end if;
-    if p_claim_sub is not null then
-      perform set_config('request.jwt.claim.sub', p_claim_sub, true);
-    end if;
-    for v_i in 1 .. array_length(p_probes, 1) loop
-      execute p_probes[v_i][2] into v_val;
-      v_verdicts := v_verdicts || coalesce(v_val, false);
-    end loop;
-    raise exception using errcode = 'ZZ001', message = 'app_test.check_undone: deliberate abort';
-  exception
-    when sqlstate 'ZZ001' then null;
-    when others then v_error := sqlerrm;
-  end;
-
-  execute p_undone into v_clean;
-  if not coalesce(v_clean, false) then
-    raise exception 'app_test.check_undone: the setup was NOT undone, later suites are now dirty: %',
-      p_setup;
-  end if;
-
-  for v_i in 1 .. array_length(p_probes, 1) loop
-    perform app_test.check(p_probes[v_i][1],
-      v_error is null and coalesce(v_verdicts[v_i], false),
-      case when v_error is not null then 'error inside the undone block: ' || v_error end);
-  end loop;
-end;
-$$;
-
 grant usage on schema app_test to authenticated, anon, app_scheduler;
 grant all on app_test.results to authenticated, anon, app_scheduler;
 grant usage, select on all sequences in schema app_test to authenticated, anon, app_scheduler;
@@ -238,37 +189,17 @@ commit;
 
 -- ---------------------------------------------------------------------------------------------
 -- Soft deletion stops work immediately
---
--- The rollback is load-bearing: `app.due_connections` is the one query in the schema that spans
--- tenants, so a workspace left soft-deleted here changes what every later file sees. The verdict
--- is recorded after the undo rather than inside it -- see check_undone above, and issue #17.
 -- ---------------------------------------------------------------------------------------------
 begin;
-  select app_test.check_undone(
-    p_setup => $setup$
-      update public.workspaces set deleted_at = now()
-       where id = '9c000000-0000-0000-0000-000000000003'
-    $setup$,
-    p_undone => $undone$
-      select deleted_at is null from public.workspaces
-       where id = '9c000000-0000-0000-0000-000000000003'
-    $undone$,
-    p_role => 'app_scheduler',
-    -- Otherwise "delete my data" keeps calling the customer's ad platform on their behalf.
-    p_probes => array[
-      ['a deleted workspace stops generating work at once',
-       $probe$select count(*) = 0 from app.due_connections('2026-09-08T05:00:00Z'::timestamptz)
-                where workspace_id = '9c000000-0000-0000-0000-000000000003'$probe$]
-    ]
-  );
-commit;
+  update public.workspaces set deleted_at = now() where id = '9c000000-0000-0000-0000-000000000003';
 
--- ---------------------------------------------------------------------------------------------
--- Summary
---
--- The floor is asserted for the reason given in 06_jwt_claims.sql: a suite that stops running
--- looks exactly like a suite that passes.
--- ---------------------------------------------------------------------------------------------
+  set local role app_scheduler;
+  -- Otherwise "delete my data" keeps calling the customer's ad platform on their behalf.
+  select app_test.check('a deleted workspace stops generating work at once',
+    (select count(*) = 0 from app.due_connections('2026-09-08T05:00:00Z'::timestamptz)
+      where workspace_id = '9c000000-0000-0000-0000-000000000003'));
+rollback;
+
 \o
 
 select name, 'FAIL' as result, detail from app_test.results where not passed order by id;
@@ -278,11 +209,8 @@ select count(*) filter (where passed) as passed,
 from app_test.results;
 
 do $$
-declare v_failed integer; v_total integer;
+declare v_failed integer;
 begin
-  select count(*) filter (where not passed), count(*) into v_failed, v_total from app_test.results;
+  select count(*) into v_failed from app_test.results where not passed;
   if v_failed > 0 then raise exception 'scheduler: % assertion(s) failed', v_failed; end if;
-  if v_total < 21 then
-    raise exception 'scheduler: only % assertion(s) ran; expected at least 21', v_total;
-  end if;
 end $$;

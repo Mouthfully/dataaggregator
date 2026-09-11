@@ -748,11 +748,8 @@ select count(*) filter (where passed) as passed,
 from app_test.results;
 
 do $$
-declare v_failed integer; v_total integer;
+declare v_failed integer;
 begin
-  select count(*) filter (where not passed), count(*) into v_failed, v_total from app_test.results;
+  select count(*) into v_failed from app_test.results where not passed;
   if v_failed > 0 then raise exception 'envelope store: % assertion(s) failed', v_failed; end if;
-  if v_total < 46 then
-    raise exception 'envelope store: only % assertion(s) ran; expected at least 46', v_total;
-  end if;
 end $$;

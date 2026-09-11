@@ -25,9 +25,13 @@ IT function — so detrics' **skeleton** is right and detrics' **voice** is aime
 
 **The alternative rejected** was treating "a combination of the two" as a visual instruction —
 sampling truely's mint-on-teal palette and detrics' blue and arbitrating between them. That would
-be an edit to `packages/tokens/src/tokens.css`, whose every value is extracted verbatim from
-`design/marketplane/Main.dc.html` and founder-confirmed, and it would do it sideways, inside a page
-change, with no record. If the brand register is to change, §5 below states the decision that needs
+be an edit to `packages/tokens/src/tokens.css`, and it would do it sideways, inside a page change,
+with no record. That file's values are extracted from `design/marketplane/Main.dc.html` with three
+carve-outs its own header names: the status hues come from specification §14, two dark-mode values
+are marked INVENTED, and `--mp-code-punct` deliberately corrects an artboard accessibility defect.
+The accent is not one of the three — `--mp-accent` is the artboard's `#2563EB`, founder-confirmed,
+doing the job the artboard already gave it — so the constraint §5 turns on holds whichever carve-out
+list one reads. If the brand register is to change, §5 below states the decision that needs
 making and what it costs. Nothing in this note changes a token.
 
 ## 2. What the two references actually are
@@ -58,7 +62,7 @@ exists in the layout and renders nothing until the fact behind it exists.
 
 | From | Element | Verdict | Why |
 |---|---|---|---|
-| truely | **Phone-first hero device** | **Take — the single most valuable import** | §11A.3 makes LINE the primary surface and `31-owner-first-client.md` records that most owners will never open the web app. The hero device should be a phone showing the daily brief, not a desktop dashboard. `design/app-simple/Brief.dc.html` already exists to be drawn. |
+| truely | **Phone-first hero device** | **Take — the single most valuable import** | §11A.3 makes LINE the primary surface and `31-owner-first-client.md` records that most owners will never open the web app. The hero device should be a phone showing the daily brief, not a desktop dashboard. `design/app-simple/Brief.dc.html` already exists to be drawn — **with §11A.4 applied to it**: every figure in that device shows its source, its fetch time and whether it is provisional. §11A.4 makes that a rule of the design system rather than a per-screen choice, and the freshness band at item 7 does not discharge it, because it sits eight sections below the numbers. |
 | truely | One promise in the hero, not a feature list | Take | The page already leads with `tagline` + `positioning`. detrics' toggleable benefit list would bury both. |
 | truely | Oversized display type, 999px pills, generous radii | Take | All three are already in `tokens.css`; this is a scale decision inside the existing system, not a new value. |
 | truely | Marquee strips, looping rails | Take sparingly | Must honour `prefers-reduced-motion`, and a looping rail must not be the only way to reach a fact. |
@@ -73,7 +77,7 @@ exists in the layout and renders nothing until the fact behind it exists.
 | detrics | FAQ accordion | Take | Cheap and honest, and the artboard already has the content — *"What IT will ask. Answered."* |
 | detrics | Pricing comparison table | Take the **shape** only | Numbers come from `finance/model.py` — ฿1,590 / ฿4,190 / ฿13,800, VAT-**inclusive**, ฿30,000 enterprise floor — not from the artboard's excl.-VAT tiers. See `31-owner-first-client.md` §2. |
 | detrics | Destination cards (Sheets / Looker / BigQuery / AI client) | **Refuse as presented** | Those are detrics' destinations. Ours are LINE, the web app and JSON. No reviewed platform policy addresses MCP as a delivery surface at all, so it cannot be sold as a destination card. |
-| detrics | *"37+ sources"* counter | **Refuse** | `packages/connectors/src/sources/` holds **two**: `ga4` and `woocommerce`. The `connectors` claim already names five — that is issue [#6](https://github.com/Mouthfully/dataaggregator/issues/6), and a big number on the page makes it worse. |
+| detrics | *"37+ sources"* counter | **Refuse — and it is already machine-enforced** | `FORBIDDEN_CLAIMS` bans `/\b\d+\s+(sources\|integrations)\b/i` and `page.test.tsx` widens it to `connectors` and `platforms`, so a count cannot ship even by accident. It would also be false twice over: `packages/connectors/src/sources/` holds **two**, `ga4` and `woocommerce`, and the `connectors` claim names five — issue [#6](https://github.com/Mouthfully/dataaggregator/issues/6). |
 | detrics | Case studies with named metrics, G2 wall, *"1,000+ agencies"* | **Slot** | Fabricated social proof is the fastest available FAIL on gate 18. The slot is what makes it obvious the facts are missing rather than forgotten. |
 | detrics | Competitor-migration CTA | **Defer** | Naming a competitor is a claim with legal surface and no specification citation. |
 | detrics | Animated cube background | Refuse | Decoration with a rendering cost and no job. |
@@ -81,11 +85,16 @@ exists in the layout and renders nothing until the fact behind it exists.
 ### The section order this produces
 
 1. Nav — one level: Product · Sources · Pricing · Help. TH/EN.
-2. Hero — `tagline`, `positioning`, a phone showing the LINE brief, one primary CTA.
-3. The one number — profit after platform fees, the figure no platform produces.
+2. Hero — `tagline`, `positioning`, a phone showing the LINE brief, one primary CTA. Every figure
+   on that device carries its source, fetch time and provisional state, per §11A.4.
+3. The one number — profit after platform fees, the figure no platform produces. Same provenance
+   rule, and see the capability note below: this is the single most gated thing on the page.
 4. Four-benefit rail — truely's shape, claim-resolved content.
 5. How it works, five steps — detrics' shape, the page's existing four plus delivery.
-6. What it reads — the honest connector count, with unbuilt sources marked as unbuilt.
+6. What it reads — sources **named, never counted**: the two that are built, and the rest of
+   §11A.14's launch set marked as not built. A numeric count is banned by `FORBIDDEN_CLAIMS` and
+   by a second, wider assertion in `page.test.tsx`; naming is what remains, and it is also the only
+   form that stays true as the set changes.
 7. Freshness and restatement, on `--mp-surface-inverse` — already shipped, keep.
 8. Pricing — baht, VAT-inclusive, from `finance/model.py`.
 9. Proof — **slot**.
@@ -93,9 +102,26 @@ exists in the layout and renders nothing until the fact behind it exists.
 11. Security and data — withheld claims stay withheld; the strip renders short.
 12. Footer — legal entity, registration and support address, from the brand file.
 
-Three of those twelve (2, 6, 9) are exactly where issue #6 bites: the claims list governs *whether
-a sentence may be said*, never *whether the thing it describes has been built*. This direction does
-not fix that, and the next change to this page should not ship without it.
+**Four of those twelve — 2, 3, 6 and 9 — are where issue #6 bites**, and item 3 is the one it
+would be easiest to miss. `31-owner-first-client.md` §4 gate 18 lists *"the whole after-fees
+number"* among the surfaces that are depicted but not built: *"a mockup may draw an unbuilt
+surface; a claim may not assert one."* Putting that figure at the top of a public page, as the one
+number the page is about, is exactly the assertion that note refused. Item 2's device and item 3's
+headline number are the same fact twice, so both are inside the capability gate's scope, not just
+the sections that obviously list capabilities. The claims list governs *whether a sentence may be
+said*, never *whether the thing it describes has been built*; this direction does not fix that, and
+the next change to this page should not ship without it.
+
+**A second defect sits underneath issue #6 and survives fixing it.** The `connectors` claim reads
+*"Reads Google Ads, GA4, Search Console, Meta and your affiliate network on your own credentials"*
+and cites `["9", "11.9"]` — but §11A.14 **overrides 11.9 on first connectors**, substituting GA4,
+WooCommerce, Shopify and a partner-named payments source and moving Google Ads, Search Console and
+Meta behind the fifth-connector gate. So the claim is provenance-valid and *superseded*: a
+capability gate alone would still let the page advertise the abandoned roadmap, because every
+source it names would eventually be built. Fixing the sentence is a change to `claims.ts` and to
+the dependent assertion in `page.test.tsx`, which is code, not this note — recorded here and filed
+rather than widened into this PR: issue
+[#16](https://github.com/Mouthfully/dataaggregator/issues/16).
 
 ## 4. What this would cost to build, and what it would touch
 
@@ -195,11 +221,20 @@ not hold.
 
 ### Claims
 
-**18. Claim provenance.** `PASS`, as a direction. Every sentence the page renders still resolves
-through `claim()`, which throws on an unknown or withheld id; this note adds no sentence and removes
-no gate. The substance of the gate here is the four refusals: the source counter, the borrowed
-social proof, the competitor-migration CTA and the destination cards are each a claim we cannot
-cite, and each is refused rather than softened.
+**18. Claim provenance.** `PASS`, as a direction — this note adds no sentence and removes no gate.
+The substance of the gate here is the four refusals: the source counter, the borrowed social proof,
+the competitor-migration CTA and the destination cards are each a claim we cannot cite, and each is
+refused rather than softened.
+
+**What the existing gate does and does not do, stated precisely, because this direction adds
+sections and every new section is an invitation to write a sentence.** `claim()` throws on an
+unknown or withheld id — but only for text passed *to* it. `page.tsx` already carries literal
+structural words by design (headings, labels, step names), and `page.test.tsx` proves that every
+id in `USED_CLAIMS` renders and cites a section; neither can detect a new inline promise written
+straight into the JSX. The rendered-output assertions catch a known-forbidden shape, not an unknown
+one. So the rule for the rebuild is a requirement rather than an observation: **every
+claim-shaped sentence in a new section resolves through `claim()`**, and structural words stay
+structural. Anything stronger needs a check that does not exist today.
 
 **But the note does not close issue #6 and must not be read as doing so.** The capability gate is
 still missing, `connectors` still names five sources against a tree holding two, and §3's slots are
@@ -236,6 +271,11 @@ a convention rather than a mechanism. The next change to this page is where that
   destination-card pattern is refused rather than adapted.
 - **Whether a claims list can be trusted without a capability gate** — issue #6, unchanged and
   still the sharpest open item on this page.
+- **§11A.14 supersedes §11.9's connector set, and the `connectors` claim still cites §11.9** —
+  issue [#16](https://github.com/Mouthfully/dataaggregator/issues/16), raised by this note and
+  fixed elsewhere. If the sentence is rewritten before the rebuild, section 6 of §3's order names
+  the new set; if not, the rebuild inherits a sentence advertising an abandoned roadmap. Either way
+  the layout is unaffected, which is the whole value of resolving copy by identifier.
 
 ## 10. Verification
 

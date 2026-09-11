@@ -1,11 +1,11 @@
 # Supabase project configuration.
 #
 # `project_id` is the local project name the CLI uses; it is NOT the hosted project ref, which is
-# supplied by `supabase link` and lives outside the repository. It is deliberately neutral rather
-# than named after the product, because the product name is not settled -- see
-# docs/marketplane/01-brand-identity.md. Renaming it later is a one-line change with no data
-# consequence, unlike the hosted ref.
-project_id = "marketplane"
+# supplied by `supabase link` and lives outside the repository. It now matches the settled product
+# name, and the brand guard match-tests it against `packages/brand/src/brand.ts` rather than
+# ban-scanning it -- so this line cannot drift from the brand file without failing the build.
+# Renaming it is a one-line change with no data consequence, unlike the hosted ref.
+project_id = "numbadee"
 
 [db]
 port = 54322

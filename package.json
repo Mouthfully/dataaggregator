@@ -19,6 +19,7 @@
     "check": "biome check .",
     "check:fix": "biome check --write .",
     "check:brand": "node scripts/check-brand.mjs",
+    "check:capabilities": "node scripts/check-capabilities.mjs",
     "check:dictionary": "node scripts/check-dictionary.mjs",
     "check:tokens": "node scripts/check-tokens.mjs"
   },

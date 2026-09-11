@@ -58,5 +58,6 @@ The standing list is docs/marketplane/00-repo-map.md section 9.
 - [ ] `pnpm -r typecheck`
 - [ ] `pnpm -r test`
 - [ ] `pnpm -r build`
-- [ ] `pnpm check:brand` and `pnpm check:tokens` -- no NEW findings (both run in warn mode in CI)
+- [ ] `pnpm check:brand`, `pnpm check:tokens`, `pnpm check:dictionary` and
+      `pnpm check:capabilities`
 - [ ] Scope not widened: everything in this diff is what the PR title says it is

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { apiUrl, brand, formatAddress, siteUrl } from "./brand.ts";
-import { CLAIMS, FORBIDDEN_CLAIMS, allowedClaims, withheldClaims } from "./claims.ts";
+import {
+  AVAILABLE_CAPABILITIES,
+  CLAIMS,
+  FORBIDDEN_CLAIMS,
+  IMPLEMENTED_SOURCE_IDS,
+  allowedClaims,
+  withheldClaims,
+  type Capability,
+} from "./claims.ts";
 
 describe("the brand file", () => {
   it("has every field a page, email or invoice needs to render", () => {
@@ -51,6 +59,51 @@ describe("the claims gate", () => {
     expect(allowed).toContain("attribution-required");
   });
 
+  it("withholds every claim whose product capability has not launched", () => {
+    const allowed = allowedClaims().map((c) => c.id);
+    for (const id of [
+      "positioning",
+      "byoc",
+      "audit-log",
+      "diagnose",
+      "second-pass",
+      "verified-alerts",
+      "reconcile",
+      "ai-confidence",
+      "cost-preview",
+      "serp-bought",
+      "pricing-two-units",
+      "billing-fairness",
+      "agency-mode",
+    ]) {
+      expect(allowed, `${id} describes an unlaunched capability`).not.toContain(id);
+    }
+  });
+
+  it("turns on a capability-gated claim only when every requirement is present", () => {
+    const withDiagnose = new Set<Capability>([...AVAILABLE_CAPABILITIES, "surface:diagnose"]);
+    const allowed = allowedClaims(brand, withDiagnose).map((c) => c.id);
+    expect(allowed).toContain("diagnose");
+    expect(allowed).toContain("second-pass");
+    expect(allowed).not.toContain("reconcile");
+    expect(allowed).not.toContain("pricing-two-units");
+
+    const withPartialBilling = new Set<Capability>([
+      ...AVAILABLE_CAPABILITIES,
+      "billing:connected-account",
+    ]);
+    expect(allowedClaims(brand, withPartialBilling).map((c) => c.id)).not.toContain(
+      "pricing-two-units",
+    );
+  });
+
+  it("derives the connector claim from the guarded implemented-source list", () => {
+    expect(IMPLEMENTED_SOURCE_IDS).toEqual(["ga4", "woocommerce"]);
+    const connectors = allowedClaims().find((claim) => claim.id === "connectors");
+    expect(connectors?.text).toBe("Reads GA4 and WooCommerce on your own credentials.");
+    expect(connectors?.text).not.toMatch(/Google Ads|Search Console|Meta|affiliate/i);
+  });
+
   // §11A.1 moved the primary customer from agencies and brands to an owner-run business with no
   // analyst and no IT function, and recorded in the specification that the claim contradicting it
   // could not be changed in the same pass. It sat contradicted for four rounds. This is the pin
@@ -76,13 +129,13 @@ describe("the claims gate", () => {
     expect(positioning?.text).not.toMatch(/\bagenc(y|ies)\b|\bbrands\b/i);
   });
 
-  it("names the field that would turn each withheld claim on", () => {
+  it("names the field or capability that would turn each withheld claim on", () => {
     const withheld = withheldClaims();
     expect(withheld.length).toBeGreaterThan(0);
-    for (const { claim, missing } of withheld) {
+    for (const { claim, missing, missingCapabilities } of withheld) {
       expect(
-        missing.length,
-        `"${claim.id}" is withheld but names no missing field`,
+        missing.length + missingCapabilities.length,
+        `"${claim.id}" is withheld but names no missing requirement`,
       ).toBeGreaterThan(0);
     }
   });

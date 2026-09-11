@@ -11,7 +11,13 @@
 import type { Source } from "@repo/contract";
 import { ORDER, afterCursor, decodeCursor, encodeCursor } from "./cursor.js";
 import { mintToken } from "./jwt.js";
-import { type PostgrestConfig, SELECT_COLUMNS, StoreError, callPostgrest, quote } from "./postgrest.js";
+import {
+  type PostgrestConfig,
+  SELECT_COLUMNS,
+  StoreError,
+  callPostgrest,
+  quote,
+} from "./postgrest.js";
 import { toEnvelopeRow } from "./row.js";
 
 /**
@@ -104,7 +110,11 @@ export function createPerformanceStore(config: PostgrestConfig): PerformanceStor
       });
 
       if (!Array.isArray(body)) {
-        throw new StoreError("the database answered a row read with something other than a list", "upstream", 200);
+        throw new StoreError(
+          "the database answered a row read with something other than a list",
+          "upstream",
+          200,
+        );
       }
       if (body.length > probe) {
         // Impossible if the `limit` parameter arrived. That is the value: a read that lost its limit

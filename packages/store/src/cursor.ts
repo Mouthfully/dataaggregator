@@ -118,7 +118,9 @@ export function afterCursor(cursor: Cursor): string {
   // `not.is.null` rather than `gt.<nothing>`: under `nullsfirst` every labelled row sorts after
   // every unlabelled one, so "after a NULL window" is "has a window at all".
   const afterWindow =
-    cursor.w === null ? "attribution_window.not.is.null" : `attribution_window.gt.${quote(cursor.w)}`;
+    cursor.w === null
+      ? "attribution_window.not.is.null"
+      : `attribution_window.gt.${quote(cursor.w)}`;
 
   return (
     "(" +

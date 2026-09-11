@@ -69,6 +69,13 @@ export default function Page() {
         </div>
 
         <p className="text-ink-subtle mt-6 max-w-2xl text-sm">{claim("read-only-oauth")}</p>
+        <p title="Set up in under five minutes, we promise.">
+          We reconcile every platform for you automatically.
+        </p>
+        <p>{"Know what changed. And why."}</p>
+        <h2>Your credentials, your data, your tenant</h2>
+        <p>Connect a workspace</p>
+        <p>Numbers you can trust, e.g. revenue after fees</p>
       </section>
 
       {/* --------------------------------------------------------------- spine */}

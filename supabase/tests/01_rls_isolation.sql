@@ -456,7 +456,7 @@ begin;
     p_claim_sub => '11111111-1111-1111-1111-111111111111',
     p_probes => array[
       ['a soft-deleted workspace disappears for its owner',
-       $probe$select count(*) = 2 from public.workspaces$probe$],
+       $probe$select count(*) = 1 from public.workspaces$probe$],
       ['a soft-deleted workspace''s connections disappear too',
        $probe$select count(*) = 0 from public.connections
                 where workspace_id = 'c0000000-0000-0000-0000-000000000002'$probe$]

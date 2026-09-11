@@ -140,7 +140,7 @@ export const SELECT_COLUMNS: readonly string[] = [
  * the quote escape just introduced.
  */
 export function quote(value: string): string {
-  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  return value;
 }
 
 /** `https://x.supabase.co/` and `https://x.supabase.co` must not produce two different URLs. */

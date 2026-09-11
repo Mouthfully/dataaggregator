@@ -30,7 +30,10 @@
  *      gateway host and the full path under the listen path are therefore unknown. Third-party
  *      clients show a v1 shape -- `https://iapi.bot.or.th/Stat/Stat-ExchangeRate/DAILY_AVG_EXG_RATE_V1/`
  *      with an `api-key` header -- but v1 is the service BOT scheduled for discontinuation on
- *      31 December 2025, and its predecessor host `apiportal.bot.or.th` no longer resolves.
+ *      31 December 2025, and BOTH v1 HOSTS ARE GONE: `iapi.bot.or.th` and `apiportal.bot.or.th`
+ *      both fail to resolve (NXDOMAIN), while `portal.api.bot.or.th` resolves. That is the one
+ *      thing here that WAS verified, and it verifies a negative: the URL a reader would copy from
+ *      any surviving example is dead.
  *      So THIS MODULE SHIPS NO DEFAULT ENDPOINT AND NO DEFAULT HEADER NAME. Both are required
  *      configuration. A guessed URL that 404s is a wasted afternoon; a guessed URL sitting in the
  *      tree looking confirmed is a lie the next reader inherits.

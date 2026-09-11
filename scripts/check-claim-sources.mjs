@@ -263,23 +263,43 @@ function main() {
     });
   }
 
-  /** overridden section -> the records that supersede it. */
-  const byOverridden = new Map();
+  // The two record shapes state the same override in different words, so they are merged on the
+  // pair they assert. Scope is the UNION of every phrasing: "first connectors" and "which
+  // connectors ship first" describe one decision, and reading them separately would report the same
+  // claim twice. An override stated anywhere without a scope is total, and totality wins the merge.
+  const overrides = new Map();
   for (const record of records) {
-    const list = byOverridden.get(record.overridden) ?? [];
-    list.push(record);
-    byOverridden.set(record.overridden, list);
+    const key = `${record.overridden} ${record.by}`;
+    const merged = overrides.get(key) ?? {
+      overridden: record.overridden,
+      by: record.by,
+      scopes: [],
+      total: false,
+      where: record.where,
+    };
+    if (record.scope === "") merged.total = true;
+    else if (!merged.scopes.includes(record.scope)) merged.scopes.push(record.scope);
+    overrides.set(key, merged);
+  }
+
+  /** overridden section -> the merged overrides that supersede it. */
+  const byOverridden = new Map();
+  for (const override of overrides.values()) {
+    const list = byOverridden.get(override.overridden) ?? [];
+    list.push(override);
+    byOverridden.set(override.overridden, list);
   }
 
   const outOfScope = [];
   for (const claim of claims) {
     const idTokens = topicTokens(claim.id);
     for (const cited of claim.sources) {
-      for (const record of byOverridden.get(cited) ?? []) {
-        const scopeTokens = topicTokens(record.scope);
+      for (const override of byOverridden.get(cited) ?? []) {
+        const scopeTokens = topicTokens(override.scopes.join(" "));
         const shared = [...scopeTokens].filter((token) => idTokens.has(token));
-        if (record.scope !== "" && shared.length === 0) {
-          outOfScope.push(`${claim.id} cites ${cited} (${record.by} overrides it on "${record.scope}")`);
+        const scopeText = override.scopes.map((s) => `"${s}"`).join(" / ");
+        if (!override.total && shared.length === 0) {
+          outOfScope.push(`${claim.id} cites ${cited}, overridden by ${override.by} on ${scopeText}`);
           continue;
         }
         if (hasIgnorePragma(pragmaScope(claimsSource, claim.index), "claim-source-guard")) continue;
@@ -289,9 +309,9 @@ function main() {
           line,
           column,
           message:
-            `claim "${claim.id}" cites ${cited}, which §${record.by} overrides` +
-            (record.scope === "" ? "" : ` on "${record.scope}"`) +
-            ` (${record.where}). Cite ${record.by} instead, or correct the claim it supports.`,
+            `claim "${claim.id}" cites ${cited}, which ${override.by} overrides` +
+            (override.total ? " outright" : ` on ${scopeText}`) +
+            ` (${override.where}). Cite ${override.by} instead, or correct the claim it supports.`,
           source: lineAt(claimsSource, claim.index),
         });
       }
@@ -299,12 +319,14 @@ function main() {
   }
 
   for (const [overridden, list] of [...byOverridden].sort()) {
-    const by = [...new Set(list.map((r) => r.by))].join(", ");
-    const scopes = [...new Set(list.map((r) => r.scope).filter(Boolean))];
-    notes.push(
-      `${overridden} is overridden by ${by}` +
-        (scopes.length === 0 ? " (no scope recorded: read as total)" : ` on ${scopes.map((s) => `"${s}"`).join(" / ")}`),
-    );
+    for (const override of list) {
+      notes.push(
+        `${overridden} is overridden by ${override.by}` +
+          (override.total
+            ? " outright (no scope recorded)"
+            : ` on ${override.scopes.map((s) => `"${s}"`).join(" / ")}`),
+      );
+    }
   }
   notes.push(
     `${records.length} override record${records.length === 1 ? "" : "s"} parsed from ${SPEC_FILE} ` +

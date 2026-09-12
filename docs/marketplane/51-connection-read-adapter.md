@@ -242,12 +242,12 @@ bytes from `openssl rand -base64 32`.
 
 ## 6. Verification
 
-- [x] `pnpm -r test` — **855 tests**, 0 failures (`@repo/api-edge` 114 → **130**)
+- [x] `pnpm -r test` — **862 tests**, 0 failures (`@repo/api-edge` 114 → **130**)
 - [x] `pnpm -r typecheck` — clean
 - [x] `pnpm exec biome lint .` / `biome format .` — clean
 - [x] **All eight guards pass**
 - [x] `pnpm -r build` — clean
-- [x] `./supabase/tests/run-local.sh` — twelve suites, **337 assertions**, 0 failures (unchanged:
+- [x] `./supabase/tests/run-local.sh` — twelve suites, **343 assertions**, 0 failures (unchanged:
       this PR adds no database object, which is the point)
 
 ### Every new check fires on a real defect

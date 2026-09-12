@@ -71,6 +71,9 @@ importers:
       '@repo/connections':
         specifier: workspace:*
         version: link:../../packages/connections
+      '@repo/connectors':
+        specifier: workspace:*
+        version: link:../../packages/connectors
       '@repo/contract':
         specifier: workspace:*
         version: link:../../packages/contract

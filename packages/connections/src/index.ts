@@ -1,4 +1,5 @@
 export {
+  CONNECTION_STATUSES,
   CREDENTIAL_LANES,
   ConnectionError,
   PROVIDER_LANES,

@@ -15,19 +15,25 @@
 import { SELF } from "cloudflare:test";
 import { envelopeRowSchema, envelopeSchema, METRICS } from "@repo/contract";
 import {
+  CONNECTION_COLUMNS,
   SELECT_COLUMNS,
   StoreError,
   TOKEN_TTL_SECONDS,
   createApiKeyAuthenticator,
+  createConnectionStore,
   createIngestStore,
   createPerformanceStore,
+  decodeBytea,
   decodeCursor,
   mintToken,
+  toConnectionRecord,
   toEnvelopeRow,
   toIngestRow,
   type PerformanceQuery,
   type PostgrestConfig,
 } from "@repo/store";
+import { CONNECTION_STATUSES, CREDENTIAL_LANES, openCredential } from "@repo/connections";
+import { type CryptoLike, seal } from "@repo/vault";
 import { describe, expect, it } from "vitest";
 import { handlePerformance } from "../src/performance.js";
 
@@ -827,5 +833,262 @@ describe("the ingest store refuses before it writes", () => {
     await expect(
       createIngestStore(ingestConfig(f.impl)).write([envelopeRow()], CONTEXT),
     ).rejects.toThrow(/refused the write with 403 \(42501\)/);
+  });
+});
+
+// -------------------------------------------------------------------------------------------
+// THE CONNECTION READ (`39-store-adapter.md`'s sibling, and step 4 of MVP-PLAN.md §5).
+//
+// One GET against `public.connections`, needing no new database object: the grant and the policy
+// both already exist. What is new is the BYTEA DECODE, which is the one thing on this path that
+// fails unreadably when it is wrong.
+// -------------------------------------------------------------------------------------------
+
+const CONNECTION = "8d000000-0000-0000-0000-000000000002";
+
+/** What PostgREST puts on the wire for a `bytea`: Postgres hex output, as a JSON string. */
+function asBytea(bytes: Uint8Array): string {
+  let hex = "";
+  for (const byte of bytes) hex += byte.toString(16).padStart(2, "0");
+  return `\\x${hex}`;
+}
+
+function connectionRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: CONNECTION,
+    workspace_id: WORKSPACE,
+    provider: "woocommerce",
+    credential_lane: "key_secret",
+    external_account_id: "https://shop.example.com",
+    display_name: "Example Shop",
+    credential_ciphertext: asBytea(new Uint8Array([0x4f, 0x37, 0xa1])),
+    credential_iv: asBytea(new Uint8Array([0x00, 0xff, 0x10])),
+    wrapped_dek: asBytea(new Uint8Array([0xde, 0xad])),
+    key_version: 1,
+    granted_scopes: [],
+    expires_at: null,
+    status: "active",
+    last_error: null,
+    revoked_at: null,
+    timezone: "Asia/Bangkok",
+    ...overrides,
+  };
+}
+
+describe("the connection read asks for exactly one row, as one workspace", () => {
+  it("filters on BOTH the id and the workspace, and caps the answer at two", async () => {
+    const f = fake([{ body: [connectionRow()] }]);
+    await createConnectionStore(config(f.impl)).read({
+      workspaceId: WORKSPACE,
+      connectionId: CONNECTION,
+    });
+
+    const url = new URL((f.calls[0] as Call).url);
+    expect(url.pathname).toBe("/rest/v1/connections");
+    expect(url.searchParams.get("id")).toBe(`eq."${CONNECTION}"`);
+    // Redundant with the policy and sent anyway: a mismatched pair must answer "nothing" through
+    // the query as well as through row-level security.
+    expect(url.searchParams.get("workspace_id")).toBe(`eq."${WORKSPACE}"`);
+    // TWO, on a primary-key lookup. The only way a second row arrives is a filter that did not,
+    // and that must not come back as "the" connection.
+    expect(url.searchParams.get("limit")).toBe("2");
+  });
+
+  it("never asks for the developer-token columns, or for `*`", async () => {
+    const f = fake([{ body: [] }]);
+    await createConnectionStore(config(f.impl)).read({
+      workspaceId: WORKSPACE,
+      connectionId: CONNECTION,
+    });
+
+    const selected = (new URL((f.calls[0] as Call).url).searchParams.get("select") ?? "").split(
+      ",",
+    );
+    expect(selected).toEqual([...CONNECTION_COLUMNS]);
+    expect(selected).not.toContain("*");
+    // A second sealed credential this path has no use for and therefore no business moving.
+    expect(selected).not.toContain("developer_token_ciphertext");
+    expect(selected).not.toContain("developer_token_wrapped_dek");
+  });
+
+  it("mints `authenticated` for the caller's workspace, with no `sub`", async () => {
+    const f = fake([{ body: [] }]);
+    await createConnectionStore(config(f.impl)).read({
+      workspaceId: WORKSPACE,
+      connectionId: CONNECTION,
+    });
+
+    const claims = claimsOf(f.calls[0] as Call);
+    expect(Object.keys(claims).sort()).toEqual(["exp", "iat", "role", "workspace_id"]);
+    expect(claims.role).toBe("authenticated");
+    expect(claims.workspace_id).toBe(WORKSPACE);
+    expect(await signatureVerifies(tokenOf(f.calls[0] as Call), SECRET)).toBe(true);
+  });
+
+  it("answers a missing connection and another tenant's with the SAME null", async () => {
+    // Row-level security makes both cases an empty list; the adapter must not turn one of them
+    // into a distinguishable error, or it becomes an oracle for which ids exist elsewhere.
+    const f = fake([{ body: [] }, { body: [] }]);
+    const store = createConnectionStore(config(f.impl));
+    expect(await store.read({ workspaceId: WORKSPACE, connectionId: CONNECTION })).toBeNull();
+    expect(
+      await store.read({
+        workspaceId: WORKSPACE,
+        connectionId: "00000000-0000-0000-0000-00000000ffff",
+      }),
+    ).toBeNull();
+  });
+
+  it("refuses two rows rather than picking one", async () => {
+    const f = fake([{ body: [connectionRow(), connectionRow()] }]);
+    await expect(
+      createConnectionStore(config(f.impl)).read({
+        workspaceId: WORKSPACE,
+        connectionId: CONNECTION,
+      }),
+    ).rejects.toThrow(StoreError);
+  });
+
+  it("refuses an answer that is not a list", async () => {
+    const f = fake([{ body: connectionRow() }]);
+    await expect(
+      createConnectionStore(config(f.impl)).read({
+        workspaceId: WORKSPACE,
+        connectionId: CONNECTION,
+      }),
+    ).rejects.toThrow(StoreError);
+  });
+});
+
+/**
+ * workerd's own `Crypto`, narrowed to what the vault uses.
+ *
+ * The cast is `packages/vault/src/vault.test.ts`'s and is there for the reason `CryptoKeyLike`
+ * exists: the handle type differs between runtimes, so `CryptoLike` describes the operations rather
+ * than nominally matching any one platform's `SubtleCrypto`. What is NOT faked is the
+ * implementation -- this is real WebCrypto in real workerd, which is the whole reason these tests
+ * live in this app.
+ */
+const webcrypto = crypto as unknown as CryptoLike;
+
+describe("bytea arrives as Postgres hex, and reading it as anything else is unreadable later", () => {
+  it("decodes the hex output PostgREST actually sends", () => {
+    expect([...decodeBytea("\\x00ff10", "t")]).toEqual([0, 255, 16]);
+    expect([...decodeBytea("\\x", "t")]).toEqual([]);
+  });
+
+  it("refuses base64, plain text and a missing prefix", () => {
+    // Each of these encodes to *something*. `TextEncoder().encode()` on any of them produces bytes
+    // that are not the ciphertext, and AES-GCM then fails authentication with a message that sends
+    // whoever reads it looking at the KEK, the DEK wrapping and the scope -- everything except the
+    // thing that is wrong.
+    expect(() => decodeBytea("AP8Q", "t")).toThrow(StoreError);
+    expect(() => decodeBytea("00ff10", "t")).toThrow(StoreError);
+    expect(() => decodeBytea(null, "t")).toThrow(StoreError);
+    expect(() => decodeBytea("\\x0f0", "t")).toThrow(StoreError);
+    expect(() => decodeBytea("\\xzz", "t")).toThrow(StoreError);
+  });
+
+  it("carries the sealed bytes through unchanged, proved by opening a real credential", async () => {
+    // THE ROUND TRIP, AND IT IS THE ONLY TEST HERE THAT WOULD HAVE CAUGHT A WRONG DECODE. Every
+    // assertion above is about a shape; this one seals a credential with the real vault, puts it on
+    // the wire exactly as PostgREST would, reads it back through the adapter and opens it. A decode
+    // that is off by a prefix, a nibble or an encoding fails here and nowhere else.
+    const kek = crypto.getRandomValues(new Uint8Array(32));
+    const sealed = await seal(webcrypto, {
+      plaintext: JSON.stringify({ kind: "key_secret", key: "ck_a1b2c3", secret: "cs_9z8y7x" }),
+      kek,
+      keyVersion: 1,
+      scope: { workspaceId: WORKSPACE, connectionId: CONNECTION },
+    });
+
+    const f = fake([
+      {
+        body: [
+          connectionRow({
+            credential_ciphertext: asBytea(sealed.ciphertext),
+            credential_iv: asBytea(sealed.iv),
+            wrapped_dek: asBytea(sealed.wrappedDek),
+            key_version: sealed.keyVersion,
+          }),
+        ],
+      },
+    ]);
+
+    const record = await createConnectionStore(config(f.impl)).read({
+      workspaceId: WORKSPACE,
+      connectionId: CONNECTION,
+    });
+    if (record === null) throw new Error("the adapter returned no row");
+
+    // `openCredential` takes `@repo/connections`'s own `ConnectionRow`. This call is the structural
+    // check the module note promises: a field renamed on either side fails HERE, at typecheck.
+    const credential = await openCredential(webcrypto, record, kek);
+    expect(credential).toEqual({ kind: "key_secret", key: "ck_a1b2c3", secret: "cs_9z8y7x" });
+  });
+});
+
+describe("a connection row this adapter cannot account for is refused, not repaired", () => {
+  it("keeps the timezone, including the null that means nobody has told us", () => {
+    expect(toConnectionRecord(connectionRow()).timezone).toBe("Asia/Bangkok");
+    expect(toConnectionRecord(connectionRow({ timezone: null })).timezone).toBeNull();
+  });
+
+  it("refuses a row with no workspace or id, because those two ARE the cipher's scope", () => {
+    // Not defensiveness. `open()` binds the ciphertext to {workspaceId, connectionId} as AES-GCM
+    // additional data, so an empty string there does not fail loudly -- it produces a different
+    // scope that simply does not authenticate, which reads exactly like a wrong KEK.
+    expect(() => toConnectionRecord(connectionRow({ workspace_id: null }))).toThrow(StoreError);
+    expect(() => toConnectionRecord(connectionRow({ id: "" }))).toThrow(StoreError);
+  });
+
+  it("refuses a provider the database allows but no connector can drive", () => {
+    // `app.connection_provider` carries nine members; PROVIDER_LANES names five. `impact`, `awin`,
+    // `cj` and `partnerstack` are rows the database will hold and that nothing here can pull. The
+    // alternative to refusing at the read is casting a lie that surfaces as an undefined lookup
+    // during a pull, hours later.
+    expect(() => toConnectionRecord(connectionRow({ provider: "impact" }))).toThrow(StoreError);
+    expect(() => toConnectionRecord(connectionRow({ provider: "shopify" }))).toThrow(StoreError);
+    expect(toConnectionRecord(connectionRow({ provider: "meta_ads" })).provider).toBe("meta_ads");
+  });
+
+  it("refuses a credential lane or a status this build does not know", () => {
+    expect(() => toConnectionRecord(connectionRow({ credential_lane: "mtls" }))).toThrow(
+      StoreError,
+    );
+    expect(() => toConnectionRecord(connectionRow({ status: "paused" }))).toThrow(StoreError);
+    // Every member of the real unions passes, read from the packages that define them rather than
+    // from a list copied into this test.
+    for (const lane of CREDENTIAL_LANES) {
+      expect(toConnectionRecord(connectionRow({ credential_lane: lane })).credentialLane).toBe(
+        lane,
+      );
+    }
+    for (const status of CONNECTION_STATUSES) {
+      expect(toConnectionRecord(connectionRow({ status })).status).toBe(status);
+    }
+  });
+
+  it("refuses a key_version that is not an integer", () => {
+    // The KEK generation a credential was wrapped under is not a value to guess.
+    expect(() => toConnectionRecord(connectionRow({ key_version: null }))).toThrow(StoreError);
+    expect(() => toConnectionRecord(connectionRow({ key_version: "1" }))).toThrow(StoreError);
+  });
+
+  it("returns status, revoked_at and expires_at verbatim rather than judging them", () => {
+    // `connectionHealth` and `openCredential` own "is this connection usable?". A second opinion
+    // here would be a second place for that answer to live, and the two would drift.
+    const revoked = toConnectionRecord(
+      connectionRow({ status: "revoked", revoked_at: "2026-09-01T00:00:00+00:00" }),
+    );
+    expect(revoked.status).toBe("revoked");
+    expect(revoked.revokedAt).toBe("2026-09-01T00:00:00+00:00");
+  });
+
+  it("reads granted_scopes as a list of strings, and an absent one as empty", () => {
+    expect(toConnectionRecord(connectionRow({ granted_scopes: ["a", "b"] })).grantedScopes).toEqual(
+      ["a", "b"],
+    );
+    expect(toConnectionRecord(connectionRow({ granted_scopes: null })).grantedScopes).toEqual([]);
   });
 });

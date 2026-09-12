@@ -68,6 +68,9 @@ importers:
 
   apps/api-edge:
     dependencies:
+      '@repo/connections':
+        specifier: workspace:*
+        version: link:../../packages/connections
       '@repo/contract':
         specifier: workspace:*
         version: link:../../packages/contract
@@ -255,6 +258,9 @@ importers:
 
   packages/store:
     dependencies:
+      '@repo/connections':
+        specifier: workspace:*
+        version: link:../connections
       '@repo/contract':
         specifier: workspace:*
         version: link:../contract

@@ -10,6 +10,15 @@
  * side without the other stays unclaimed; adding both without updating the mirror fails the build.
  * That is the desired failure mode: stale marketing copy cannot survive a connector change.
  *
+ * CLAIMABLE IS NOT THE SAME AS REACHABLE, and the gap between them was live. `google_ads`,
+ * `meta_ads` and `search_console` each had a tested client and normaliser -- so this guard counted
+ * them, and the site said "Reads GA4, Google Ads, Meta Ads, Search Console and WooCommerce" --
+ * while `packages/connectors/src/index.ts` exported NONE of the three. The claim was true about
+ * the directory listing and false about the product: no other package could import any of them.
+ *
+ * So a source must also be EXPORTED from the barrel. A connector nothing can import is not a
+ * capability, and a guard that reads the tree without reading the barrel will keep saying it is.
+ *
  * Usage: node scripts/check-capabilities.mjs [--warn]
  */
 
@@ -19,6 +28,7 @@ import { parseArgs, readText, repoRoot, report } from "./lib/scan.mjs";
 
 const CLAIMS_FILE = "packages/brand/src/claims.ts";
 const SOURCES_DIR = "packages/connectors/src/sources";
+const BARREL = "packages/connectors/src/index.ts";
 
 function sourceList(source) {
   const match = source.match(/IMPLEMENTED_SOURCE_IDS\s*=\s*\[([\s\S]*?)\]\s*as const/);
@@ -55,6 +65,27 @@ if (unknown.length > 0) {
 const declared = sourceList(readText(CLAIMS_FILE));
 const implemented = implementedSources();
 const findings = [];
+
+// REACHABILITY. Every implemented source must be re-exported from the package barrel, for both
+// halves it owns: the client that fetches and the normaliser that turns a response into envelope
+// rows. Exporting one without the other is the same defect at half scale -- `woocommerce` exported
+// its normaliser and not the client feeding it, so nothing outside the package could fetch an order.
+const barrel = readText(BARREL);
+for (const source of implemented) {
+  for (const half of ["client", "normalize"]) {
+    if (!barrel.includes(`./sources/${source}/${half}.js`)) {
+      findings.push({
+        file: BARREL,
+        line: 1,
+        column: 1,
+        message:
+          `source "${source}" has a ${half}.ts that the barrel does not export, so no other ` +
+          "package can import it. The connector claim counts this source as implemented, which " +
+          "makes the marketing sentence true about the tree and false about the product.",
+      });
+    }
+  }
+}
 
 if (declared === null) {
   findings.push({
@@ -97,8 +128,11 @@ process.exit(
     notes: [
       "the connector claim is derived from packages/brand because brand cannot import connectors",
       "a claimable source has both client.ts and normalize.ts under packages/connectors/src/sources",
+      "and both halves must be re-exported from the barrel -- claimable is not the same as reachable",
     ],
     warn,
-    summary: "the connector claim names exactly the source modules implemented in the repository",
+    summary:
+      "the connector claim names exactly the source modules implemented in the repository, and " +
+      "every one of them is importable",
   }),
 );

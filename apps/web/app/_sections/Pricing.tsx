@@ -7,11 +7,12 @@
  * The reference ships two <button>s and a script that rewrites each price when you switch. That
  * script is not in the supplied page set (only index.html, styles.css, extended.css and the brand
  * guide were delivered), so the yearly figures do not exist anywhere in the design. The brief's
- * rule is that pricing is taken verbatim and never invented, and 20% off $19 is a number I would
- * be making up, not reading. So this section renders MONTHLY ONLY and the pill is a static
- * segmented indicator: two spans, no <button>, no href, no hover state, no pointer cursor, nothing
- * focusable. It states which period the prices below are quoted in and that a yearly term saves
- * 20% -- both true -- and the `.billing-note` underneath repeats the period in words. A dead
+ * rule is that pricing is taken verbatim and never invented, and a yearly figure for $19 is a
+ * number I would be making up, not reading. So this section renders MONTHLY ONLY and the pill is a
+ * static segmented indicator: two spans, no <button>, no href, no hover state, no pointer cursor,
+ * nothing focusable. It states which period the prices below are quoted in and that a yearly term
+ * costs ten months rather than twelve -- both true -- and the `.billing-note` underneath repeats
+ * the period in words. A dead
  * <button> that swallows a click would be the misleading version; this is the honest one. When the
  * yearly figures arrive, this becomes a "use client" component with useState over a second price
  * field, and nothing else about the file changes.
@@ -61,9 +62,9 @@ const BILLING_NOTE = "Monthly billing. Upgrade anytime.";
 const BILLING = {
   active: "Monthly",
   alternate: "Yearly",
-  saving: "20% off",
+  saving: "2 months free",
   /** Read by assistive tech in place of the visual pill, which is two bare spans. */
-  label: "Prices shown are per month. A yearly term saves 20%.",
+  label: "Prices shown are per month. A yearly term costs ten months rather than twelve.",
 } as const;
 
 const CTA_LABEL = "Get started";
@@ -190,7 +191,7 @@ export function Pricing() {
 
         {/* Not a control. See the module comment: two spans, nothing focusable, nothing to click.
             The visual pill is hidden from assistive tech and replaced by one spoken sentence,
-            because "Monthly Yearly 20% off" read out of a group conveys the opposite of the truth. */}
+            because "Monthly Yearly 2 months free" read out of a group conveys the opposite of the truth. */}
         <div className="mt-6 mb-7 flex justify-center">
           <span className="sr-only">{BILLING.label}</span>
           <div

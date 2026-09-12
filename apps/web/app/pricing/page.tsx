@@ -140,7 +140,11 @@ const POPULAR_BADGE = "Most popular";
 const CTA_LABEL = "Get started";
 
 const PER_MONTH = "/ month";
-const YEARLY_SAVING = "20% off";
+// "TWO MONTHS FREE" RATHER THAN A PERCENTAGE, because it is exactly true and a percentage was not.
+// The yearly price is ten times the monthly one in all three currencies, so the saving is two whole
+// months to the satang -- there is no rounding for the copy to overstate. `plans.test.ts` asserts
+// this sentence as arithmetic in every currency.
+const YEARLY_SAVING = "2 months free";
 
 /**
  * The four self-serve tiers, composed from the catalogue so no price is written twice.

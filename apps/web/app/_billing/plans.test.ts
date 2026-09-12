@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ANNUAL_DISCOUNT,
+  MONTHS_CHARGED_ANNUALLY,
+  MONTHS_PER_YEAR,
   CURRENCIES,
   DEFAULT_CURRENCY,
   amountOf,
@@ -27,15 +28,36 @@ describe("the plan catalogue", () => {
   });
 
   it.each(PLAN_DISPLAY.filter((p) => p.plan !== "free"))(
-    "$name's yearly price is twelve months less the stated discount, IN EVERY CURRENCY",
+    "$name's yearly price is ten months' money, IN EVERY CURRENCY",
     (entry) => {
-      // Per currency, because the discount is the promise and the monthly figure is the judgement.
+      // Per currency, because the term is the promise and the monthly figure is the judgement.
       // A currency added with a hand-written yearly number that quietly differs is exactly what
-      // this catches. If a plan ever gets a different discount, delete ITS case rather than
-      // loosening this one -- a rule widened to fit an exception stops catching the typo.
+      // this catches. If a plan ever gets a different term, delete ITS case rather than loosening
+      // this one -- a rule widened to fit an exception stops catching the typo.
+      //
+      // NO `Math.round` HERE, deliberately, and it is the assertion that now has teeth. The old
+      // rule multiplied by 0.8 and rounded, so it accepted any monthly figure. This one demands an
+      // EXACT product: if a yearly price is ever typed by hand, or a monthly figure is chosen that
+      // does not multiply cleanly, the equality fails rather than being absorbed by the rounding.
       for (const currency of CURRENCIES) {
-        const expected = Math.round(entry.monthly[currency] * 12 * (1 - ANNUAL_DISCOUNT));
-        expect(entry.yearly[currency], currency).toBe(expected);
+        expect(entry.yearly[currency], currency).toBe(
+          entry.monthly[currency] * MONTHS_CHARGED_ANNUALLY,
+        );
+      }
+    },
+  );
+
+  it.each(PLAN_DISPLAY.filter((p) => p.plan !== "free"))(
+    "$name's annual term really is two free months, IN EVERY CURRENCY",
+    (entry) => {
+      // THE PAGE SAYS "two months free". This is that sentence, as arithmetic. A term that stopped
+      // being exactly two months would leave the copy overstating by some fraction nobody would
+      // notice, which is the failure the percentage rule actually had.
+      for (const currency of CURRENCIES) {
+        const free = MONTHS_PER_YEAR - MONTHS_CHARGED_ANNUALLY;
+        expect(entry.monthly[currency] * MONTHS_PER_YEAR - entry.yearly[currency], currency).toBe(
+          entry.monthly[currency] * free,
+        );
       }
     },
   );

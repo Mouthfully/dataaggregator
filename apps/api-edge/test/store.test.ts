@@ -199,6 +199,29 @@ describe("the minted token is the whole authority, and its absences are load-bea
     expect(JSON.stringify(f.calls)).not.toContain(SECRET);
   });
 
+  it("mints an app_ingest token with NO workspace_id, because the function takes one", async () => {
+    // The third role, and the one categorically unlike the other two: `anon` and `authenticated`
+    // read, and RLS narrows what they see. `app_ingest` WRITES, and reaches the table through a
+    // `security definer` that does not consult RLS at all -- so a workspace_id claim here would be
+    // decoration that reads like a constraint. The workspace is an argument.
+    const token = await mintToken({ secret: SECRET, role: "app_ingest", now: FIXED });
+    const claims = JSON.parse(
+      new TextDecoder().decode(
+        Uint8Array.from(
+          atob((token.split(".")[1] as string).replace(/-/g, "+").replace(/_/g, "/")),
+          (c) => c.charCodeAt(0),
+        ),
+      ),
+    );
+    expect(Object.keys(claims).sort()).toEqual(["exp", "iat", "role"]);
+    expect(claims.role).toBe("app_ingest");
+    expect(claims.workspace_id).toBeUndefined();
+    // Same secret, same signing path -- which is exactly why the design note says this makes
+    // SUPABASE_JWT_SECRET a write credential and not only a read one.
+    expect(await signatureVerifies(token, SECRET)).toBe(true);
+    expect(await signatureVerifies(token, `${SECRET}-tampered`)).toBe(false);
+  });
+
   it("refuses to sign with an empty secret rather than producing a valid-looking token", async () => {
     await expect(mintToken({ secret: "", role: "authenticated", now: FIXED })).rejects.toThrow(
       /empty signing secret/,

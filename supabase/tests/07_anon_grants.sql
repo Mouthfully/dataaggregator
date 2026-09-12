@@ -155,6 +155,10 @@ select app_test.check('anon holds no USAGE on schema app, which is why only publ
 do $$
 declare
   r record;
+  -- STILL TWO. `public.ingest_envelope_rows(jsonb)` was added by
+  -- 20260912000300_ingest_entry_point.sql and is deliberately NOT here: it is executable only by
+  -- `app_ingest`, never by anon, and the assertions below the loop check that directly. A third
+  -- entry in this array would mean the internet could write envelope rows.
   v_expected constant text[] := array[
     'public.consume_api_key_credits(bytea, integer)',
     'public.verify_api_key(bytea)'
@@ -216,6 +220,46 @@ begin;
 commit;
 
 -- ---------------------------------------------------------------------------------------------
+-- THE INGEST ENTRY POINT, asserted from both directions.
+--
+-- `public.ingest_envelope_rows` is the one function in `public` that WRITES derived platform data,
+-- and the enumeration above only proves anon cannot reach it. These prove the rest of the shape:
+-- that the role which is supposed to reach it can, and that the role PostgREST assumes on a tenant
+-- request cannot. A revoke that took `app_ingest` with it presents as "ingest silently writes
+-- nothing", which is the failure this whole file exists to make loud.
+-- ---------------------------------------------------------------------------------------------
+select app_test.check('app_ingest may execute the ingest entry point',
+  has_function_privilege('app_ingest', 'public.ingest_envelope_rows(jsonb)', 'EXECUTE'));
+
+select app_test.check('anon may NOT execute the ingest entry point',
+  not has_function_privilege('anon', 'public.ingest_envelope_rows(jsonb)', 'EXECUTE'),
+  'the anon key is public and ships in browsers; this function writes the numbers the product guarantees');
+
+select app_test.check('authenticated may NOT execute the ingest entry point',
+  not has_function_privilege('authenticated', 'public.ingest_envelope_rows(jsonb)', 'EXECUTE'),
+  'a tenant able to call this could fabricate its own reported numbers');
+
+-- PostgREST logs in as `authenticator` and SET LOCAL ROLEs to the token's claim. Without this
+-- membership the SET ROLE fails and surfaces as a rejected token, sending whoever hits it to look
+-- at the signing secret rather than at role membership.
+--
+-- 'MEMBER', NOT 'USAGE', AND THE DIFFERENCE IS THE WHOLE POINT. `pg_has_role(..., 'USAGE')` asks
+-- whether the role holds the privileges PASSIVELY, by inheritance; 'MEMBER' asks whether it may
+-- SET ROLE to it. `authenticator` is NOINHERIT, so USAGE is false here while the grant is recorded
+-- and SET ROLE works -- this assertion was written as USAGE first and failed against a correct
+-- migration, which is a cheaper way to learn it than in production.
+select app_test.check('authenticator may assume app_ingest, which is how PostgREST reaches it',
+  pg_has_role('authenticator', 'app_ingest', 'MEMBER'));
+
+-- AND IT MUST NOT INHERIT. If `authenticator` were INHERIT, it would hold app_ingest's EXECUTE
+-- passively on EVERY request -- including a tenant's, before any SET ROLE narrows it -- which turns
+-- the careful revoke above into decoration. Supabase ships it NOINHERIT; this asserts that rather
+-- than trusting it, because the property is invisible until something exploits it.
+select app_test.check('authenticator does not INHERIT app_ingest, so a tenant request never holds it',
+  not (select rolinherit from pg_roles where rolname = 'authenticator'),
+  'an inheriting authenticator holds app_ingest EXECUTE on every request, before SET ROLE narrows it');
+
+-- ---------------------------------------------------------------------------------------------
 -- Summary
 --
 -- The floor is asserted for the reason given in 06_jwt_claims.sql: a suite that stops running
@@ -236,7 +280,7 @@ declare v_failed integer; v_total integer;
 begin
   select count(*) filter (where not passed), count(*) into v_failed, v_total from app_test.results;
   if v_failed > 0 then raise exception 'anon grants: % assertion(s) failed', v_failed; end if;
-  if v_total < 88 then
-    raise exception 'anon grants: only % assertion(s) ran; expected at least 88', v_total;
+  if v_total < 93 then
+    raise exception 'anon grants: only % assertion(s) ran; expected at least 93', v_total;
   end if;
 end $$;

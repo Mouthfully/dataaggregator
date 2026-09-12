@@ -36,8 +36,29 @@ const encoder = new TextEncoder();
  */
 export const TOKEN_TTL_SECONDS = 60;
 
-/** The two roles this Worker ever asks PostgREST for. Anything wider is a different design. */
-export type MintedRole = "anon" | "authenticated";
+/**
+ * The roles this Worker asks PostgREST for.
+ *
+ * This was two, with a comment reading "anything wider is a different design". `app_ingest` IS that
+ * different design, taken deliberately rather than by widening a union in passing:
+ *
+ *   anon           reads nothing. Used for `verify_api_key`, which is gated on the key hash.
+ *   authenticated  reads ONE workspace's rows, narrowed by row-level security on every query.
+ *   app_ingest     WRITES derived platform data, and is narrowed by nothing at all.
+ *
+ * The third is categorically unlike the first two, and the cost is worth stating where it is felt:
+ * it makes SUPABASE_JWT_SECRET a WRITE credential rather than only a read one. Anything that can
+ * mint a token can now reach `public.ingest_envelope_rows`. That function is executable by no other
+ * role -- `supabase/tests/07_anon_grants.sql` fails if anon or authenticated ever gain it, and
+ * `10_ingest_entry_point.sql` calls it as a tenant and asserts the refusal -- so the secret is the
+ * whole boundary. A direct connection through Hyperdrive is what would replace it, and remains the
+ * deferred decision `apps/api-edge/src/index.ts` already names for the webhook drain.
+ *
+ * A token minted for `app_ingest` carries NO `workspace_id` claim. The workspace is an argument to
+ * the function, which reaches the table through a `security definer` that does not consult RLS, so
+ * a claim here would be decoration that reads like a constraint.
+ */
+export type MintedRole = "anon" | "authenticated" | "app_ingest";
 
 export interface CryptoLike {
   subtle: Pick<SubtleCrypto, "importKey" | "sign" | "digest">;

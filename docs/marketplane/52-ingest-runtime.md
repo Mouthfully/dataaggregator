@@ -113,6 +113,33 @@ fabricated human identity is exactly what would turn this into a credential that
 connection. **So the Worker physically cannot write `last_backfill_at`.** That is a limitation with
 a cause, not an oversight; see §4.
 
+### Nine findings from review, all real, all fixed
+
+A Codex review on the first push raised nine. Every one was verified against the code or the runtime
+before acting, and every one held. Two are worth reading:
+
+**P1 — a future `until` banks a checkpoint over orders that were never read.** The window closes at
+`until` and the checkpoint *becomes* `until`. An order modified between this run finishing and that
+future instant sits inside the banked window, was never fetched, and **no later run asks for a
+window behind the mark**. Refused rather than silently clamped to `fetchedAt`: clamping answers a
+different question than the operator asked.
+
+**P1 — `WooNormalizeError` was on the allow-list and should not have been.** Its sentences are
+written in this repository for a human to read — and they interpolate the *merchant's payload* into
+them: `order ${order.id} total` names an order and `JSON.stringify(value)` prints the raw field that
+failed to parse. The allow-list had been reasoned about at the level of *who wrote the sentence*
+rather than *what the sentence contains*. It now emits the error's `code` — the whole diagnosis an
+operator needs, none of the values.
+
+The other seven: a `StoreError` from the connection read and a decryption failure from
+`openCredential` both threw **outside** the reporting `try` and escaped every handler as an
+unstructured 500 (now `store_unavailable` → 502 and `bad_kek` → 503); non-UUID identifiers reached
+Postgres to fail there; `until <= since` surfaced as a 502 telling the caller to retry a request no
+retry can rescue; `parseRfc3339` accepted hour 24; `pages` claimed to count store requests while the
+bisector's discarded probe pages never reached it (now documented accurately, with `splits`
+alongside); and a revoked connection missing a timezone was told to populate a column that could not
+make it runnable.
+
 ## 2. Cost estimate
 
 **฿0.00 per connected store per month in platform fees**, unchanged from
@@ -245,7 +272,7 @@ change only once somebody writes it down.
 
 ## 6. Verification
 
-- [x] `pnpm -r test` — **883 tests**, 0 failures (`@repo/api-edge` 130 → **151**)
+- [x] `pnpm -r test` — **893 tests**, 0 failures (`@repo/api-edge` 130 → **160**)
 - [x] `pnpm -r typecheck` — clean
 - [x] `pnpm exec biome lint .` / `biome format .` — clean
 - [x] **All eight guards pass**
@@ -264,6 +291,28 @@ change only once somebody writes it down.
 | I4 | the timezone refusal removed, defaulting to UTC | `ingest.test.ts` | **FAIL** |
 | I5 | `tokenMatches` replaced with `===` | `ingest.test.ts` | **FAIL** — *see below* |
 | I6 | `reasonOf` returns every error's raw message | `ingest.test.ts` | **FAIL** |
+| R5 | the future-`until` refusal removed | `ingest.test.ts` | **FAIL** |
+| R6 | the connection read left unwrapped, as before the fix | `ingest.test.ts` | **FAIL** |
+| R7 | `parseRfc3339` reverted to a date-only probe | *see below* | **CONFIRMED** |
+| R8 | `WooNormalizeError` back on the allow-list | `ingest.test.ts` | **FAIL** |
+| R9 | health checked after the timezone again | `ingest.test.ts` | **FAIL** |
+
+### R7 took three attempts, and the first two were wrong
+
+The first two mutations removed the *comparisons* of the hour, minute and second but left the probe
+still **constructed** from them — and hour-24 rollover changes the date, so the surviving date
+comparison caught it anyway. Both runs reported "survived", which would have been a false claim that
+the fix was unnecessary.
+
+The faithful original constructs the probe from the date alone. Run directly, without a test runner:
+
+```
+ORIGINAL   2026-09-11T24:00:00Z  ->  2026-09-12T00:00:00.000Z   (silently a day later)
+FIXED      2026-09-11T24:00:00Z  ->  THREW
+```
+
+Recorded because the lesson is about the method, not the function: **a mutation that only half-reverts
+a change tests nothing, and it fails in the direction that looks like good news.**
 
 ### I5 survived, and what that cost
 

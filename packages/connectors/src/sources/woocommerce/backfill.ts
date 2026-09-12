@@ -221,11 +221,16 @@ export function wooBackfillChunks(
  *                               reason, and `vitest.config.ts` pins the suite to Asia/Bangkok
  *                               because in UTC the wrong answer and the right one are one string.
  *   `"September 11, 2026"`    -> accepted. Not a format any caller should be able to reach here.
+ *   `"2026-09-11T24:00:00Z"`  -> **the next day**. RFC3339 forbids hour 24 and `Date.parse` rolls
+ *                               it over silently. Same failure as the first, one field along --
+ *                               and the first draft of this function missed it, because the round
+ *                               trip below checked only the date. Found in review.
  *
- * So the SHAPE is matched first, and then the CALENDAR is checked by rebuilding the instant from
- * its own components: `Date.UTC(2026, 1, 30)` rolls forward, so a date that does not survive the
- * round trip did not exist. The offset is applied by `Date.parse` afterwards, which is sound once
- * the components are known to be real.
+ * So the SHAPE is matched first, and then EVERY COMPONENT is checked by rebuilding the instant from
+ * its own parts: `Date.UTC` normalises rather than refusing in both halves -- `(2026, 1, 30)` is
+ * March 2 and `(2026, 8, 11, 24, 0, 0)` is the twelfth -- so anything that does not survive the
+ * round trip did not exist. The components are checked as a WALL CLOCK, independent of the offset:
+ * the offset only moves the resulting instant, which `Date.parse` applies afterwards.
  *
  * Exported because `apps/api-edge` validates the same two fields at its HTTP boundary, and two
  * implementations of "is this an instant" is how they come to disagree.
@@ -244,19 +249,34 @@ export function parseRfc3339(value: string, field: string): number {
     );
   }
 
-  const [, y, mo, d] = m as unknown as [string, string, string, string];
-  // THE CALENDAR CHECK. `Date.UTC(2026, 1, 30)` is March 2 and reports no error, so the only way to
-  // learn that a date did not exist is to build it and see whether it came back the same.
-  const probe = new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d)));
+  const [, y, mo, d, hh, mi, ss] = m as unknown as [
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+  ];
+
+  // THE ROUND TRIP, OVER EVERY COMPONENT. `Date.UTC` normalises rather than refusing, and it does
+  // so in both halves: `(2026, 1, 30)` is March 2, and `(2026, 8, 11, 24, 0, 0)` is the twelfth.
+  // Checking only the date let `2026-09-11T24:00:00Z` through -- a day later than the caller wrote.
+  const probe = new Date(
+    Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(hh), Number(mi), Number(ss)),
+  );
   if (
     probe.getUTCFullYear() !== Number(y) ||
     probe.getUTCMonth() !== Number(mo) - 1 ||
-    probe.getUTCDate() !== Number(d)
+    probe.getUTCDate() !== Number(d) ||
+    probe.getUTCHours() !== Number(hh) ||
+    probe.getUTCMinutes() !== Number(mi) ||
+    probe.getUTCSeconds() !== Number(ss)
   ) {
     throw new WooBackfillError(
-      `woocommerce: ${field} is ${JSON.stringify(value)}, which is not a date that exists. ` +
+      `woocommerce: ${field} is ${JSON.stringify(value)}, which is not an instant that exists. ` +
         "Rolling it forward would query a window nobody asked for and then advance the watermark " +
-        "past the days it skipped.",
+        "past what it skipped.",
       "invalid_window",
     );
   }

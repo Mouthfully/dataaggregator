@@ -137,6 +137,10 @@ const REFUSAL_STATUS: Record<IngestError["refusal"], number> = {
   wrong_credential_lane: 409,
   // A deployment fault, like a missing binding, and answered the same way.
   bad_kek: 503,
+  // 502, and RETRYABLE -- unlike every other member. The request was fine and the run never began,
+  // so there is no partial progress and no checkpoint to report; trying again is the correct next
+  // move, which is exactly what the other 5xx here does NOT mean.
+  store_unavailable: 502,
 };
 
 /**
@@ -273,6 +277,7 @@ function body_of(report: IngestReport): Record<string, unknown> {
     rows_read: report.rowsRead,
     rows_written: report.rowsWritten,
     chunks: report.chunks,
+    splits: report.splits,
     checkpoint: report.checkpoint,
     complete: report.complete,
   };
@@ -288,10 +293,32 @@ function body_of(report: IngestReport): Record<string, unknown> {
  * a stack is nobody's business. Same rule as `storeFailure`'s: the kind travels, the values do not.
  */
 export function reasonOf(cause: unknown): string {
-  const named = ["WooClientError", "WooNormalizeError", "WooBackfillError", "StoreError"];
-  if (cause instanceof Error && named.includes(cause.name)) return cause.message;
-  if (cause instanceof Error) return `the run failed with ${cause.name}`;
-  return "the run failed";
+  if (!(cause instanceof Error)) return "the run failed";
+
+  // `WooNormalizeError` IS NOT ON THE ALLOW-LIST, AND IT LOOKS LIKE IT SHOULD BE. Its sentences are
+  // written in this repository for a human to read -- and they interpolate the MERCHANT'S PAYLOAD
+  // into them: `order ${order.id} total` names an order, and `JSON.stringify(value)` prints the raw
+  // field that failed to parse. Both are platform data, and this function is the last gate before a
+  // response body and a log line.
+  //
+  // Its `code` carries the whole diagnosis an operator needs -- `missing_currency` says which field
+  // and what to do -- with none of the values. Found in review; the allow-list had been reasoned
+  // about at the level of "who wrote the sentence" rather than "what the sentence contains".
+  if (cause.name === "WooNormalizeError") {
+    const code = (cause as { code?: unknown }).code;
+    return `an order could not be normalised (${typeof code === "string" ? code : "unknown"})`;
+  }
+
+  // The rest are repository-authored AND value-free. `WooClientError` and `WooBackfillError`
+  // interpolate windows and counts, which are the caller's own inputs and arithmetic over them;
+  // `StoreError` deliberately drops PostgREST's `details` and `hint` because both echo the failing
+  // query. Each was re-read against this rule rather than inherited from the previous list.
+  const named = ["WooClientError", "WooBackfillError", "StoreError"];
+  if (named.includes(cause.name)) return cause.message;
+
+  // Everything else by NAME only. `ExtractError` is why: its message interpolates the request URL,
+  // and the request URL is the merchant's store origin.
+  return `the run failed with ${cause.name}`;
 }
 
 /** Counts and reasons only. No payload, no credential, no store URL. */
@@ -305,6 +332,7 @@ function log(report: IngestReport, requestId: string, failure: string | null): v
       rows_read: report.rowsRead,
       rows_written: report.rowsWritten,
       chunks: report.chunks,
+      splits: report.splits,
       complete: report.complete,
       ...(failure === null ? {} : { failure }),
     }),

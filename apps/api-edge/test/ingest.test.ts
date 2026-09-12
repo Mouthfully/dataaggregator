@@ -31,7 +31,8 @@ import {
 import indexSource from "../src/index.ts?raw";
 import { reasonOf, tokenMatches } from "../src/index.js";
 import { StoreError } from "@repo/store";
-import { WooBackfillError } from "@repo/connectors";
+import { WooBackfillError, parseRfc3339 } from "@repo/connectors";
+import { WooNormalizeError } from "@repo/connectors";
 import { ExtractError } from "@repo/extract";
 
 const WORKSPACE = "7c000000-0000-0000-0000-000000000001";
@@ -430,6 +431,137 @@ describe("the route", () => {
   it("refuses a GET", async () => {
     const response = await SELF.fetch("https://edge.test/v1/ingest/run");
     expect(response.status).toBe(405);
+  });
+});
+
+describe("what review found, and what now fails without the fix", () => {
+  it("refuses an `until` in the future, because the checkpoint would cover unread orders", async () => {
+    // The window closes at `until` and the checkpoint BECOMES `until`. An order modified between
+    // this run finishing and that future instant sits inside the banked window, was never read, and
+    // no later run asks for a window behind the mark. Clamping silently would answer a different
+    // question than the operator asked.
+    const h = await harness();
+    await expect(
+      runIngest({ ...REQUEST, until: "2026-12-25T00:00:00.000Z" }, h.deps),
+    ).rejects.toMatchObject({ refusal: "bad_request" });
+    expect(h.storeCalls).toHaveLength(0);
+
+    // `until` exactly at the run's start is the boundary and is fine.
+    const ok = await harness();
+    await expect(
+      runIngest({ ...REQUEST, until: NOW.toISOString() }, ok.deps),
+    ).resolves.toMatchObject({ complete: true });
+  });
+
+  it("turns a database failure on the connection read into a refusal, never a 500", async () => {
+    // This throw is OUTSIDE the run's own try, so before the fix it escaped every handler in the
+    // route. `store_unavailable` is 502 and retryable -- unlike every other refusal.
+    const h = await harness();
+    await expect(
+      runIngest(REQUEST, {
+        ...h.deps,
+        connections: {
+          read: async () => {
+            throw new StoreError("the database could not be reached: TypeError", "upstream");
+          },
+        },
+      }),
+    ).rejects.toMatchObject({ refusal: "store_unavailable" });
+  });
+
+  it("classifies a KEK that is the right length and the wrong key", async () => {
+    // `kekFromBase64` checks 32 bytes and nothing more, so a KEK from another deployment decodes
+    // fine and then fails AES-GCM authentication inside open(). That is a deployment fault and
+    // `bad_kek` exists to diagnose it -- but the throw was not an IngestError, so it 500'd.
+    const wrong = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+    const h = await harness({ kekOverride: wrong });
+    await expect(runIngest(REQUEST, h.deps)).rejects.toMatchObject({ refusal: "bad_kek" });
+    expect(h.storeCalls).toHaveLength(0);
+  });
+
+  it("reports terminal health before a missing timezone", async () => {
+    // A revoked connection that ALSO has no timezone was told to populate a column -- work that
+    // cannot make it runnable, while the merchant's reauthorisation is what is actually needed.
+    const kek = crypto.getRandomValues(new Uint8Array(32));
+    const h = await harness({
+      record: await connection(kek, {
+        status: "revoked",
+        revokedAt: "2026-09-01T00:00:00+00:00",
+        timezone: null,
+      }),
+    });
+    await expect(runIngest(REQUEST, h.deps)).rejects.toMatchObject({
+      refusal: "connection_unusable",
+    });
+  });
+
+  it("refuses a non-UUID identifier at the boundary rather than inside Postgres", () => {
+    const base = { connection_id: CONNECTION, since: "2026-09-11T00:00:00Z" };
+    expect(() => parseIngestRequest({ ...base, workspace_id: "bad" })).toThrow(IngestError);
+    expect(() =>
+      parseIngestRequest({ workspace_id: WORKSPACE, connection_id: "bad", since: base.since }),
+    ).toThrow(IngestError);
+    expect(parseIngestRequest({ ...base, workspace_id: WORKSPACE }).workspaceId).toBe(WORKSPACE);
+  });
+
+  it("refuses a window that ends at or before it starts, as a 400 and not a 502", () => {
+    // The connector refuses this too -- but inside the generator, where the route wraps it as a 502
+    // `run_incomplete`, telling an operator to retry a request no retry can rescue.
+    const base = { workspace_id: WORKSPACE, connection_id: CONNECTION };
+    const t = "2026-09-11T00:00:00Z";
+    expect(() => parseIngestRequest({ ...base, since: t, until: t })).toThrow(IngestError);
+    expect(() => parseIngestRequest({ ...base, since: "2026-09-12T00:00:00Z", until: t })).toThrow(
+      IngestError,
+    );
+  });
+
+  it("refuses hour 24, which RFC3339 forbids and Date.parse rolls over", () => {
+    // The original round trip checked only the calendar date, so this passed and began a watermark
+    // walk a day later than the caller wrote.
+    expect(Date.parse("2026-09-11T24:00:00Z")).toBe(Date.parse("2026-09-12T00:00:00Z"));
+    expect(() => parseRfc3339("2026-09-11T24:00:00Z", "t")).toThrow(WooBackfillError);
+    expect(() =>
+      parseIngestRequest({
+        workspace_id: WORKSPACE,
+        connection_id: CONNECTION,
+        since: "2026-09-11T24:00:00Z",
+      }),
+    ).toThrow(IngestError);
+    // The real boundary values still pass.
+    expect(parseRfc3339("2026-09-11T23:59:59Z", "t")).toBe(Date.parse("2026-09-11T23:59:59Z"));
+    expect(parseRfc3339("2026-09-11T00:00:00Z", "t")).toBe(Date.parse("2026-09-11T00:00:00Z"));
+  });
+
+  it("counts the bisector's discarded probe pages as splits", async () => {
+    // `pages` counts what the backfill YIELDS. A window whose first page reports too many pages has
+    // already cost the merchant that request before the bisector discards it -- so `pages` alone
+    // would tell an operator a busy store was cheap to read.
+    let call = 0;
+    const h = await harness({
+      handler: () => {
+        call += 1;
+        // The first request reports a window far too large to page; the halves are readable.
+        return call === 1 ? page([order(1)], 999, 99_900) : page([order(1000 + call)], 1, 1);
+      },
+    });
+    const report = await runIngest(REQUEST, h.deps);
+    expect(report.splits).toBeGreaterThan(0);
+    // And the store really was asked for more than `pages` reports.
+    expect(h.storeCalls.length).toBeGreaterThan(report.pages);
+  });
+
+  it("never lets a normaliser message carry the merchant's payload into a response", () => {
+    // WooNormalizeError sentences are repository-authored AND interpolate order ids and raw field
+    // values. The allow-list had been reasoned about at the level of who wrote the sentence rather
+    // than what the sentence contains.
+    const leaky = new WooNormalizeError(
+      'woocommerce: order 4711 total is "\u0e3f1,250.00", which is not a number',
+      "unparseable_value",
+    );
+    const reason = reasonOf(leaky);
+    expect(reason).toBe("an order could not be normalised (unparseable_value)");
+    expect(reason).not.toContain("4711");
+    expect(reason).not.toContain("1,250.00");
   });
 });
 

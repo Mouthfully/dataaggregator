@@ -78,13 +78,29 @@ export const SUGGESTED_FIRST_WINDOW_DAYS = 30;
 export interface IngestReport {
   readonly source: typeof INGEST_SOURCE;
   readonly connectionId: string;
-  /** Pages fetched from the merchant's store. */
+  /**
+   * Pages of orders YIELDED by the backfill -- not every page fetched from the store.
+   *
+   * THE DIFFERENCE IS REAL AND IT UNDERSTATES. When a window's first page reports too many pages,
+   * that probe page has already been fetched from the merchant before the bisector discards it and
+   * splits; those requests reach the store and never reach this counter. Review caught the original
+   * wording ("pages fetched"), which claimed a request count this number does not measure.
+   *
+   * `splits` below is the missing signal: one split means at least one discarded probe.
+   */
   readonly pages: number;
   /** Envelope rows normalised. One per order. */
   readonly rowsRead: number;
   /** Envelope rows the database confirmed. Equal to `rowsRead` on a clean run. */
   readonly rowsWritten: number;
   readonly chunks: number;
+  /**
+   * Windows the bisector had to split, each implying at least one fetched-and-discarded probe page.
+   *
+   * Reported because `pages` alone would tell an operator a busy store was cheap to read. A run
+   * with `pages: 3, splits: 7` cost the merchant far more than three requests.
+   */
+  readonly splits: number;
   /**
    * The `since` the NEXT run must use. Present even on a failed run -- especially then.
    *
@@ -141,7 +157,17 @@ export type IngestRefusal =
   | "no_timezone"
   | "connection_unusable"
   | "wrong_credential_lane"
-  | "bad_kek";
+  | "bad_kek"
+  /**
+   * The database could not be reached or refused the connection read.
+   *
+   * A REFUSAL AND NOT AN `IngestRunFailure`, because nothing has been read or written yet: the
+   * counts are all zero and the checkpoint has not moved, so there is no partial progress to
+   * report and a `run_incomplete` would imply there was. Added after review found that a
+   * `StoreError` from `deps.connections.read()` escaped every handler and became an unstructured
+   * 500 -- the one shape this route is built never to produce.
+   */
+  | "store_unavailable";
 
 export class IngestError extends Error {
   constructor(
@@ -157,8 +183,8 @@ export class IngestError extends Error {
 export function parseIngestRequest(body: unknown): IngestRequest {
   const b = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
 
-  const workspaceId = str(b.workspace_id, "workspace_id");
-  const connectionId = str(b.connection_id, "connection_id");
+  const workspaceId = uuid(b.workspace_id, "workspace_id");
+  const connectionId = uuid(b.connection_id, "connection_id");
   // THROUGH `parseRfc3339`, NOT `Date.parse`, AND NOT A SECOND COPY OF IT. `Date.parse` normalises
   // `2026-02-30T00:00:00Z` to March 2 without complaint and reads an offset-less string as LOCAL
   // time; either would query a window nobody asked for and then advance the checkpoint past the
@@ -167,7 +193,19 @@ export function parseIngestRequest(body: unknown): IngestRequest {
   // borrowing its implementation is what stops the two answers diverging.
   const since = instant(b.since, "since");
   if (b.until === undefined || b.until === null) return { workspaceId, connectionId, since };
-  return { workspaceId, connectionId, since, until: instant(b.until, "until") };
+
+  const until = instant(b.until, "until");
+  // ORDERING IS THE CALLER'S MISTAKE, SO IT IS A 400 HERE. `wooBackfillChunks` refuses the same
+  // thing -- but it refuses it inside the generator, where the route wraps it as a 502
+  // `run_incomplete`, which tells an operator to retry a request that cannot ever succeed.
+  if (Date.parse(until) <= Date.parse(since)) {
+    throw new IngestError(
+      `\`until\` (${until}) is not after \`since\` (${since}). A window that ends where it starts ` +
+        "can contain nothing, and one that ends before it is almost always two values swapped.",
+      "bad_request",
+    );
+  }
+  return { workspaceId, connectionId, since, until };
 }
 
 /**
@@ -188,6 +226,31 @@ function instant(value: unknown, field: string): string {
             `deliberately -- ${SUGGESTED_FIRST_WINDOW_DAYS} days is a reasonable first window and ` +
             "this endpoint will not choose one for you."
           : "Use 2026-09-11T00:00:00Z."),
+      "bad_request",
+    );
+  }
+  return text;
+}
+
+/**
+ * A UUID, checked here rather than by Postgres.
+ *
+ * `workspace_id` and `connection_id` are `uuid` columns and the token's `workspace_id` claim is
+ * read as one. Any non-empty string used to reach PostgREST, where the cast failed and came back as
+ * a `StoreError` -- and before the fix below, as an unstructured 500. Even with that fixed it would
+ * be a 502 telling the caller to retry, for a request no retry can rescue.
+ *
+ * Shape only, not existence: whether a well-formed id names a real connection is row-level
+ * security's answer, and it is deliberately the same `null` for "does not exist" and "not yours".
+ */
+const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+function uuid(value: unknown, field: string): string {
+  const text = str(value, field);
+  if (!UUID.test(text)) {
+    throw new IngestError(
+      `\`${field}\` is ${JSON.stringify(text)}, which is not a UUID. Both identifiers are \`uuid\` ` +
+        "columns; a malformed one fails inside the database rather than here.",
       "bad_request",
     );
   }
@@ -231,10 +294,28 @@ export async function runIngest(request: IngestRequest, deps: IngestDeps): Promi
     );
   }
 
-  const connection = await deps.connections.read({
-    workspaceId: request.workspaceId,
-    connectionId: request.connectionId,
-  });
+  // WRAPPED, BECAUSE THIS THROW IS OUTSIDE THE RUN'S OWN `try` AND NOTHING ELSE CATCHES IT. A
+  // `StoreError` here -- Supabase unreachable, the gateway refusing, a malformed answer -- used to
+  // escape every handler in the route and surface as an unstructured 500, which is the one shape
+  // this route exists never to produce. `StoreError`'s own message is repository-authored and
+  // carries no filter values (`postgrest.ts` drops PostgREST's `details` and `hint` for exactly
+  // that reason), so it travels.
+  let connection: ConnectionRecord | null;
+  try {
+    connection = await deps.connections.read({
+      workspaceId: request.workspaceId,
+      connectionId: request.connectionId,
+    });
+  } catch (cause) {
+    throw new IngestError(
+      `the connection could not be read: ${
+        cause instanceof Error && cause.name === "StoreError"
+          ? cause.message
+          : "the database did not answer"
+      }. Nothing was read and nothing was written.`,
+      "store_unavailable",
+    );
+  }
   if (connection === null) {
     // ONE ANSWER FOR TWO SITUATIONS, deliberately, and inherited from the adapter: a connection
     // that does not exist and one in another workspace are indistinguishable here.
@@ -246,7 +327,33 @@ export async function runIngest(request: IngestRequest, deps: IngestDeps): Promi
 
   assertRunnable(connection, deps.now?.() ?? new Date());
 
-  const credential = await openCredential(deps.crypto, connection, kek);
+  // THE KEY CAN BE THE RIGHT LENGTH AND STILL BE THE WRONG KEY. `kekFromBase64` checks 32 bytes and
+  // nothing more, so a KEK from another deployment decodes fine and then fails AES-GCM
+  // authentication inside `open()`. That throw is not an `IngestError`, so it escaped to an
+  // unstructured 500 -- for a deployment fault `bad_kek` is explicitly mapped to diagnose.
+  //
+  // `ConnectionError` is kept separate because it is a DIFFERENT diagnosis with a different owner:
+  // a revoked connection or a lane that disagrees with the sealed blob is not a key problem.
+  let credential: Awaited<ReturnType<typeof openCredential>>;
+  try {
+    credential = await openCredential(deps.crypto, connection, kek);
+  } catch (cause) {
+    if (cause instanceof Error && cause.name === "ConnectionError") {
+      throw new IngestError(
+        `connection ${connection.id} could not be opened: ${cause.message}`,
+        "connection_unusable",
+      );
+    }
+    // Deliberately does NOT claim the KEK is wrong. A failed decryption is equally consistent with
+    // a re-keyed deployment, a `key_version` that moved, or a ciphertext that did not survive its
+    // round trip -- and naming one cause sends an operator to rule out the other two last.
+    throw new IngestError(
+      `connection ${connection.id} did not decrypt. CREDENTIAL_KEK decodes to 32 bytes, so it is ` +
+        "well formed but did not open this credential: either it is not the key this credential " +
+        "was sealed under, or the stored ciphertext, IV or scope does not match the row.",
+      "bad_kek",
+    );
+  }
   if (credential.kind !== "key_secret") {
     // Unreachable through `credential_lane`, which `openCredential` already checks against the
     // sealed blob. Asserted anyway because the alternative is `credential.key` being `undefined`
@@ -264,8 +371,24 @@ export async function runIngest(request: IngestRequest, deps: IngestDeps): Promi
   // nor the next.
   const until = request.until ?? fetchedAt;
 
+  // A FUTURE `until` IS A PERMANENT HOLE, WHICH IS WHY IT IS REFUSED RATHER THAN CLAMPED.
+  //
+  // The window closes at `until` and the checkpoint becomes `until`. An order modified between the
+  // moment this run finishes and that future instant is inside the banked window and was never
+  // read -- and no later run asks for a window behind the mark. Clamping to `fetchedAt` silently
+  // would answer a different question than the operator asked, so it says so instead.
+  if (Date.parse(until) > Date.parse(fetchedAt)) {
+    throw new IngestError(
+      `\`until\` (${until}) is after this run started (${fetchedAt}). The checkpoint would cover ` +
+        "orders that had not been modified yet, and nothing ever re-reads a window behind the " +
+        "watermark. Omit `until` to pin it to the run's start.",
+      "bad_request",
+    );
+  }
+
   let checkpoint: WooCheckpoint = { modifiedAfter: request.since, chunks: 0, rows: 0 };
   let pages = 0;
+  let splits = 0;
   let rowsRead = 0;
   let rowsWritten = 0;
 
@@ -279,6 +402,13 @@ export async function runIngest(request: IngestRequest, deps: IngestDeps): Promi
       sleep: deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
     },
     window: { modifiedAfter: request.since, modifiedBefore: until },
+    // The only way to see the requests the bisector spends and discards. `onSplit` is the hook
+    // `client.ts` added so a caller could "meter how hard a store is to read"; this is that caller.
+    walk: {
+      onSplit: () => {
+        splits += 1;
+      },
+    },
     // Not null by this point -- `assertRunnable` refused a connection without one, which is the
     // whole reason the column exists.
     timezone: connection.timezone as string,
@@ -316,6 +446,7 @@ export async function runIngest(request: IngestRequest, deps: IngestDeps): Promi
       rowsRead,
       rowsWritten,
       chunks: checkpoint.chunks,
+      splits,
       checkpoint: checkpoint.modifiedAfter,
       complete,
     };
@@ -360,6 +491,22 @@ function assertRunnable(connection: ConnectionRecord, now: Date): void {
     );
   }
 
+  // ASKED BEFORE THE TIMEZONE, AND THE ORDER IS THE MESSAGE. A revoked connection that also has no
+  // timezone would otherwise be told to populate a column -- work that cannot make it runnable,
+  // sending an operator to fix the wrong thing while the merchant's reauthorisation is what is
+  // actually needed. Terminal health first; the incomplete-row problem second.
+  //
+  // `connectionHealth` owns this question rather than it being re-derived here: it knows a
+  // persisted `needs_reauth` outranks an expiry that has not passed, which is a distinction this
+  // file would have got wrong.
+  const health = connectionHealth(connection, now);
+  if (!health.usable) {
+    throw new IngestError(
+      `connection ${connection.id} is not usable: ${health.reason}`,
+      "connection_unusable",
+    );
+  }
+
   if (connection.timezone === null) {
     // NOT `bad_request`. The request is fine; the connection is incomplete, and the fix is to set
     // the column. Guessing UTC here would move every order placed in the merchant's evening onto
@@ -368,17 +515,6 @@ function assertRunnable(connection: ConnectionRecord, now: Date): void {
       `connection ${connection.id} has no timezone. Every date on every row would be computed in ` +
         "a zone nobody chose. Set `public.connections.timezone` to the store's IANA zone.",
       "no_timezone",
-    );
-  }
-
-  // `connectionHealth` owns this question, so it is asked rather than re-derived. It knows that a
-  // persisted `needs_reauth` outranks an expiry that has not passed, which is a distinction this
-  // file would have got wrong.
-  const health = connectionHealth(connection, now);
-  if (!health.usable) {
-    throw new IngestError(
-      `connection ${connection.id} is not usable: ${health.reason}`,
-      "connection_unusable",
     );
   }
 }

@@ -6,6 +6,7 @@ import { isAuthConfigured } from "../_auth/env";
 import { SiteHeader } from "../_chrome";
 import { AUTH } from "../_content-auth";
 import { SignInForm } from "./form";
+import { isGoogleSignInEnabled } from "./google";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -51,7 +52,14 @@ export default async function SignInPage({
 
           <div className="border-line bg-surface mt-8 rounded-xl border p-8">
             {isAuthConfigured() ? (
-              <SignInForm initialError={error ? ERRORS[error] : undefined} />
+              <SignInForm
+                initialError={error ? ERRORS[error] : undefined}
+                // Read HERE rather than inside the client component. Next inlines
+                // `process.env.NEXT_PUBLIC_*` into the client bundle at BUILD time, so a read down
+                // there would mean turning the provider on in Supabase and setting the variable
+                // still shows nothing until an unrelated commit triggers a rebuild.
+                googleEnabled={isGoogleSignInEnabled()}
+              />
             ) : (
               // Configuration is missing. Say so plainly rather than rendering a form that takes an
               // address and drops it -- the failure belongs in front of whoever deployed this, not

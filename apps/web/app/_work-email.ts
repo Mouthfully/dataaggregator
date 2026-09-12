@@ -18,9 +18,15 @@
  * here is a domain that is unambiguously a free consumer mailbox, and anything uncertain is let
  * through to be dealt with by a human.
  *
- * Google sign-in is offered alongside this and is subject to the SAME rule: a Workspace account on
- * a company domain passes, a personal @gmail.com account does not. The provider is not the policy;
- * the domain is.
+ * Google sign-in is subject to the SAME rule wherever it is offered: a Workspace account on a
+ * company domain passes, a personal @gmail.com account does not. The provider is not the policy;
+ * the domain is, and `app/auth/callback/route.ts` applies this module to the OAuth identity rather
+ * than trusting that Google vouched for it.
+ *
+ * "OFFERED ALONGSIDE THIS" IS WHAT THIS COMMENT USED TO SAY, and it stopped being true when the
+ * button was put behind `NEXT_PUBLIC_GOOGLE_SIGNIN_ENABLED`: the provider is disabled in the
+ * Supabase project, so unless a deployer sets that variable there is no Google button to be
+ * alongside anything. The rule is enforced either way; only the second door is currently shut.
  */
 
 export type EmailRefusal = "empty" | "malformed" | "consumer_domain" | "disposable";

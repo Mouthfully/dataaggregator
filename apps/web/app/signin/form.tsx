@@ -18,7 +18,19 @@ import { checkWorkEmail } from "../_work-email";
  * JavaScript disabled and the pending state comes from the framework rather than from a boolean
  * this file would have to keep in sync.
  */
-export function SignInForm({ initialError }: { initialError?: string }) {
+export function SignInForm({
+  initialError,
+  googleEnabled,
+}: {
+  initialError?: string;
+  /**
+   * GOOGLE IS OFF IN THE LIVE SUPABASE PROJECT -- `auth/v1/settings` reports google: false -- so
+   * `signInWithOAuth` answers 400 for every visitor who presses the button. It is therefore not
+   * rendered unless a deployment says it works. Decided on the server by `./google.ts`; false is
+   * the default and the page is then exactly the page it was before this existed.
+   */
+  googleEnabled: boolean;
+}) {
   const emailId = useId();
   const errorId = useId();
   const [state, submit, pending] = useActionState<SignInState, FormData>(signInWithEmail, {
@@ -40,21 +52,27 @@ export function SignInForm({ initialError }: { initialError?: string }) {
 
   return (
     <>
-      <form action={signInWithGoogle}>
-        <button
-          type="submit"
-          className="border-line text-ink hover:bg-surface-inset flex min-h-[46px] w-full items-center justify-center gap-3 rounded-md border px-5 text-sm font-bold transition-colors"
-        >
-          <GoogleMark />
-          {AUTH.googleCta}
-        </button>
-      </form>
+      {googleEnabled ? (
+        <>
+          <form action={signInWithGoogle}>
+            <button
+              type="submit"
+              className="border-line text-ink hover:bg-surface-inset flex min-h-[46px] w-full items-center justify-center gap-3 rounded-md border px-5 text-sm font-bold transition-colors"
+            >
+              <GoogleMark />
+              {AUTH.googleCta}
+            </button>
+          </form>
 
-      <div className="my-6 flex items-center gap-4">
-        <span className="bg-line h-px flex-1" />
-        <span className="text-ink-faint text-xs">{AUTH.divider}</span>
-        <span className="bg-line h-px flex-1" />
-      </div>
+          {/* The divider goes with the button, not above the email form. "or" separating one
+              option from nothing is a rule with a word on it. */}
+          <div className="my-6 flex items-center gap-4">
+            <span className="bg-line h-px flex-1" />
+            <span className="text-ink-faint text-xs">{AUTH.divider}</span>
+            <span className="bg-line h-px flex-1" />
+          </div>
+        </>
+      ) : null}
 
       <form action={submit} noValidate>
         <label htmlFor={emailId} className="text-ink block text-sm font-bold">

@@ -221,7 +221,7 @@ const WHAT_YOU_SEE = [
 const READS_EYEBROW = "The mapping, in full";
 const READS_HEADING = "What the connector actually reads.";
 const READS_LEAD =
-  "Five metrics and five dimensions. This is the whole list; the connector refuses anything it has no dictionary entry for.";
+  "Five metrics and four dimensions, beside the account id the upsert key needs. This is the whole list; the connector refuses anything it has no dictionary entry for.";
 
 /** `client.ts` pins `GOOGLE_ADS_API_VERSION`. Not a sentence, so it is a caption rather than copy. */
 const READS_API_VERSION = "Google Ads API v21";
@@ -286,7 +286,11 @@ const DIMENSION_ROWS = [
     field: "customer.time_zone",
     note: "Without it the date has no meaning",
   },
-  { row: "account_id", field: "customer.id", note: "Half of the upsert key" },
+  {
+    row: "account_id",
+    field: "customer.id",
+    note: "Entity field, not a dimension. Half of the upsert key.",
+  },
   {
     row: "attribution_window",
     field: "set by the connector",

@@ -95,11 +95,7 @@ const HERO_SECONDARY_CTA = "See what it reads";
  * Three facts, not three promises. OAuth is the only entry in `PROVIDER_LANES.ga4`; twelve days is
  * `RESTATEMENT_CLOCKS.ga4.windowDays`; and the third is the presence of `sources/ga4/backfill.ts`.
  */
-const HERO_CHECKS = [
-  "OAuth only",
-  "12-day restatement window",
-  "Walks a date range",
-] as const;
+const HERO_CHECKS = ["OAuth only", "12-day restatement window", "Walks a date range"] as const;
 
 /* The panel beside the hero. Everything in it is `fixtures.ts` plus what `normalize.ts` writes. */
 const PANEL_LABEL = "One normalised row";
@@ -250,8 +246,7 @@ const READS_LEAD =
 /** `client.ts` pins `GA4_DATA_API_BASE`. Not a sentence, so it is a caption rather than copy. */
 const READS_API = "Data API v1beta · runReport";
 
-const METRIC_TABLE_CAPTION =
-  "GA4 metric names, and the canonical column each one maps to";
+const METRIC_TABLE_CAPTION = "GA4 metric names, and the canonical column each one maps to";
 
 /**
  * `GA4_METRIC_MAP` joined to `METRICS`. The left column is the name GA4 uses, the middle the
@@ -293,8 +288,7 @@ const METRIC_ROWS = [
   },
 ] as const;
 
-const DIMENSION_TABLE_CAPTION =
-  "The rest of the row, and where each part is read from";
+const DIMENSION_TABLE_CAPTION = "The rest of the row, and where each part is read from";
 
 /** The `entity`, `dimensions` and freshness fields `normalizeGa4Report` writes, and their sources. */
 const DIMENSION_ROWS = [
@@ -388,8 +382,7 @@ const BACKFILL_STEPS = [
 /* Getting started. */
 const SETUP_EYEBROW = "What a connection needs";
 const SETUP_HEADING = "Four things before a report runs.";
-const SETUP_LEAD =
-  "One consent screen, one property, one report definition, and a paged pull.";
+const SETUP_LEAD = "One consent screen, one property, one report definition, and a paged pull.";
 
 const SETUP_STEPS = [
   {
@@ -464,23 +457,18 @@ const FAQS = [
 
 /* The closing panel. */
 const FINAL_HEADING = "Sessions, with the clock attached.";
-const FINAL_LEAD =
-  "Every row says where it came from and how long it can still move.";
+const FINAL_LEAD = "Every row says where it came from and how long it can still move.";
 const FINAL_CTA = "Explore dashboard";
 
 /** Shared class strings, kept identical to the sibling connector pages so the two cannot drift. */
 const PRIMARY_BUTTON =
   "bg-accent text-ink-on-accent hover:bg-accent-hover inline-flex min-h-[46px] items-center justify-center gap-4 rounded-md px-[22px] text-sm font-bold transition-colors";
-const TEXT_LINK =
-  "text-accent inline-flex items-center gap-3 text-sm font-bold hover:underline";
-const EYEBROW =
-  "text-ink-faint block text-[11px] font-bold tracking-[0.14em] uppercase md:text-xs";
+const TEXT_LINK = "text-accent inline-flex items-center gap-3 text-sm font-bold hover:underline";
+const EYEBROW = "text-ink-faint block text-[11px] font-bold tracking-[0.14em] uppercase md:text-xs";
 const SECTION_HEADING =
   "font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-bold tracking-[-0.02em] md:text-[38px]";
-const TABLE_HEAD =
-  "text-ink-subtle border-line border-b px-4 py-3 text-left font-bold";
-const TABLE_CELL =
-  "border-line-soft text-ink-muted border-b px-4 py-3 align-top";
+const TABLE_HEAD = "text-ink-subtle border-line border-b px-4 py-3 text-left font-bold";
+const TABLE_CELL = "border-line-soft text-ink-muted border-b px-4 py-3 align-top";
 
 export default function Ga4ConnectorPage() {
   return (
@@ -533,9 +521,7 @@ export default function Ga4ConnectorPage() {
               <h1 className="font-display text-ink text-[36px] leading-[1.06] font-bold tracking-[-0.04em] md:text-[42px] lg:text-[48px]">
                 {HERO_HEADING_TOP}
                 <br />
-                <span className="brand-gradient-text">
-                  {HERO_HEADING_BOTTOM}
-                </span>
+                <span className="brand-gradient-text">{HERO_HEADING_BOTTOM}</span>
               </h1>
 
               {/* 475px is the design's measure cap, which is the guide's 60-70 characters. */}
@@ -558,14 +544,8 @@ export default function Ga4ConnectorPage() {
 
               <ul className="mt-6 flex flex-wrap gap-3 md:gap-5">
                 {HERO_CHECKS.map((check) => (
-                  <li
-                    key={check}
-                    className="text-ink-muted text-xs whitespace-nowrap"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="text-brand-mint mr-2 font-bold"
-                    >
+                  <li key={check} className="text-ink-muted text-xs whitespace-nowrap">
+                    <span aria-hidden="true" className="text-brand-mint mr-2 font-bold">
                       &#10003;
                     </span>
                     {check}
@@ -605,10 +585,7 @@ export default function Ga4ConnectorPage() {
                   </span>
                   <div className="mt-3.5 flex items-center gap-1">
                     <i className="from-brand-mint to-brand-blue block h-0.5 flex-1 bg-linear-to-r" />
-                    <b
-                      aria-hidden="true"
-                      className="text-accent text-xl leading-none"
-                    >
+                    <b aria-hidden="true" className="text-accent text-xl leading-none">
                       &rarr;
                     </b>
                   </div>
@@ -622,9 +599,7 @@ export default function Ga4ConnectorPage() {
                     height={60}
                     className="h-[45px] w-auto object-contain md:h-[60px]"
                   />
-                  <strong className="text-ink text-center text-sm">
-                    {brand.productName}
-                  </strong>
+                  <strong className="text-ink text-center text-sm">{brand.productName}</strong>
                 </div>
               </div>
 
@@ -637,17 +612,13 @@ export default function Ga4ConnectorPage() {
                 />
                 <span className="text-ink-faint">{PANEL_RAW_LABEL}</span>
                 <span className="min-w-0 truncate">{PANEL_RAW_VALUE}</span>
-                <span className="text-ink-faint ml-auto shrink-0">
-                  {PANEL_RAW_NOTE}
-                </span>
+                <span className="text-ink-faint ml-auto shrink-0">{PANEL_RAW_NOTE}</span>
               </p>
 
               <dl className="mt-5 grid grid-cols-2 gap-2 md:gap-3">
                 {PANEL_STATS.map((stat) => (
                   <div key={stat.label} className="min-w-0">
-                    <dt className="text-ink-faint font-mono text-[10px]">
-                      {stat.label}
-                    </dt>
+                    <dt className="text-ink-faint font-mono text-[10px]">{stat.label}</dt>
                     <dd className="font-display text-ink mt-1 text-lg font-bold md:text-[22px]">
                       {stat.value}
                     </dd>
@@ -658,9 +629,7 @@ export default function Ga4ConnectorPage() {
               <dl className="bg-surface-subtle text-ink-muted font-mono mt-6 rounded-lg p-4 text-[10px] leading-[1.9] md:text-[11px]">
                 {PANEL_ROW.map((line) => (
                   <div key={line.key} className="flex gap-2">
-                    <dt className="text-ink-faint w-[95px] shrink-0 md:w-[118px]">
-                      {line.key}
-                    </dt>
+                    <dt className="text-ink-faint w-[95px] shrink-0 md:w-[118px]">{line.key}</dt>
                     <dd className="min-w-0 break-words">{line.value}</dd>
                   </div>
                 ))}
@@ -675,10 +644,7 @@ export default function Ga4ConnectorPage() {
           <ul className="mx-auto flex max-w-[1200px] gap-6 overflow-x-auto px-8 py-4 whitespace-nowrap md:justify-center md:gap-10">
             {SECTION_LINKS.map((link) => (
               <li key={link.href}>
-                <a
-                  href={link.href}
-                  className="text-ink-muted hover:text-accent text-[13px]"
-                >
+                <a href={link.href} className="text-ink-muted hover:text-accent text-[13px]">
                   {link.label}
                 </a>
               </li>
@@ -729,10 +695,7 @@ export default function Ga4ConnectorPage() {
                 <p className="text-ink-muted flex-1 text-[13px] leading-[1.6] md:text-sm">
                   {destination.body}
                 </p>
-                <a
-                  href={destination.href}
-                  className={`${TEXT_LINK} mt-4 text-xs`}
-                >
+                <a href={destination.href} className={`${TEXT_LINK} mt-4 text-xs`}>
                   {destination.cta}
                   <span aria-hidden="true">&rarr;</span>
                 </a>
@@ -781,9 +744,7 @@ export default function Ga4ConnectorPage() {
                   <h3 className="font-display text-ink mb-3 text-xl leading-[1.3] font-bold tracking-[-0.01em]">
                     {item.title}
                   </h3>
-                  <p className="text-ink-muted text-[15px] leading-[1.7]">
-                    {item.body}
-                  </p>
+                  <p className="text-ink-muted text-[15px] leading-[1.7]">{item.body}</p>
                 </li>
               ))}
             </ul>
@@ -834,10 +795,7 @@ export default function Ga4ConnectorPage() {
               <tbody>
                 {METRIC_ROWS.map((row) => (
                   <tr key={row.field}>
-                    <th
-                      scope="row"
-                      className={`${TABLE_CELL} text-ink font-mono font-normal`}
-                    >
+                    <th scope="row" className={`${TABLE_CELL} text-ink font-mono font-normal`}>
                       {row.field}
                     </th>
                     <td className={`${TABLE_CELL} font-mono`}>{row.metric}</td>
@@ -870,10 +828,7 @@ export default function Ga4ConnectorPage() {
               <tbody>
                 {DIMENSION_ROWS.map((row) => (
                   <tr key={row.row}>
-                    <th
-                      scope="row"
-                      className={`${TABLE_CELL} text-ink font-mono font-normal`}
-                    >
+                    <th scope="row" className={`${TABLE_CELL} text-ink font-mono font-normal`}>
                       {row.row}
                     </th>
                     <td className={`${TABLE_CELL} font-mono`}>{row.field}</td>
@@ -925,9 +880,7 @@ export default function Ga4ConnectorPage() {
                     <h3 className="font-display text-ink mb-3 text-base leading-[1.3] font-bold tracking-[-0.01em] md:text-[18px]">
                       {point.title}
                     </h3>
-                    <p className="text-ink-muted text-sm leading-[1.7]">
-                      {point.body}
-                    </p>
+                    <p className="text-ink-muted text-sm leading-[1.7]">{point.body}</p>
                   </li>
                 ))}
               </ul>
@@ -947,9 +900,7 @@ export default function Ga4ConnectorPage() {
                       >
                         {index + 1}
                       </span>
-                      <p className="text-ink-muted min-w-0 text-sm leading-[1.65]">
-                        {step}
-                      </p>
+                      <p className="text-ink-muted min-w-0 text-sm leading-[1.65]">{step}</p>
                     </li>
                   ))}
                 </ol>
@@ -978,10 +929,7 @@ export default function Ga4ConnectorPage() {
 
           <ol className="grid gap-6 md:grid-cols-2 md:gap-10 lg:grid-cols-4 lg:gap-[38px]">
             {SETUP_STEPS.map((step, index) => (
-              <li
-                key={step.title}
-                className="relative min-w-0 pl-[60px] md:pl-0"
-              >
+              <li key={step.title} className="relative min-w-0 pl-[60px] md:pl-0">
                 {/* A duplicate of the list's own numbering, so it is hidden from assistive
                     technology rather than announced twice. */}
                 <span
@@ -993,9 +941,7 @@ export default function Ga4ConnectorPage() {
                 <h3 className="font-display text-ink mb-3 text-xl leading-[1.3] font-bold tracking-[-0.01em]">
                   {step.title}
                 </h3>
-                <p className="text-ink-muted text-[15px] leading-[1.7]">
-                  {step.body}
-                </p>
+                <p className="text-ink-muted text-[15px] leading-[1.7]">{step.body}</p>
               </li>
             ))}
           </ol>
@@ -1031,24 +977,16 @@ export default function Ga4ConnectorPage() {
 
           <div className="min-w-0">
             {FAQS.map((item) => (
-              <details
-                key={item.question}
-                className="group border-line border-b py-[18px]"
-              >
+              <details key={item.question} className="group border-line border-b py-[18px]">
                 <summary className="text-ink flex cursor-pointer list-none justify-between gap-5 text-sm font-bold [&::-webkit-details-marker]:hidden">
                   {item.question}
                   {/* Hidden from assistive tech: <details> already announces expanded/collapsed. */}
-                  <span
-                    aria-hidden="true"
-                    className="text-ink-subtle shrink-0 leading-[1.5]"
-                  >
+                  <span aria-hidden="true" className="text-ink-subtle shrink-0 leading-[1.5]">
                     <span className="group-open:hidden">+</span>
                     <span className="hidden group-open:inline">&#8722;</span>
                   </span>
                 </summary>
-                <p className="text-ink-muted mt-3.5 text-sm leading-[1.65]">
-                  {item.answer}
-                </p>
+                <p className="text-ink-muted mt-3.5 text-sm leading-[1.65]">{item.answer}</p>
               </details>
             ))}
           </div>
@@ -1070,10 +1008,7 @@ export default function Ga4ConnectorPage() {
               </h2>
               <p className="text-ink-muted leading-[1.65]">{FINAL_LEAD}</p>
             </div>
-            <a
-              href="/dashboard"
-              className={`${PRIMARY_BUTTON} shrink-0 self-start md:self-auto`}
-            >
+            <a href="/dashboard" className={`${PRIMARY_BUTTON} shrink-0 self-start md:self-auto`}>
               {FINAL_CTA}
               <span aria-hidden="true">&rarr;</span>
             </a>

@@ -283,8 +283,7 @@ const READS_LEAD =
 /** `META_GRAPH_BASE` pins the version. Not a sentence, so it is a caption rather than copy. */
 const READS_API_VERSION = "Graph API v21.0";
 
-const LEVEL_TABLE_CAPTION =
-  "The reporting levels, and the canonical entity each becomes";
+const LEVEL_TABLE_CAPTION = "The reporting levels, and the canonical entity each becomes";
 
 /**
  * `LEVEL_SHAPE` in `normalize.ts`, verbatim: Meta's own word, the canonical grain it maps to, the
@@ -298,8 +297,7 @@ const LEVEL_ROWS = [
   { level: "ad", type: "ad", id: "ad_id", parent: "adset_id" },
 ] as const;
 
-const METRIC_TABLE_CAPTION =
-  "Metrics, and which of the two rows each one lands on";
+const METRIC_TABLE_CAPTION = "Metrics, and which of the two rows each one lands on";
 
 /**
  * `META_METRIC_MAP` joined to `METRICS`, plus the two action arrays the attributed rows are summed
@@ -450,23 +448,18 @@ const FAQS = [
 
 /* The closing panel. */
 const FINAL_HEADING = "Every conversion, with its window.";
-const FINAL_LEAD =
-  "One row that says which window credited it, and how long it can still move.";
+const FINAL_LEAD = "One row that says which window credited it, and how long it can still move.";
 const FINAL_CTA = "Read the documentation";
 
 /** Shared class strings, so the hero buttons and the closing one cannot drift apart. */
 const PRIMARY_BUTTON =
   "bg-accent text-ink-on-accent hover:bg-accent-hover inline-flex min-h-[46px] items-center justify-center gap-4 rounded-md px-[22px] text-sm font-bold transition-colors";
-const TEXT_LINK =
-  "text-accent inline-flex items-center gap-3 text-sm font-bold hover:underline";
-const EYEBROW =
-  "text-ink-faint block text-[11px] font-bold tracking-[0.14em] uppercase md:text-xs";
+const TEXT_LINK = "text-accent inline-flex items-center gap-3 text-sm font-bold hover:underline";
+const EYEBROW = "text-ink-faint block text-[11px] font-bold tracking-[0.14em] uppercase md:text-xs";
 const SECTION_HEADING =
   "font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-bold tracking-[-0.02em] md:text-[38px]";
-const TABLE_HEAD =
-  "text-ink-subtle border-line border-b px-4 py-3 text-left font-bold";
-const TABLE_CELL =
-  "border-line-soft text-ink-muted border-b px-4 py-3 align-top";
+const TABLE_HEAD = "text-ink-subtle border-line border-b px-4 py-3 text-left font-bold";
+const TABLE_CELL = "border-line-soft text-ink-muted border-b px-4 py-3 align-top";
 
 export default function MetaAdsConnectorPage() {
   return (
@@ -518,9 +511,7 @@ export default function MetaAdsConnectorPage() {
               <h1 className="font-display text-ink text-[36px] leading-[1.06] font-bold tracking-[-0.04em] md:text-[42px] lg:text-[48px]">
                 {HERO_HEADING_TOP}
                 <br />
-                <span className="brand-gradient-text">
-                  {HERO_HEADING_BOTTOM}
-                </span>
+                <span className="brand-gradient-text">{HERO_HEADING_BOTTOM}</span>
               </h1>
 
               <p className="text-ink-muted mt-6 max-w-[475px] text-base leading-[1.65] md:text-[17px]">
@@ -542,14 +533,8 @@ export default function MetaAdsConnectorPage() {
 
               <ul className="mt-6 flex flex-wrap gap-3 md:gap-5">
                 {HERO_CHECKS.map((check) => (
-                  <li
-                    key={check}
-                    className="text-ink-muted text-xs whitespace-nowrap"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="text-brand-mint mr-2 font-bold"
-                    >
+                  <li key={check} className="text-ink-muted text-xs whitespace-nowrap">
+                    <span aria-hidden="true" className="text-brand-mint mr-2 font-bold">
                       &#10003;
                     </span>
                     {check}
@@ -578,9 +563,7 @@ export default function MetaAdsConnectorPage() {
                     height={58}
                     className="h-[45px] w-[45px] object-contain md:h-[58px] md:w-[58px]"
                   />
-                  <strong className="text-ink text-center text-sm">
-                    Meta Ads
-                  </strong>
+                  <strong className="text-ink text-center text-sm">Meta Ads</strong>
                 </div>
 
                 {/* The track. The level caption sits over a mint-to-blue rule; the arrow is
@@ -591,10 +574,7 @@ export default function MetaAdsConnectorPage() {
                   </span>
                   <div className="mt-3.5 flex items-center gap-1">
                     <i className="from-brand-mint to-brand-blue block h-0.5 flex-1 bg-linear-to-r" />
-                    <b
-                      aria-hidden="true"
-                      className="text-accent text-xl leading-none"
-                    >
+                    <b aria-hidden="true" className="text-accent text-xl leading-none">
                       &rarr;
                     </b>
                   </div>
@@ -608,9 +588,7 @@ export default function MetaAdsConnectorPage() {
                     height={60}
                     className="h-[45px] w-auto object-contain md:h-[60px]"
                   />
-                  <strong className="text-ink text-center text-sm">
-                    {brand.productName}
-                  </strong>
+                  <strong className="text-ink text-center text-sm">{brand.productName}</strong>
                 </div>
               </div>
 
@@ -623,17 +601,13 @@ export default function MetaAdsConnectorPage() {
                 />
                 <span className="text-ink-faint">{PANEL_RAW_LABEL}</span>
                 <span className="min-w-0 truncate">{PANEL_RAW_VALUE}</span>
-                <span className="text-ink-faint ml-auto shrink-0">
-                  {PANEL_RAW_NOTE}
-                </span>
+                <span className="text-ink-faint ml-auto shrink-0">{PANEL_RAW_NOTE}</span>
               </p>
 
               <dl className="mt-5 grid grid-cols-3 gap-2 md:gap-3">
                 {PANEL_STATS.map((stat) => (
                   <div key={stat.label} className="min-w-0">
-                    <dt className="text-ink-faint font-mono truncate text-[10px]">
-                      {stat.label}
-                    </dt>
+                    <dt className="text-ink-faint font-mono truncate text-[10px]">{stat.label}</dt>
                     <dd className="font-display text-ink mt-1 text-lg font-bold md:text-[22px]">
                       {stat.value}
                       <span className="text-ink-faint font-body block text-[10px] font-normal">
@@ -647,9 +621,7 @@ export default function MetaAdsConnectorPage() {
               <dl className="bg-surface-subtle text-ink-muted font-mono mt-6 rounded-lg p-4 text-[10px] leading-[1.9] md:text-[11px]">
                 {PANEL_ROW.map((line) => (
                   <div key={line.key} className="flex gap-2">
-                    <dt className="text-ink-faint w-[92px] shrink-0 md:w-[112px]">
-                      {line.key}
-                    </dt>
+                    <dt className="text-ink-faint w-[92px] shrink-0 md:w-[112px]">{line.key}</dt>
                     <dd className="min-w-0 break-words">{line.value}</dd>
                   </div>
                 ))}
@@ -663,10 +635,7 @@ export default function MetaAdsConnectorPage() {
           <ul className="mx-auto flex max-w-[1200px] gap-6 overflow-x-auto px-8 py-4 whitespace-nowrap md:justify-center md:gap-10">
             {SECTION_LINKS.map((link) => (
               <li key={link.href}>
-                <a
-                  href={link.href}
-                  className="text-ink-muted hover:text-accent text-[13px]"
-                >
+                <a href={link.href} className="text-ink-muted hover:text-accent text-[13px]">
                   {link.label}
                 </a>
               </li>
@@ -716,10 +685,7 @@ export default function MetaAdsConnectorPage() {
                 <p className="text-ink-muted flex-1 text-[13px] leading-[1.6] md:text-sm">
                   {destination.body}
                 </p>
-                <a
-                  href={destination.href}
-                  className={`${TEXT_LINK} mt-4 text-xs`}
-                >
+                <a href={destination.href} className={`${TEXT_LINK} mt-4 text-xs`}>
                   {destination.cta}
                   <span aria-hidden="true">&rarr;</span>
                 </a>
@@ -758,19 +724,14 @@ export default function MetaAdsConnectorPage() {
                   <h3 className="font-display text-ink mt-5 mb-3 text-xl leading-[1.3] font-bold tracking-[-0.01em]">
                     {lane.title}
                   </h3>
-                  <p className="text-ink-muted text-[15px] leading-[1.7]">
-                    {lane.body}
-                  </p>
+                  <p className="text-ink-muted text-[15px] leading-[1.7]">{lane.body}</p>
                   <ul className="border-line-soft mt-5 border-t">
                     {lane.points.map((point) => (
                       <li
                         key={point}
                         className="border-line-soft text-ink-muted border-b py-3 text-[13px] leading-[1.6] last:border-b-0"
                       >
-                        <span
-                          aria-hidden="true"
-                          className="text-brand-mint mr-2 font-bold"
-                        >
+                        <span aria-hidden="true" className="text-brand-mint mr-2 font-bold">
                           &#8226;
                         </span>
                         {point}
@@ -812,10 +773,7 @@ export default function MetaAdsConnectorPage() {
 
           <ul className="grid gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3 lg:gap-[30px]">
             {WHAT_YOU_SEE.map((item) => (
-              <li
-                key={item.title}
-                className="border-line bg-surface rounded-lg border p-6 md:p-7"
-              >
+              <li key={item.title} className="border-line bg-surface rounded-lg border p-6 md:p-7">
                 <svg
                   viewBox="0 0 24 24"
                   width="28"
@@ -833,9 +791,7 @@ export default function MetaAdsConnectorPage() {
                 <h3 className="font-display text-ink mb-3 text-xl leading-[1.3] font-bold tracking-[-0.01em]">
                   {item.title}
                 </h3>
-                <p className="text-ink-muted text-[15px] leading-[1.7]">
-                  {item.body}
-                </p>
+                <p className="text-ink-muted text-[15px] leading-[1.7]">{item.body}</p>
               </li>
             ))}
           </ul>
@@ -886,17 +842,12 @@ export default function MetaAdsConnectorPage() {
                 <tbody>
                   {LEVEL_ROWS.map((row) => (
                     <tr key={row.level}>
-                      <th
-                        scope="row"
-                        className={`${TABLE_CELL} text-ink font-mono font-normal`}
-                      >
+                      <th scope="row" className={`${TABLE_CELL} text-ink font-mono font-normal`}>
                         {row.level}
                       </th>
                       <td className={`${TABLE_CELL} font-mono`}>{row.type}</td>
                       <td className={`${TABLE_CELL} font-mono`}>{row.id}</td>
-                      <td className={`${TABLE_CELL} font-mono`}>
-                        {row.parent}
-                      </td>
+                      <td className={`${TABLE_CELL} font-mono`}>{row.parent}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -927,15 +878,10 @@ export default function MetaAdsConnectorPage() {
                 <tbody>
                   {METRIC_ROWS.map((row) => (
                     <tr key={row.field}>
-                      <th
-                        scope="row"
-                        className={`${TABLE_CELL} text-ink font-mono font-normal`}
-                      >
+                      <th scope="row" className={`${TABLE_CELL} text-ink font-mono font-normal`}>
                         {row.field}
                       </th>
-                      <td className={`${TABLE_CELL} font-mono`}>
-                        {row.metric}
-                      </td>
+                      <td className={`${TABLE_CELL} font-mono`}>{row.metric}</td>
                       <td className={TABLE_CELL}>{row.unit}</td>
                       <td className={TABLE_CELL}>{row.lands}</td>
                     </tr>
@@ -958,9 +904,7 @@ export default function MetaAdsConnectorPage() {
                   </li>
                 ))}
               </ul>
-              <p className="text-ink-subtle mt-4 text-[13px] leading-[1.65]">
-                {WINDOWS_NOTE}
-              </p>
+              <p className="text-ink-subtle mt-4 text-[13px] leading-[1.65]">{WINDOWS_NOTE}</p>
             </div>
 
             <ul className="mt-6 grid gap-3 md:grid-cols-2 md:gap-4">
@@ -1001,10 +945,7 @@ export default function MetaAdsConnectorPage() {
 
           <ol className="grid gap-6 md:grid-cols-2 md:gap-10 lg:grid-cols-4 lg:gap-[38px]">
             {SETUP_STEPS.map((step, index) => (
-              <li
-                key={step.title}
-                className="relative min-w-0 pl-[60px] md:pl-0"
-              >
+              <li key={step.title} className="relative min-w-0 pl-[60px] md:pl-0">
                 {/* A duplicate of the list's own numbering, so it is hidden from assistive
                     technology rather than announced twice. */}
                 <span
@@ -1016,9 +957,7 @@ export default function MetaAdsConnectorPage() {
                 <h3 className="font-display text-ink mb-3 text-xl leading-[1.3] font-bold tracking-[-0.01em]">
                   {step.title}
                 </h3>
-                <p className="text-ink-muted text-[15px] leading-[1.7]">
-                  {step.body}
-                </p>
+                <p className="text-ink-muted text-[15px] leading-[1.7]">{step.body}</p>
               </li>
             ))}
           </ol>
@@ -1054,24 +993,16 @@ export default function MetaAdsConnectorPage() {
 
           <div className="min-w-0">
             {FAQS.map((item) => (
-              <details
-                key={item.question}
-                className="group border-line border-b py-[18px]"
-              >
+              <details key={item.question} className="group border-line border-b py-[18px]">
                 <summary className="text-ink flex cursor-pointer list-none justify-between gap-5 text-sm font-bold [&::-webkit-details-marker]:hidden">
                   {item.question}
                   {/* Hidden from assistive tech: <details> already announces expanded/collapsed. */}
-                  <span
-                    aria-hidden="true"
-                    className="text-ink-subtle shrink-0 leading-[1.5]"
-                  >
+                  <span aria-hidden="true" className="text-ink-subtle shrink-0 leading-[1.5]">
                     <span className="group-open:hidden">+</span>
                     <span className="hidden group-open:inline">&#8722;</span>
                   </span>
                 </summary>
-                <p className="text-ink-muted mt-3.5 text-sm leading-[1.65]">
-                  {item.answer}
-                </p>
+                <p className="text-ink-muted mt-3.5 text-sm leading-[1.65]">{item.answer}</p>
               </details>
             ))}
           </div>
@@ -1094,10 +1025,7 @@ export default function MetaAdsConnectorPage() {
               </h2>
               <p className="text-ink-muted leading-[1.65]">{FINAL_LEAD}</p>
             </div>
-            <a
-              href="/docs"
-              className={`${PRIMARY_BUTTON} shrink-0 self-start md:self-auto`}
-            >
+            <a href="/docs" className={`${PRIMARY_BUTTON} shrink-0 self-start md:self-auto`}>
               {FINAL_CTA}
               <span aria-hidden="true">&rarr;</span>
             </a>

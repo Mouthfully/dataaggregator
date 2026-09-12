@@ -22,7 +22,7 @@ import { Footer, SiteHeader } from "../../_chrome";
  * `METRICS` in `packages/contract/src/metrics.ts`; the setup sequence is `scripts/seal-connection.ts`
  * and `sources/woocommerce/client.ts`; the timezone rule is the two migrations named on
  * SETUP_STEPS; what survives into the archive is `packages/payloads/src/redaction.ts`. Where a fact
- * is not published -- product and customer entities, a refresh schedule -- the page says so instead
+ * is not published -- the product and customer entities -- the page says so instead
  * of filling the gap.
  *
  * THERE IS NO WOOCOMMERCE MARK IN `public/platforms`, AND THAT IS STATED RATHER THAN WORKED AROUND.

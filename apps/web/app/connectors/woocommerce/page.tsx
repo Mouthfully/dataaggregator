@@ -411,10 +411,12 @@ const TEXT_LINK = "text-accent inline-flex items-center gap-3 text-sm font-bold 
 function ConnectorTile({ className }: { className: string }) {
   return (
     <span
-      aria-hidden="true"
       className={`border-line bg-surface-inset text-brand-blue flex shrink-0 items-center justify-center rounded-md border ${className}`}
     >
+      {/* The hiding sits on the <svg>, not the wrapper: an svg with neither a title nor this
+          attribute is announced, and the wrapper holds nothing else to hide. */}
       <svg
+        aria-hidden="true"
         viewBox="0 0 24 24"
         width="60%"
         height="60%"

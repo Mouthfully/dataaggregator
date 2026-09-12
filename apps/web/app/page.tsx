@@ -1,5 +1,5 @@
 import { brand } from "@repo/brand";
-import { FEATURES, PLATFORMS, SITE } from "./_content";
+import { SITE } from "./_content";
 import { Footer, SiteHeader } from "./_chrome";
 import { AssistantPanel } from "./_sections/AssistantPanel";
 import { DashboardFeature } from "./_sections/DashboardFeature";
@@ -19,8 +19,8 @@ import { UseCases } from "./_sections/UseCases";
  * TWO RULES THIS FILE OBEYS, both enforced rather than intended.
  *
  * NO SENTENCE IS TYPED HERE. `scripts/check-copy.mjs` refuses a JSX text node of five or more words
- * ending in terminal punctuation, so every line of copy arrives from `SITE`, `FEATURES` or a claim
- * resolver in `_content.ts`. Structural words -- a heading fragment, a link label -- are the only
+ * ending in terminal punctuation, so every line of copy arrives from `SITE` in `_content.ts` or
+ * from the section file that renders it. Structural words -- a heading fragment, a link label -- are the only
  * prose written inline, which is the same division the guard was measured against.
  *
  * NO HEX VALUE IS TYPED HERE. Every colour is a token utility resolved through `@theme inline` in
@@ -120,31 +120,6 @@ export default function Page() {
 
       <Footer />
     </>
-  );
-}
-
-/** Three outline marks, 24px on a 1.75 stroke, per BRAND.md "Shape and interface details". */
-function FeatureIcon({ id }: { id: string }) {
-  const paths: Record<string, string> = {
-    numbers: "M4 13h3v8H4zM10 8h3v13h-3zM16 3h3v18h-3z",
-    action: "m6 11 4 4L21 4M20 12v8H3V3h12",
-    sync: "M8 3v5m8-5v5M6 8h12v4a6 6 0 0 1-6 6v3m-6-9a6 6 0 0 0 6 6",
-  };
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="28"
-      height="28"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className="text-accent"
-    >
-      <path d={paths[id] ?? paths.numbers} />
-    </svg>
   );
 }
 

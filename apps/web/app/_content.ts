@@ -180,37 +180,6 @@ export const NAV = [
   { href: "/signin", label: "Sign in" },
 ] as const;
 
-/** The platform strip under the hero. Wordmarks, not logos, so nothing is hotlinked. */
-export const PLATFORMS = [
-  "Google Ads",
-  "Meta Ads",
-  "Shopify",
-  "TikTok Ads",
-  "HubSpot",
-  "Stripe",
-  "YouTube",
-  "Google Analytics",
-] as const;
-
-/** The three feature cards. */
-export const FEATURES = [
-  {
-    id: "numbers",
-    title: "The numbers that matter",
-    body: "Revenue, orders, spend, and return on ad spend sit together. Clear comparisons make changes easier to spot.",
-  },
-  {
-    id: "action",
-    title: "Your next best action",
-    body: "Prioritized insights help your team move from seeing a problem to doing something about it.",
-  },
-  {
-    id: "sync",
-    title: "Every source in sync",
-    body: "Connection health and recent sync activity make it clear where your data is coming from.",
-  },
-] as const;
-
 /* ---------------------------------------------------------------------------------------------
  * THE DASHBOARD, AND WHY ITS NUMBERS ARE HERE.
  *

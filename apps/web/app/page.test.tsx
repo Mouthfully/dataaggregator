@@ -10,8 +10,8 @@ import Page from "./page";
  *
  * WHAT CHANGED, AND WHAT IT COST. This page was previously built entirely out of `claims.ts` --
  * every sentence carried a specification citation and a withheld capability could not render. The
- * founder-supplied page set replaced it, so the page's copy now comes from `SITE` and
- * `FEATURES` in `_content.ts`, which are brand copy rather than cited claims.
+ * founder-supplied page set replaced it, so the page's copy now comes from `SITE` in
+ * `_content.ts` and from the section files, which are brand copy rather than cited claims.
  *
  * That is a real reduction in what these tests can promise and it is recorded here rather than
  * quietly absorbed: **the claims gate no longer guards the homepage.** `claims.ts`, its citations

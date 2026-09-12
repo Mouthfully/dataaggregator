@@ -647,7 +647,7 @@ export default async function PricingPage({
 
           {/* THE FIFTH TIER. A panel rather than a fifth card: it has no price to line up with the
               other four, and squeezing five cards across would shrink all of them to fit one. */}
-          <div
+          <section
             id="enterprise"
             className="bg-surface-inset mt-6 rounded-xl p-6 md:mt-8 md:p-10"
             aria-labelledby="enterprise-heading"
@@ -696,7 +696,7 @@ export default async function PricingPage({
                 </p>
               </div>
             </div>
-          </div>
+          </section>
         </section>
 
         {/* THE MATRIX. The one element allowed past the body's width, inside its own scroller. The

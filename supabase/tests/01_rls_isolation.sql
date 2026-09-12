@@ -185,12 +185,16 @@ insert into public.workspace_members (workspace_id, member_id) values
   ('c0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000002'),
   ('c0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000004');
 
+-- `credential_lane` is stated rather than defaulted, here and in every fixture below, because
+-- the column has no default on purpose -- see 20260912000100_credential_lane.sql. Omitting it is
+-- a write error, which is the point: a bearer credential silently filed as a grant is discovered
+-- when the scheduler cannot open it, hours later.
 insert into public.connections
-  (id, workspace_id, provider, external_account_id, credential_ciphertext, credential_iv, wrapped_dek)
+  (id, workspace_id, provider, external_account_id, credential_ciphertext, credential_iv, wrapped_dek, credential_lane)
 values
-  ('e0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'google_ads', '111-111-1111', '\x01', '\x02', '\x03'),
-  ('e0000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000002', 'meta_ads',   'act_222',      '\x01', '\x02', '\x03'),
-  ('e0000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000003', 'ga4',        'properties/333','\x01', '\x02', '\x03');
+  ('e0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'google_ads', '111-111-1111', '\x01', '\x02', '\x03', 'oauth'),
+  ('e0000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000002', 'meta_ads',   'act_222',      '\x01', '\x02', '\x03', 'oauth'),
+  ('e0000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000003', 'ga4',        'properties/333','\x01', '\x02', '\x03', 'oauth');
 
 insert into public.api_keys (id, workspace_id, name, key_prefix, key_hash, monthly_credit_budget)
 values
@@ -256,9 +260,10 @@ begin;
   -- He may write in the workspace he holds...
   select app_test.check_denied('analyst cannot create a connection in a workspace he does not hold', $sql$
     insert into public.connections (workspace_id, provider, external_account_id,
-                                    credential_ciphertext, credential_iv, wrapped_dek)
+                                    credential_ciphertext, credential_iv, wrapped_dek,
+                                    credential_lane)
     values ('c0000000-0000-0000-0000-000000000002', 'google_ads', 'stolen',
-            '\x01'::bytea, '\x02'::bytea, '\x03'::bytea);
+            '\x01'::bytea, '\x02'::bytea, '\x03'::bytea, 'oauth');
   $sql$);
   select app_test.check_denied('analyst cannot create a workspace', $sql$
     insert into public.workspaces (organisation_id, name, slug)
@@ -286,9 +291,10 @@ begin;
     (select count(*) = 1 from public.workspaces));
   select app_test.check_denied('viewer cannot create a connection even where he can read', $sql$
     insert into public.connections (workspace_id, provider, external_account_id,
-                                    credential_ciphertext, credential_iv, wrapped_dek)
+                                    credential_ciphertext, credential_iv, wrapped_dek,
+                                    credential_lane)
     values ('c0000000-0000-0000-0000-000000000001', 'ga4', 'nope',
-            '\x01'::bytea, '\x02'::bytea, '\x03'::bytea);
+            '\x01'::bytea, '\x02'::bytea, '\x03'::bytea, 'oauth');
   $sql$);
 commit;
 
@@ -363,9 +369,10 @@ begin;
       where id = 'e0000000-0000-0000-0000-000000000001'));
   select app_test.check_denied('API-key session cannot create a connection', $sql$
     insert into public.connections (workspace_id, provider, external_account_id,
-                                    credential_ciphertext, credential_iv, wrapped_dek)
+                                    credential_ciphertext, credential_iv, wrapped_dek,
+                                    credential_lane)
     values ('c0000000-0000-0000-0000-000000000001', 'meta_ads', 'attacker',
-            '\x01'::bytea, '\x02'::bytea, '\x03'::bytea);
+            '\x01'::bytea, '\x02'::bytea, '\x03'::bytea, 'oauth');
   $sql$);
 commit;
 

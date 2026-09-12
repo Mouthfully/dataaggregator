@@ -6,10 +6,13 @@ import {
   type ConnectionRow,
   type ConnectionStatus,
   type ConnectionStore,
+  type CredentialLane,
   connect,
   connectWithKey,
+  connectWithToken,
   connectionHealth,
-  isKeyPasteProvider,
+  lanesFor,
+  offersLane,
   openCredential,
   recordFailure,
 } from "./connections.js";
@@ -170,6 +173,7 @@ describe("health, and why the two providers differ", () => {
       id: CONNECTION,
       workspaceId: WORKSPACE,
       provider: "google_ads",
+      credentialLane: "oauth" as CredentialLane,
       externalAccountId: "111",
       displayName: null,
       credentialCiphertext: new Uint8Array(),
@@ -330,9 +334,14 @@ describe("the key-paste lane", () => {
     );
   });
 
-  it("knows which providers are key-paste", () => {
-    expect(isKeyPasteProvider("woocommerce")).toBe(true);
-    expect(isKeyPasteProvider("ga4")).toBe(false);
+  it("knows which lanes each provider offers, including the one that offers two", () => {
+    expect(lanesFor("woocommerce")).toEqual(["key_secret"]);
+    expect(lanesFor("ga4")).toEqual(["oauth"]);
+    // The entry the whole change exists for: same provider, same account, two ways in.
+    expect(lanesFor("meta_ads")).toEqual(["oauth", "bearer"]);
+    expect(offersLane("meta_ads", "bearer")).toBe(true);
+    expect(offersLane("ga4", "bearer")).toBe(false);
+    expect(offersLane("woocommerce", "oauth")).toBe(false);
   });
 });
 
@@ -355,6 +364,7 @@ describe("credentials sealed before the union existed", () => {
       id: CONNECTION,
       workspaceId: WORKSPACE,
       provider: "ga4",
+      credentialLane: "oauth",
       externalAccountId: "properties/123",
       displayName: null,
       credentialCiphertext: sealed.ciphertext,
@@ -387,5 +397,152 @@ describe("credentials sealed before the union existed", () => {
     const credential = await openCredential(crypto, row, KEK);
     if (credential.kind !== "oauth") throw new Error("expected an oauth credential");
     expect(credential.refreshToken).toBeNull();
+  });
+});
+
+describe("the bearer lane, and the token a customer mints for itself", () => {
+  let store: ConnectionStore;
+  let rows: Map<string, ConnectionRow>;
+
+  beforeEach(() => {
+    ({ store, rows } = memoryStore());
+  });
+
+  function connectToken(overrides: Record<string, unknown> = {}) {
+    return connectWithToken(crypto, store, {
+      workspaceId: WORKSPACE,
+      connectionId: CONNECTION,
+      provider: "meta_ads",
+      externalAccountId: "act_1234567890",
+      token: "EAAG_system_user_token",
+      kek: KEK,
+      keyVersion: 1,
+      now: NOW,
+      ...overrides,
+    });
+  }
+
+  it("seals one token under its own discriminant rather than half a key pair", async () => {
+    const row = await connectToken();
+    expect(row.credentialLane).toBe("bearer");
+    const credential = await openCredential(crypto, row, KEK);
+    expect(credential.kind).toBe("bearer");
+    if (credential.kind !== "bearer") throw new Error("expected a bearer credential");
+    expect(credential.token).toBe("EAAG_system_user_token");
+  });
+
+  it("refuses a provider that has no pasteable token, before writing anything", async () => {
+    // Google issues no long-lived pasteable token, so offering the lane would be offering a road
+    // with no end. The refusal names the lanes that do exist rather than just saying no.
+    await expect(connectToken({ provider: "ga4" })).rejects.toThrow(/no pasteable long-lived/);
+    await expect(connectToken({ provider: "ga4" })).rejects.toThrow(/oauth/);
+    expect(rows.size).toBe(0);
+  });
+
+  it("refuses an empty token, for the reason an empty key half is refused", async () => {
+    await expect(connectToken({ token: "   " })).rejects.toThrow(ConnectionError);
+    expect(rows.size).toBe(0);
+  });
+
+  it("refuses a token that has already expired, while the customer is still at the keyboard", async () => {
+    // The alternative is discovering it on a scheduled pull at 3am, when the only available action
+    // is marking the row broken.
+    await expect(connectToken({ expiresAt: "2026-09-01T00:00:00Z" })).rejects.toThrow(
+      /expired at 2026-09-01/,
+    );
+    expect(rows.size).toBe(0);
+  });
+
+  it("refuses an unparseable expiry rather than storing it as null", async () => {
+    // Null means PERMANENT here. Silently coercing a typo to null would promote a dated token to
+    // a permanent one, which is the one direction that fails silently.
+    await expect(connectToken({ expiresAt: "next tuesday" })).rejects.toThrow(
+      /must be a timestamp/,
+    );
+    expect(rows.size).toBe(0);
+  });
+
+  it("reports no scopes, because the platform reports none back at paste time", async () => {
+    const row = await connectToken();
+    expect(row.grantedScopes).toEqual([]);
+    expect(row.expiresAt).toBeNull();
+  });
+
+  it("calls a null expiry permanent, and says so in words the customer can act on", async () => {
+    const health = connectionHealth(await connectToken(), NOW);
+    expect(health.usable).toBe(true);
+    expect(health.needsCustomerAction).toBe(false);
+    expect(health.reason).toMatch(/does not expire/i);
+  });
+
+  it("does NOT call a dated token permanent -- the defect the old provider list produced", async () => {
+    // THIS IS THE TRAP THE LANE EXISTS TO REMOVE, and it is worth stating precisely rather than
+    // dramatically. The old model keyed health off the PROVIDER: `isKeyPasteProvider(row.provider)`
+    // returned early with "this key does not expire". So adding the Meta paste lane the obvious way
+    // -- putting `meta_ads` in KEY_PASTE_PROVIDERS -- would have made that branch answer for EVERY
+    // Meta connection, OAuth grants included, reporting `usable: true` on a grant that expired
+    // sixty days ago. The only alternative under that model was not offering the lane at all.
+    // Keying off the connection's own lane is what makes both answers available at once.
+    const dead = await (async () => {
+      const row = await connectToken();
+      return { ...row, expiresAt: "2026-09-07T00:00:00Z" };
+    })();
+    const health = connectionHealth(dead, NOW);
+    expect(health.usable).toBe(false);
+    expect(health.needsCustomerAction).toBe(true);
+    expect(health.status).toBe("needs_reauth");
+    expect(health.reason).toMatch(/mint a new one/i);
+    // And it must not tell them to reconnect an account, because there is no account to reconnect.
+    expect(health.reason).not.toMatch(/reconnect the account/i);
+  });
+
+  it("warns a week out, so the gap is avoidable rather than reported", async () => {
+    const row = await connectToken();
+    const soon = { ...row, expiresAt: "2026-09-11T00:00:00Z" };
+    const health = connectionHealth(soon, NOW);
+    expect(health.usable).toBe(true);
+    expect(health.needsCustomerAction).toBe(true);
+    expect(health.reason).toMatch(/within a week/i);
+  });
+
+  it("stays quiet when the expiry is comfortably away", async () => {
+    const row = await connectToken();
+    const later = { ...row, expiresAt: "2026-11-07T00:00:00Z" };
+    expect(connectionHealth(later, NOW)).toMatchObject({
+      usable: true,
+      needsCustomerAction: false,
+      reason: "Connected.",
+    });
+  });
+
+  it("lets one provider hold both lanes without either learning the other's rules", async () => {
+    // Meta over OAuth expires and cannot be refreshed -- `connectionHealth` says "reconnect the
+    // account". The same provider over a pasted token says "mint a new one". Same provider, same
+    // expiry, different instruction, because the customer's actual next action differs.
+    const pasted = { ...(await connectToken()), expiresAt: "2026-09-07T00:00:00Z" };
+    const granted = {
+      ...pasted,
+      credentialLane: "oauth" as CredentialLane,
+      expiresAt: "2026-09-07T00:00:00Z",
+    };
+    expect(connectionHealth(pasted, NOW).reason).toMatch(/mint a new one/i);
+    expect(connectionHealth(granted, NOW).reason).toMatch(/reconnect the account/i);
+  });
+
+  it("refuses to open a credential whose blob disagrees with its column", async () => {
+    // The column is readable without the KEK; that is why it exists. The cost is a second copy of
+    // one fact, and a second copy that can drift is exactly how this module's history went wrong.
+    const row = await connectToken();
+    const mislabelled = { ...row, credentialLane: "oauth" as CredentialLane };
+    await expect(openCredential(crypto, mislabelled, KEK)).rejects.toThrow(
+      /recorded as a oauth credential but seals a bearer one/,
+    );
+  });
+
+  it("routes a 401 to needs_reauth, because only the customer can mint another", async () => {
+    const row = await connectToken();
+    expect(await recordFailure(store, row, { status: 401, message: "invalid token" })).toBe(
+      "needs_reauth",
+    );
   });
 });

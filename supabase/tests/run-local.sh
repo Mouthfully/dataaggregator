@@ -55,3 +55,6 @@ psql -d "$DB" -q -f "$HERE/06_jwt_claims.sql"
 
 echo "==> anon grants suite"
 psql -d "$DB" -q -f "$HERE/07_anon_grants.sql"
+
+echo "==> credential lane suite"
+psql -d "$DB" -q -f "$HERE/08_credential_lane.sql"

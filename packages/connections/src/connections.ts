@@ -20,29 +20,78 @@ import { PROVIDERS, providerFor, scopesFor } from "@repo/oauth";
 export type ConnectionStatus = "active" | "needs_reauth" | "revoked" | "error";
 
 /**
- * Sources whose credential the MERCHANT issues to itself and pastes in.
+ * HOW A CREDENTIAL GOT HERE, AND THEREFORE WHAT IS TRUE ABOUT IT.
  *
- * 11A.13's first test is "who is reviewed". An OAuth source puts THIS COMPANY in front of a
- * platform reviewer and that review is the schedule; a key-paste source has no reviewer and no
- * calendar, because the merchant generates the key in its own admin. That is a different lifecycle,
- * not a different flavour of the same one, and the difference is why this list exists rather than
- * a boolean on a provider config:
+ * This replaces a list of "key-paste providers", and the reason is Meta. That list made the lane a
+ * property of the PROVIDER -- woocommerce is key-paste, everything else is OAuth -- and Meta is a
+ * counterexample the product needs rather than an edge case: the same Meta Ads account can be
+ * connected by sending an owner through the OAuth dance, or by pasting a System User token the
+ * customer minted in its own Business Manager. Same provider, same account, two lanes, and
+ * everything downstream that matters -- whether a refresh exists, whether a null expiry means
+ * "never" or "we were not told", what to say when it breaks -- differs between them.
  *
- *   - There is no authorisation server, so no scope to check and none to be missing.
- *   - There is no refresh token, because there is nothing to refresh.
- *   - THE CREDENTIAL NEVER EXPIRES. It stops working when the merchant deletes it or the WordPress
- *     user behind it is removed, and neither event has a date we could hold. `expiresAt` is null
- *     and means "no expiry", not "unknown expiry".
+ * So the lane belongs to the CONNECTION. It is a column, not a lookup, and `connectionHealth`
+ * reads it instead of asking which list the provider is on.
+ *
+ *   - `oauth`       an authorisation server issued it. It has scopes, a clock, and possibly a
+ *                   refresh token. Only this lane can ever self-heal.
+ *   - `key_secret`  the customer issued itself a key AND a secret in its own admin. No issuer, no
+ *                   scopes reported back, no clock.
+ *   - `bearer`      the customer issued itself ONE opaque token. No issuer, no scopes reported
+ *                   back, and a clock only if the platform gave us a date -- Meta System User
+ *                   tokens may be dated or permanent, a Shopify Admin token is permanent. A bearer
+ *                   token is NEVER refreshable: there is no issuer to ask.
  */
-export const KEY_PASTE_PROVIDERS = ["woocommerce"] as const;
+export type CredentialLane = "oauth" | "key_secret" | "bearer";
 
-export type KeyPasteProvider = (typeof KEY_PASTE_PROVIDERS)[number];
+export const CREDENTIAL_LANES = ["oauth", "key_secret", "bearer"] as const;
+
+/**
+ * Which lanes each provider actually offers.
+ *
+ * Enumerated rather than inferred, because offering a lane is a claim about the platform and not
+ * about our code: Google has no pasteable long-lived token, so `bearer` for `ga4` would be a lane
+ * a customer can never walk down. `connectWithToken` and `connectWithKey` both check this, so an
+ * unsupported lane is refused at the seam instead of sealing a credential nothing can use.
+ */
+export const PROVIDER_LANES = {
+  ga4: ["oauth"],
+  google_ads: ["oauth"],
+  search_console: ["oauth"],
+  // BOTH, and this is the entry the type above exists for. §11A.13's "who is reviewed" test cuts
+  // differently per lane: the OAuth lane puts this company in front of a Meta reviewer, the System
+  // User lane puts nobody in front of anybody, because the customer minted the token itself.
+  meta_ads: ["oauth", "bearer"],
+  woocommerce: ["key_secret"],
+} as const satisfies Record<string, readonly CredentialLane[]>;
 
 /** Every provider a connection can be to. `app.connection_provider` must carry the same members. */
-export type ConnectionProvider = SourceId | KeyPasteProvider;
+export type ConnectionProvider = keyof typeof PROVIDER_LANES;
 
-export function isKeyPasteProvider(provider: ConnectionProvider): provider is KeyPasteProvider {
-  return (KEY_PASTE_PROVIDERS as readonly string[]).includes(provider);
+export function lanesFor(provider: ConnectionProvider): readonly CredentialLane[] {
+  return PROVIDER_LANES[provider];
+}
+
+export function offersLane(provider: ConnectionProvider, lane: CredentialLane): boolean {
+  return (PROVIDER_LANES[provider] as readonly CredentialLane[]).includes(lane);
+}
+
+/**
+ * Whether the customer minted this credential itself.
+ *
+ * Derived from the lane rather than stored, because it is a consequence and not a fact: both
+ * non-OAuth lanes share the properties that matter here -- no authorisation server, so no scopes
+ * came back and no refresh is possible -- and a third such lane should inherit them by default
+ * rather than by somebody remembering to add it to a list. That forgetting is what this change is
+ * repairing.
+ */
+export function isSelfIssued(lane: CredentialLane): boolean {
+  return lane !== "oauth";
+}
+
+/** Narrows to the subset of providers that `providerFor` and `scopesFor` accept. */
+export function isOAuthSource(provider: ConnectionProvider): provider is SourceId {
+  return offersLane(provider, "oauth");
 }
 
 /** The row, as `20260908000500_connections.sql` defines it. */
@@ -50,6 +99,8 @@ export interface ConnectionRow {
   readonly id: string;
   readonly workspaceId: string;
   readonly provider: ConnectionProvider;
+  /** Which lane this credential arrived on. `credential_lane` in the table; never inferred. */
+  readonly credentialLane: CredentialLane;
   readonly externalAccountId: string;
   readonly displayName: string | null;
   readonly credentialCiphertext: Uint8Array;
@@ -95,6 +146,19 @@ export type StoredCredential =
       readonly kind: "key_secret";
       readonly key: string;
       readonly secret: string;
+    }
+  | {
+      /**
+       * ONE opaque token the customer minted in its own admin.
+       *
+       * Not a degenerate `key_secret` with an empty half, and not an `oauth` with a null refresh
+       * token. Both of those compile; both then lie. `connectWithKey` refuses an empty secret on
+       * purpose -- an empty half seals fine and 401s hours later -- so a bearer token pushed
+       * through it is rejected outright, and pushed through `connect` it would reach
+       * `scopesFor(providerFor(...))` and be measured against scopes no System User token reports.
+       */
+      readonly kind: "bearer";
+      readonly token: string;
     };
 
 export class ConnectionError extends Error {
@@ -161,6 +225,7 @@ export async function connect(
     id: options.connectionId,
     workspaceId: options.workspaceId,
     provider: options.source,
+    credentialLane: "oauth",
     externalAccountId: options.externalAccountId,
     displayName: options.displayName ?? null,
     credentialCiphertext: sealed.ciphertext,
@@ -205,7 +270,7 @@ export async function connectWithKey(
   options: {
     workspaceId: string;
     connectionId: string;
-    provider: KeyPasteProvider;
+    provider: ConnectionProvider;
     /** The account at the provider. For a self-hosted store, its https origin. */
     externalAccountId: string;
     displayName?: string;
@@ -215,6 +280,14 @@ export async function connectWithKey(
     keyVersion: number;
   },
 ): Promise<ConnectionRow> {
+  if (!offersLane(options.provider, "key_secret")) {
+    throw new ConnectionError(
+      `${options.provider} does not issue a key-and-secret pair. Lanes it offers: ` +
+        `${lanesFor(options.provider).join(", ")}.`,
+      "no_credential",
+    );
+  }
+
   if (options.key.trim() === "" || options.secret.trim() === "") {
     throw new ConnectionError(
       "a key-paste connection needs both a key and a secret. An empty half seals successfully and " +
@@ -240,6 +313,7 @@ export async function connectWithKey(
     id: options.connectionId,
     workspaceId: options.workspaceId,
     provider: options.provider,
+    credentialLane: "key_secret",
     externalAccountId: options.externalAccountId,
     displayName: options.displayName ?? null,
     credentialCiphertext: sealed.ciphertext,
@@ -248,8 +322,112 @@ export async function connectWithKey(
     keyVersion: sealed.keyVersion,
     // Empty, not invented. The platform reports no grant.
     grantedScopes: [],
-    // NULL MEANS "NO EXPIRY", not "unknown". See KEY_PASTE_PROVIDERS.
+    // NULL MEANS "NO EXPIRY", not "unknown". A key-and-secret pair has no clock at all.
     expiresAt: null,
+    status: "active",
+    lastError: null,
+    revokedAt: null,
+  });
+}
+
+/**
+ * Store a single pasted bearer token.
+ *
+ * THE THIRD SIBLING, for the same reason `connectWithKey` was the second: the alternative is a
+ * branch inside one function that fabricates the parts the lane does not have. Here that would
+ * mean an empty `secret` to satisfy `connectWithKey`'s both-halves refusal -- defeating a check
+ * that exists because an empty half seals successfully and 401s hours later with nothing pointing
+ * at the cause.
+ *
+ * `expiresAt` IS ACCEPTED AND OPTIONAL, and that asymmetry with `connectWithKey` is the point.
+ * A key-and-secret pair has no clock at all; a bearer token may or may not, and only the customer
+ * knows which. Meta will mint a System User token that never expires or one dated sixty days out,
+ * from the same screen. Passing null says "permanent" -- it does not say "unknown", and nothing
+ * downstream may read it as unknown, because `connectionHealth` would then report "Connected." to
+ * somebody whose token died last week.
+ *
+ * NO SCOPE CHECK, and no invented `grantedScopes`. A System User token carries whatever the
+ * customer granted the system user, and the platform reports none of it back at paste time. An
+ * insufficient permission surfaces as a 403 on the first pull, which `recordFailure` turns into
+ * `needs_reauth` -- the honest failure mode, since only the customer can widen it.
+ */
+export async function connectWithToken(
+  crypto: VaultCrypto,
+  store: ConnectionStore,
+  options: {
+    workspaceId: string;
+    connectionId: string;
+    provider: ConnectionProvider;
+    externalAccountId: string;
+    displayName?: string;
+    token: string;
+    /** When the platform says it dies. Null means PERMANENT, never "we do not know". */
+    expiresAt?: string | null;
+    kek: Uint8Array;
+    keyVersion: number;
+    /** Injected so the already-expired refusal below is testable rather than clock-dependent. */
+    now?: Date;
+  },
+): Promise<ConnectionRow> {
+  if (!offersLane(options.provider, "bearer")) {
+    throw new ConnectionError(
+      `${options.provider} has no pasteable long-lived token. Lanes it offers: ` +
+        `${lanesFor(options.provider).join(", ")}.`,
+      "no_credential",
+    );
+  }
+
+  if (options.token.trim() === "") {
+    throw new ConnectionError(
+      "a bearer connection needs a token. An empty one seals successfully and fails on the first " +
+        "pull, hours later, with nothing pointing at the cause.",
+      "no_credential",
+    );
+  }
+
+  const expiresAt = options.expiresAt ?? null;
+  if (expiresAt !== null) {
+    const parsed = Date.parse(expiresAt);
+    if (Number.isNaN(parsed)) {
+      throw new ConnectionError(
+        `\`expiresAt\` must be a timestamp, got ${JSON.stringify(expiresAt)}. An unparseable ` +
+          "date would be stored as null, and null means permanent here.",
+        "no_credential",
+      );
+    }
+    // Refused at paste time rather than discovered at 3am. The customer is at the keyboard now and
+    // can mint another; the scheduler, later, can only mark the row broken.
+    if (parsed <= (options.now ?? new Date()).getTime()) {
+      throw new ConnectionError(
+        `that token expired at ${expiresAt}. Mint a new one and paste that instead.`,
+        "expired",
+      );
+    }
+  }
+
+  const credential: StoredCredential = { kind: "bearer", token: options.token };
+
+  const sealed = await seal(crypto, {
+    plaintext: JSON.stringify(credential),
+    kek: options.kek,
+    keyVersion: options.keyVersion,
+    scope: { workspaceId: options.workspaceId, connectionId: options.connectionId },
+  });
+
+  return store.upsert({
+    id: options.connectionId,
+    workspaceId: options.workspaceId,
+    provider: options.provider,
+    credentialLane: "bearer",
+    externalAccountId: options.externalAccountId,
+    displayName: options.displayName ?? null,
+    credentialCiphertext: sealed.ciphertext,
+    credentialIv: sealed.iv,
+    wrappedDek: sealed.wrappedDek,
+    keyVersion: sealed.keyVersion,
+    // Empty, not invented. Nothing was reported back.
+    grantedScopes: [],
+    expiresAt,
     status: "active",
     lastError: null,
     revokedAt: null,
@@ -301,6 +479,22 @@ export async function openCredential(
     };
   }
 
+  // THE COLUMN AND THE BLOB MUST AGREE, and until now nothing checked that they did.
+  //
+  // `credential_lane` is readable without the KEK -- that is the whole reason it is a column, so
+  // `connectionHealth` and the connect surface can reason about a connection without decrypting
+  // it. The cost of that convenience is a second copy of one fact, and a second copy that can
+  // drift silently is how this file's own history went wrong. If they disagree, every cheap read
+  // has been answering from the wrong one, so refuse rather than pick a winner.
+  if (parsed.kind !== row.credentialLane) {
+    throw new ConnectionError(
+      `connection ${row.id} is recorded as a ${row.credentialLane} credential but seals a ` +
+        `${parsed.kind} one. Everything that reads the lane without decrypting -- health, the ` +
+        "connect surface -- has been answering from the wrong one.",
+      "no_credential",
+    );
+  }
+
   return parsed as StoredCredential;
 }
 
@@ -322,6 +516,40 @@ export interface ConnectionHealth {
  * either wakes someone for a refresh that would have happened anyway, or lets a Meta connection go
  * dark with nobody told.
  */
+/** A week. Long enough to act on, short enough not to become noise. */
+const WARN_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * What a DATED self-issued credential is worth right now.
+ *
+ * Separated from the OAuth path because the advice differs in the only way the customer cares
+ * about: an expired OAuth grant is fixed by reconnecting an account, and an expired pasted token
+ * is fixed by minting another and pasting it. Telling someone to "reconnect the account" when
+ * there is no account to reconnect sends them looking for a button that does not exist.
+ */
+function selfIssuedExpiry(expiresAtIso: string, now: Date): ConnectionHealth {
+  const expiresAt = Date.parse(expiresAtIso);
+  if (expiresAt <= now.getTime()) {
+    return {
+      status: "needs_reauth",
+      usable: false,
+      needsCustomerAction: true,
+      reason: "This token has expired and cannot be refreshed. Mint a new one and paste it in.",
+    };
+  }
+  if (expiresAt - now.getTime() < WARN_MS) {
+    return {
+      status: "active",
+      usable: true,
+      needsCustomerAction: true,
+      reason:
+        "This token expires within a week and cannot be refreshed automatically. " +
+        "Mint a new one and paste it in to avoid a gap.",
+    };
+  }
+  return { status: "active", usable: true, needsCustomerAction: false, reason: "Connected." };
+}
+
 export function connectionHealth(row: ConnectionRow, now: Date): ConnectionHealth {
   if (row.revokedAt !== null || row.status === "revoked") {
     return {
@@ -356,16 +584,38 @@ export function connectionHealth(row: ConnectionRow, now: Date): ConnectionHealt
     };
   }
 
-  // A KEY-PASTE CONNECTION HAS NO PROVIDER CONFIG AND NO CLOCK, so it must be answered before the
-  // lookup below -- `providerFor` does not accept it, and every branch after this one reasons about
-  // an expiry it does not have. Reaching the expiry logic with `expiresAt: null` would report
-  // "Connected." by accident rather than on purpose; this says it on purpose.
-  if (isKeyPasteProvider(row.provider)) {
+  // A SELF-ISSUED CREDENTIAL HAS NO PROVIDER CONFIG, so `providerFor` -- which takes a `SourceId`
+  // -- cannot be reached with one. What it MAY have is a clock: that is the whole difference
+  // between the two self-issued lanes and the reason this is no longer one early return.
+  //
+  // A key-and-secret pair never expires, so it is answered here and done. A bearer token may be
+  // permanent or dated from the same screen, so a DATED one has to fall through to the expiry
+  // logic below. The previous version of this function returned "This key does not expire" for
+  // anything not on the OAuth list, which for a dated System User token is a sentence that is
+  // simply false -- and reports `usable: true` on a connection that 401s.
+  if (isSelfIssued(row.credentialLane)) {
+    if (row.expiresAt === null) {
+      return {
+        status: "active",
+        usable: true,
+        needsCustomerAction: false,
+        reason:
+          row.credentialLane === "key_secret"
+            ? "Connected. This key does not expire; it stops working only if you delete it."
+            : "Connected. This token does not expire; it stops working only if you revoke it.",
+      };
+    }
+    return selfIssuedExpiry(row.expiresAt, now);
+  }
+
+  // `isOAuthSource` rather than a cast: the lane says this connection came from an authorisation
+  // server, and the narrowing makes the compiler agree instead of being told.
+  if (!isOAuthSource(row.provider)) {
     return {
-      status: "active",
-      usable: true,
+      status: "error",
+      usable: false,
       needsCustomerAction: false,
-      reason: "Connected. This key does not expire; it stops working only if you delete it.",
+      reason: `${row.provider} has no OAuth lane, so this connection's recorded lane is wrong.`,
     };
   }
 
@@ -394,7 +644,6 @@ export function connectionHealth(row: ConnectionRow, now: Date): ConnectionHealt
 
   // Warn before it breaks, not after. Meta's window is ~60 days, so a week is enough notice for
   // someone to act without it becoming noise.
-  const WARN_MS = 7 * 24 * 60 * 60 * 1000;
   if (!config.issuesRefreshToken && expiresAt !== null && expiresAt - now.getTime() < WARN_MS) {
     return {
       status: "active",

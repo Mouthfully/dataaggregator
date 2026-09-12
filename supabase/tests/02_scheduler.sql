@@ -108,16 +108,16 @@ insert into public.members (id, organisation_id, user_id, role) values
   ('9d000000-0000-0000-0000-000000000003', '9bbbbbbb-0000-0000-0000-000000000002', '93333333-3333-3333-3333-333333333333', 'owner');
 
 insert into public.connections
-  (id, workspace_id, provider, external_account_id, credential_ciphertext, credential_iv, wrapped_dek, status, expires_at, last_backfill_at)
+  (id, workspace_id, provider, external_account_id, credential_ciphertext, credential_iv, wrapped_dek, credential_lane, status, expires_at, last_backfill_at)
 values
   -- due: never pulled
-  ('9e000000-0000-0000-0000-000000000001', '9c000000-0000-0000-0000-000000000001', 'google_ads', '111', '\x01', '\x02', '\x03', 'active', null, null),
+  ('9e000000-0000-0000-0000-000000000001', '9c000000-0000-0000-0000-000000000001', 'google_ads', '111', '\x01', '\x02', '\x03', 'oauth', 'active', null, null),
   -- due: pulled yesterday, and belongs to the OTHER tenant
-  ('9e000000-0000-0000-0000-000000000003', '9c000000-0000-0000-0000-000000000003', 'ga4', '333', '\x01', '\x02', '\x03', 'active', null, '2026-09-07T02:00:00Z'),
+  ('9e000000-0000-0000-0000-000000000003', '9c000000-0000-0000-0000-000000000003', 'ga4', '333', '\x01', '\x02', '\x03', 'oauth', 'active', null, '2026-09-07T02:00:00Z'),
   -- not due: needs reauth
-  ('9e000000-0000-0000-0000-000000000004', '9c000000-0000-0000-0000-000000000001', 'meta_ads', '444', '\x01', '\x02', '\x03', 'needs_reauth', null, null),
+  ('9e000000-0000-0000-0000-000000000004', '9c000000-0000-0000-0000-000000000001', 'meta_ads', '444', '\x01', '\x02', '\x03', 'oauth', 'needs_reauth', null, null),
   -- not due: the grant has expired, so pulling would burn shared quota to earn a 401
-  ('9e000000-0000-0000-0000-000000000005', '9c000000-0000-0000-0000-000000000001', 'search_console', '555', '\x01', '\x02', '\x03', 'active', '2026-09-01T00:00:00Z', null);
+  ('9e000000-0000-0000-0000-000000000005', '9c000000-0000-0000-0000-000000000001', 'search_console', '555', '\x01', '\x02', '\x03', 'oauth', 'active', '2026-09-01T00:00:00Z', null);
 
 -- ---------------------------------------------------------------------------------------------
 -- What the scheduler sees

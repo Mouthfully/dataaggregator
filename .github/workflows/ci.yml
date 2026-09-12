@@ -116,6 +116,15 @@ jobs:
         if: ${{ !cancelled() }}
         run: node scripts/check-claim-sources.mjs
 
+      # `app.connection_provider` and its TypeScript twin had nothing relating them -- the
+      # connections migration says so in a comment and shipped anyway, and four affiliate-network
+      # members had already drifted past TypeScript by the time anyone looked. A provider the
+      # column cannot store fails on the INSERT, in production, after the customer has finished
+      # authorising: the latest possible moment to learn it.
+      - name: Provider guard
+        if: ${{ !cancelled() }}
+        run: node scripts/check-providers.mjs
+
   # Row-level security is the whole tenant-isolation guarantee, so it is a regression gate rather
   # than a one-off check someone once ran. `supabase start` needs Docker-in-Docker and a full
   # Supabase stack; this needs a database, so it runs the real migrations against a plain

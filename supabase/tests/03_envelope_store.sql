@@ -76,9 +76,9 @@ insert into public.members (id, organisation_id, user_id, role) values
   ('7d000000-0000-0000-0000-000000000003', '7bbbbbbb-0000-0000-0000-000000000002', '73333333-3333-3333-3333-333333333333', 'owner');
 
 insert into public.connections
-  (id, workspace_id, provider, external_account_id, credential_ciphertext, credential_iv, wrapped_dek)
+  (id, workspace_id, provider, external_account_id, credential_ciphertext, credential_iv, wrapped_dek, credential_lane)
 values
-  ('7e000000-0000-0000-0000-000000000001', '7c000000-0000-0000-0000-000000000001', 'ga4', 'properties/123456', '\x01', '\x02', '\x03');
+  ('7e000000-0000-0000-0000-000000000001', '7c000000-0000-0000-0000-000000000001', 'ga4', 'properties/123456', '\x01', '\x02', '\x03', 'oauth');
 
 -- ---------------------------------------------------------------------------------------------
 -- THE PROMISE. first_seen_at is written once and survives every re-pull.

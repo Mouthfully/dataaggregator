@@ -1,12 +1,15 @@
 import { brand } from "@repo/brand";
 import { FEATURES, PLATFORMS, SITE } from "./_content";
 import { Footer, SiteHeader } from "./_chrome";
+import { AssistantPanel } from "./_sections/AssistantPanel";
+import { DashboardFeature } from "./_sections/DashboardFeature";
 import { Faq, FinalCta } from "./_sections/FaqCta";
 import { FeatureGrid } from "./_sections/FeatureGrid";
 import { IntegrationsMap } from "./_sections/IntegrationsMap";
 import { IntegrationsStrip } from "./_sections/IntegrationsStrip";
 import { Pricing } from "./_sections/Pricing";
 import { SimplerWay } from "./_sections/SimplerWay";
+import { Templates } from "./_sections/Templates";
 import { UseCases } from "./_sections/UseCases";
 
 /**
@@ -105,7 +108,10 @@ export default function Page() {
         <IntegrationsStrip />
         <SimplerWay />
         <FeatureGrid />
+        <AssistantPanel />
         <IntegrationsMap />
+        <DashboardFeature />
+        <Templates />
         <Pricing />
         <UseCases />
         <Faq />

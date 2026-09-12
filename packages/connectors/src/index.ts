@@ -192,6 +192,7 @@ export {
 export {
   WOO_BACKFILL_CHUNK_DAYS,
   WooBackfillError,
+  parseRfc3339,
   runWooBackfill,
   wooBackfillChunks,
   type WooBackfillBatch,

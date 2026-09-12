@@ -184,15 +184,19 @@ begin
     -- trigger declared on one of them passes every insert test while leaving the column writable
     -- to anything afterwards -- which is the shape a real mistake takes, since a seed script
     -- inserts once and a correction updates.
+    --
+    -- BOTH RUN AGAINST THE ROW WHOSE ZONE IS STILL NULL, because setting a null zone is the only
+    -- update this column now permits at all -- see the immutability block below. Using the
+    -- Asia/Bangkok row would assert the immutability rule twice and the IANA rule never.
     begin
       update public.connections set timezone = 'Mars/Olympus'
-       where id = 'e3000000-0000-4000-8000-000000000001';
+       where id = 'e3000000-0000-4000-8000-000000000003';
     exception when others then
       v_update_bad := true;
     end;
 
     update public.connections set timezone = 'Europe/Berlin'
-     where id = 'e3000000-0000-4000-8000-000000000001';
+     where id = 'e3000000-0000-4000-8000-000000000003';
     v_update_good := true;
 
     v_reached := true;
@@ -229,8 +233,97 @@ begin
     v_update_bad
   );
   perform app_test.check(
-    'an UPDATE to a real zone still lands',
+    'an UPDATE that SETS a zone for the first time still lands',
     v_update_good
+  );
+end $$;
+
+-- ---------------------------------------------------------------------------------------------
+-- IMMUTABLE ONCE SET.
+--
+-- The sharpest assertion in this file, and it exists because of a review finding rather than
+-- because anyone thought of it first. `date` on an envelope row is now computed in this zone and
+-- `date` is part of the upsert key, so changing the zone makes a re-pull of an order near midnight
+-- write a SECOND row instead of updating the first -- and the customer's total goes silently UP.
+--
+-- Every path is exercised: null -> a zone (allowed, it is how one gets set), a zone -> the same
+-- zone (allowed, a no-op update must not fail), a zone -> a different zone (refused), and a zone
+-- -> null (refused, because otherwise it is a two-step version of the same change).
+-- ---------------------------------------------------------------------------------------------
+do $$
+declare
+  v_reached     boolean := false;
+  v_set_first   boolean := false;
+  v_same        boolean := false;
+  v_changed     boolean := false;
+  v_to_null     boolean := false;
+  v_untouched   text;
+begin
+  begin
+    insert into auth.users (id, email) values
+      ('e0000000-0000-4000-8000-000000000002', 'tz2@test.test') on conflict do nothing;
+    insert into public.organisations (id, name, slug) values
+      ('e1000000-0000-4000-8000-000000000002', 'TZ Org 2', 'tz-org-2') on conflict do nothing;
+    insert into public.workspaces (id, organisation_id, name, slug) values
+      ('e2000000-0000-4000-8000-000000000002', 'e1000000-0000-4000-8000-000000000002',
+       'TZ Workspace 2', 'tz-workspace-2') on conflict do nothing;
+
+    -- Starts with NO zone, which is what a connection looks like before anyone is asked.
+    insert into public.connections
+      (id, workspace_id, provider, credential_lane, external_account_id,
+       credential_ciphertext, credential_iv, wrapped_dek, timezone)
+    values
+      ('e4000000-0000-4000-8000-000000000001', 'e2000000-0000-4000-8000-000000000002',
+       'woocommerce', 'key_secret', 'https://immutable.example.com', '\x00', '\x00', '\x00', null);
+
+    -- null -> a zone. THE SETTING PATH, and it must stay open or a connection could never be used.
+    update public.connections set timezone = 'Asia/Bangkok'
+     where id = 'e4000000-0000-4000-8000-000000000001';
+    v_set_first := true;
+
+    -- the same zone. A no-op update that raised would break every unrelated write to this table.
+    update public.connections set timezone = 'Asia/Bangkok'
+     where id = 'e4000000-0000-4000-8000-000000000001';
+    v_same := true;
+
+    -- a DIFFERENT zone. The one that forks the rows.
+    begin
+      update public.connections set timezone = 'America/New_York'
+       where id = 'e4000000-0000-4000-8000-000000000001';
+    exception when others then v_changed := true;
+    end;
+
+    -- back to null. Refused too, or it is `Asia/Bangkok -> null -> America/New_York` in two steps.
+    begin
+      update public.connections set timezone = null
+       where id = 'e4000000-0000-4000-8000-000000000001';
+    exception when others then v_to_null := true;
+    end;
+
+    select timezone into v_untouched from public.connections
+     where id = 'e4000000-0000-4000-8000-000000000001';
+
+    v_reached := true;
+    raise exception 'discarding the fixture';
+  exception
+    when others then null;
+  end;
+
+  perform app_test.check(
+    'the immutability block ran to completion, so the verdicts below mean something',
+    v_reached,
+    'an earlier statement raised; every immutability verdict in this block is void'
+  );
+  perform app_test.check('a null zone can be SET for the first time', v_set_first);
+  perform app_test.check('setting the same zone again is not an error', v_same);
+  perform app_test.check(
+    'changing a set zone is REFUSED, because it forks every keyed row', v_changed);
+  perform app_test.check(
+    'clearing a set zone is refused too, or the change is just two steps long', v_to_null);
+  perform app_test.check(
+    'the refused updates left the stored zone untouched',
+    v_untouched = 'Asia/Bangkok',
+    format('the zone is now %s', coalesce(quote_literal(v_untouched), 'NULL'))
   );
 end $$;
 
@@ -242,7 +335,8 @@ do $$
 declare v_left integer;
 begin
   select count(*) into v_left from public.connections
-   where workspace_id = 'e2000000-0000-4000-8000-000000000001';
+   where workspace_id in ('e2000000-0000-4000-8000-000000000001',
+                          'e2000000-0000-4000-8000-000000000002');
   perform app_test.check(
     'the fixture rolled back and left no connection row', v_left = 0,
     format('%s row(s) survived', v_left)
@@ -266,7 +360,7 @@ declare v_failed integer; v_total integer;
 begin
   select count(*) filter (where not passed), count(*) into v_failed, v_total from app_test.results;
   if v_failed > 0 then raise exception 'connection timezone: % assertion(s) failed', v_failed; end if;
-  if v_total < 14 then
-    raise exception 'connection timezone: only % assertion(s) ran; expected at least 14', v_total;
+  if v_total < 20 then
+    raise exception 'connection timezone: only % assertion(s) ran; expected at least 20', v_total;
   end if;
 end $$;

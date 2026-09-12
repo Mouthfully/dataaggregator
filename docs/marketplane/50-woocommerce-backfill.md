@@ -112,6 +112,51 @@ buckets in it via `formatToParts` (not `format`, which is a locale's idea of a d
 Shipping the column without this would have added an input nothing read, which is the worst of both:
 the cost of the migration and none of the correctness.
 
+### Three findings from review, all real, all fixed
+
+A Codex review on the first push raised three, and verifying them found all three sound. The second
+is the sharpest, because **this PR introduced it**.
+
+**P1 — a timezone change forks every keyed row.** The upsert key is
+`(workspace_id, source, account_id, entity_id, date, attribution_window)`. Making `date` depend on
+the store's zone — which is what this PR does — means a zone change recomputes the key for any order
+near midnight, so the next re-pull **inserts a second row** instead of updating the first. The old
+row stays, nothing points at it, both are returned, and the total goes silently *up*. Orders never
+re-pulled keep the old date, so the table holds two timezones at once with nothing recording which
+is which.
+
+Before this PR `date` was UTC-derived and independent of the column, so a zone change moved only the
+label. The hazard is new, and it is mine.
+
+Re-keying every affected row is not something anything here can do yet, so the column is now
+**immutable once set**: null → a zone is allowed (it is how one gets set), the same zone again is
+allowed (a no-op update must not fail), and any other change is refused with a message naming the
+consequence. A change back to `null` is refused too — otherwise
+`Asia/Bangkok → null → America/New_York` is the same change in two steps. `envelope_rows` holds zero
+rows on every project today, so this costs nothing now and closes the hazard before there is data to
+damage.
+
+**P2 — `Date.parse` is not RFC3339 validation.** Three of its answers are dangerous, and the first
+is the one that matters:
+
+| input | `Date.parse` | why it is not harmless |
+|---|---|---|
+| `2026-02-30T00:00:00Z` | **2026-03-02** | a watermark on a day that does not exist silently skips two days of orders, and the checkpoint then advances past them |
+| `2026-09-11T00:00:00` | parsed as **local** | this repository has a documented history with exactly that reading — it is why `wooGmtToDate` appends a `Z` and why the suite is pinned to Asia/Bangkok |
+| `September 11, 2026` | accepted | not a format any caller should reach here |
+
+`parseRfc3339` now matches the shape and then checks the **calendar** by rebuilding the instant from
+its own components: `Date.UTC(2026, 1, 30)` rolls forward, so a date that does not survive the round
+trip did not exist. Exported, because `apps/api-edge` validates the same two fields at its HTTP
+boundary and two implementations of *"is this an instant"* is how they come to disagree.
+
+**P2 — `onChunk` was typed `=> void` and not awaited.** A caller banking the watermark durably will
+want to *write* it, and a `void` signature accepts an `async` function while dropping its promise:
+the next chunk starts while the write is in flight, two writes can land out of order, and a rejected
+one surfaces as an unhandled rejection while the run reports success. Every one of those ends the
+same way — a watermark ahead of what was stored, which is the single thing this callback exists to
+prevent. It now returns `void | Promise<void>` and is awaited.
+
 ### The guard grew a third file
 
 `check-capabilities.mjs` read `client.ts` and `normalize.ts` and not `backfill.ts` — which is the
@@ -215,6 +260,9 @@ ever been written.
 
 **Result:** `11 PASS, 7 N/A, 0 FAIL`
 
+*(Gate 5 re-checked after the immutability trigger: still `PASS`. It adds no policy and no grant,
+and `01_rls_isolation.sql` passes from all seven principals.)*
+
 ## 4. What was left out
 
 - **The watermark is not persisted.** It is returned to the caller. The Worker *cannot* write
@@ -249,6 +297,11 @@ ever been written.
   `WOO_BACKFILL_CHUNK_DAYS` is derived *from* it, so it inherits that status.
 - **The ~50 and ~500 changed-orders-a-night figures come from `32` §3**, which states them as
   launch-target estimates rather than observations.
+- **Re-keying existing rows after a timezone correction.** The column is immutable instead, which
+  refuses the operation rather than performing it. Doing it properly means deleting every
+  `envelope_rows` row for the connection and rewinding the watermark to the start of history — a
+  destructive operation with no caller, no UI and no audit trail, and the wrong thing to invent
+  speculatively. Filed; the refusal message says what it would take.
 - **`envelope_rows.timezone` has no validation of its own.** The connection column is validated and
   the connector refuses an unknown zone, so the two live paths are covered; a hand-written row into
   `envelope_rows` is not. Filed rather than folded in: that table's write path is
@@ -260,13 +313,13 @@ ever been written.
 On this branch with a real `pnpm install --frozen-lockfile`, plus a PostgreSQL 16 run of the full
 database suite.
 
-- [x] `pnpm -r test` — **839 tests**, 0 failures (`@repo/connectors` 323 → **345**)
+- [x] `pnpm -r test` — **846 tests**, 0 failures (`@repo/connectors` 323 → **352**)
 - [x] `pnpm -r typecheck` — clean
 - [x] `pnpm exec biome lint .` / `biome format .` — clean
 - [x] **All eight guards pass**
 - [x] `pnpm -r build` — `next build` and `wrangler deploy --dry-run` both clean
-- [x] `./supabase/tests/run-local.sh` — twelve suites, **337 assertions**, 0 failures, including the
-      new `11_connection_timezone.sql` at 15
+- [x] `./supabase/tests/run-local.sh` — twelve suites, **343 assertions**, 0 failures, including the
+      new `11_connection_timezone.sql` at 21
 
 ### Every new check fires on a real defect
 
@@ -289,6 +342,10 @@ Each mutation was applied to a green tree, the suite run, and the tree restored.
 | T5 | checkpoint advanced *before* the chunk is read | `backfill.test.ts` | **FAIL** — 3 |
 | T6 | timezone checked at normalise time rather than before the first request | `backfill.test.ts` | **FAIL** — 2 |
 | T7 | one batch per chunk (GA4's shape) instead of one per page | `backfill.test.ts` | **FAIL** |
+| R1 | `onChunk` not awaited *(the review finding, restored)* | `backfill.test.ts` | **FAIL** — 2 |
+| R2 | RFC3339 left to `Date.parse` *(the review finding, restored)* | `backfill.test.ts` | **FAIL** — 4 |
+| R3 | the timezone immutability rule removed *(the review finding, restored)* | `11_connection_timezone.sql` | **FAIL** — 3 |
+| R4 | immutability keeps only the "different zone" case, allowing a `null` detour | `11_connection_timezone.sql` | **FAIL** — 2 |
 
 C3 is the one worth reading twice: it is a hole that existed before this PR and that the guard's
 previous version reported as PASS.
@@ -304,7 +361,13 @@ previous version reported as PASS.
    parsing as `POSITION(x IN y)`. `timezone` is also a function name, so it was exercised bare in a
    select list, in `is distinct from`, and as `new.timezone` in a trigger before the column was
    named. It is fine in all four — which is a fact now, rather than an assumption.
-3. **A mutation that should have failed and did.** The first draft of the "watermark stays at the
+3. **The review found something the whole suite could not.** The P1 above is not a bug in code this
+   PR wrote — every test passed, every guard passed, and the database suite was green. It is a
+   consequence of a *correct* change meeting an existing key, visible only to somebody holding both
+   facts at once. Worth recording because no amount of mutation testing on this diff would have
+   surfaced it: the mutation that reveals it is "change a connection's timezone", which is not an
+   edit to any file here.
+4. **A mutation that should have failed and did.** The first draft of the "watermark stays at the
    last complete chunk" test made chunk 2 return a body with no pagination headers, expecting a
    refusal. `readPagination` treats a missing header as *one page* — deliberately, so a store behind
    a header-stripping proxy is read once rather than skipped — so the chunk succeeded and the test

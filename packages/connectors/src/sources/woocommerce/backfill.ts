@@ -121,8 +121,17 @@ export interface WooBackfillOptions {
   readonly chunkDays?: number;
   /** Passed through to the bisector, so a caller can meter how hard a store is to read. */
   readonly walk?: WooWalkOptions;
-  /** Fires after a chunk has been read in full. THE ONLY PLACE A WATERMARK MAY ADVANCE. */
-  readonly onChunk?: (checkpoint: WooCheckpoint) => void;
+  /**
+   * Fires after a chunk has been read in full. THE ONLY PLACE A WATERMARK MAY ADVANCE.
+   *
+   * IT MAY BE ASYNC, AND IT IS AWAITED. A caller that banks the watermark durably will want to
+   * write it, and a `=> void` signature accepts an `async` function happily -- so the promise would
+   * be dropped, the next chunk would start while the write was still in flight, two writes could
+   * land out of order, and a REJECTED write would surface as an unhandled rejection while the run
+   * reported success. Every one of those ends the same way: a watermark ahead of what was stored,
+   * which is the one failure this callback exists to prevent.
+   */
+  readonly onChunk?: (checkpoint: WooCheckpoint) => void | Promise<void>;
 }
 
 /** One page of one chunk, normalised. */
@@ -198,15 +207,74 @@ export function wooBackfillChunks(
   return out;
 }
 
-function instant(rfc3339: string, field: string): number {
-  const ms = Date.parse(rfc3339);
-  if (!Number.isFinite(ms)) {
+/**
+ * RFC3339, checked. `Date.parse` alone is not that check and three of its answers are dangerous.
+ *
+ * IT IS FAR MORE PERMISSIVE THAN THE NAME OF THIS FIELD PROMISES, and each extra thing it accepts
+ * turns a typo into a silently different window rather than into a refusal:
+ *
+ *   `"2026-02-30T00:00:00Z"`  -> **2026-03-02**. Normalised, not rejected. A watermark set to a day
+ *                               that does not exist silently skips two days of orders, and the
+ *                               checkpoint then advances past them -- so nothing ever reads them.
+ *   `"2026-09-11T00:00:00"`   -> parsed as LOCAL time. This repository has a documented history with
+ *                               exactly that reading: `wooGmtToDate` appends a `Z` for the same
+ *                               reason, and `vitest.config.ts` pins the suite to Asia/Bangkok
+ *                               because in UTC the wrong answer and the right one are one string.
+ *   `"September 11, 2026"`    -> accepted. Not a format any caller should be able to reach here.
+ *
+ * So the SHAPE is matched first, and then the CALENDAR is checked by rebuilding the instant from
+ * its own components: `Date.UTC(2026, 1, 30)` rolls forward, so a date that does not survive the
+ * round trip did not exist. The offset is applied by `Date.parse` afterwards, which is sound once
+ * the components are known to be real.
+ *
+ * Exported because `apps/api-edge` validates the same two fields at its HTTP boundary, and two
+ * implementations of "is this an instant" is how they come to disagree.
+ */
+const RFC3339 =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/;
+
+export function parseRfc3339(value: string, field: string): number {
+  const m = RFC3339.exec(value);
+  if (m === null) {
     throw new WooBackfillError(
-      `woocommerce: ${field} is ${JSON.stringify(rfc3339)}, which is not an RFC3339 instant.`,
+      `woocommerce: ${field} is ${JSON.stringify(value)}, which is not an RFC3339 instant. It ` +
+        "needs a date, a time and a designator -- 2026-09-11T00:00:00Z. A value without one is " +
+        "read as local time, which moves the window by the runtime's offset.",
+      "invalid_window",
+    );
+  }
+
+  const [, y, mo, d] = m as unknown as [string, string, string, string];
+  // THE CALENDAR CHECK. `Date.UTC(2026, 1, 30)` is March 2 and reports no error, so the only way to
+  // learn that a date did not exist is to build it and see whether it came back the same.
+  const probe = new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d)));
+  if (
+    probe.getUTCFullYear() !== Number(y) ||
+    probe.getUTCMonth() !== Number(mo) - 1 ||
+    probe.getUTCDate() !== Number(d)
+  ) {
+    throw new WooBackfillError(
+      `woocommerce: ${field} is ${JSON.stringify(value)}, which is not a date that exists. ` +
+        "Rolling it forward would query a window nobody asked for and then advance the watermark " +
+        "past the days it skipped.",
+      "invalid_window",
+    );
+  }
+
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) {
+    // The shape is right and the calendar is right, so this is an out-of-range time component --
+    // `25:00:00`, which the regex cannot exclude without becoming unreadable.
+    throw new WooBackfillError(
+      `woocommerce: ${field} is ${JSON.stringify(value)}, which carries a time that does not exist.`,
       "invalid_window",
     );
   }
   return ms;
+}
+
+function instant(rfc3339: string, field: string): number {
+  return parseRfc3339(rfc3339, field);
 }
 
 /**
@@ -263,7 +331,8 @@ export async function* runWooBackfill(
       chunks: checkpoint.chunks + 1,
       rows: checkpoint.rows + rowsThisChunk,
     };
-    options.onChunk?.(checkpoint);
+    // AWAITED, so the next chunk does not begin until the caller has finished banking this one.
+    await options.onChunk?.(checkpoint);
   }
 
   return checkpoint;

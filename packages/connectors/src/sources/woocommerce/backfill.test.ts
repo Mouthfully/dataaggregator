@@ -5,6 +5,7 @@ import {
   type WooBackfillBatch,
   WooBackfillError,
   type WooCheckpoint,
+  parseRfc3339,
   runWooBackfill,
   wooBackfillChunks,
 } from "./backfill.js";
@@ -124,6 +125,53 @@ describe("cutting the span into chunks", () => {
 
   it("refuses a boundary that is not an RFC3339 instant", () => {
     expect(() => wooBackfillChunks(span("yesterday", "2026-09-10T00:00:00.000Z"))).toThrow(
+      WooBackfillError,
+    );
+  });
+});
+
+describe("RFC3339, and the three things Date.parse accepts that it must not", () => {
+  it("accepts the forms that are actually RFC3339", () => {
+    expect(parseRfc3339("2026-09-11T00:00:00Z", "t")).toBe(Date.parse("2026-09-11T00:00:00Z"));
+    expect(parseRfc3339("2026-09-11T00:00:00.123Z", "t")).toBe(
+      Date.parse("2026-09-11T00:00:00.123Z"),
+    );
+    // An offset is legitimate and must resolve to the instant it names, not to midnight UTC.
+    expect(parseRfc3339("2026-09-11T00:00:00+07:00", "t")).toBe(Date.parse("2026-09-10T17:00:00Z"));
+    // A leap day in a leap year is a real date.
+    expect(parseRfc3339("2024-02-29T00:00:00Z", "t")).toBe(Date.parse("2024-02-29T00:00:00Z"));
+  });
+
+  it("refuses a date that does not exist rather than rolling it forward", () => {
+    // `Date.parse("2026-02-30T00:00:00Z")` is 2026-03-02 and reports no error. As a watermark that
+    // silently skips two days of orders -- and the checkpoint then advances past them, so nothing
+    // reads them again. This is the sharpest of the three.
+    expect(Date.parse("2026-02-30T00:00:00Z")).toBe(Date.parse("2026-03-02T00:00:00Z"));
+    expect(() => parseRfc3339("2026-02-30T00:00:00Z", "t")).toThrow(WooBackfillError);
+    expect(() => parseRfc3339("2026-04-31T00:00:00Z", "t")).toThrow(WooBackfillError);
+    expect(() => parseRfc3339("2025-02-29T00:00:00Z", "t")).toThrow(WooBackfillError);
+  });
+
+  it("refuses a timestamp with no designator, which would be read as LOCAL time", () => {
+    // THE SUITE RUNS IN ASIA/BANGKOK. `Date.parse("2026-09-11T00:00:00")` is 17:00 on the 10th in
+    // UTC here and midnight in CI, so accepting it would move the window by the runtime's offset --
+    // the identical failure `wooGmtToDate` appends a `Z` to avoid.
+    expect(() => parseRfc3339("2026-09-11T00:00:00", "t")).toThrow(WooBackfillError);
+    expect(() => parseRfc3339("2026-09-11", "t")).toThrow(WooBackfillError);
+  });
+
+  it("refuses the loose formats Date.parse happens to understand", () => {
+    expect(Number.isFinite(Date.parse("September 11, 2026"))).toBe(true);
+    expect(() => parseRfc3339("September 11, 2026", "t")).toThrow(WooBackfillError);
+    expect(() => parseRfc3339("", "t")).toThrow(WooBackfillError);
+    expect(() => parseRfc3339("2026-09-11T25:00:00Z", "t")).toThrow(WooBackfillError);
+  });
+
+  it("is what the window boundaries actually go through", () => {
+    expect(() => wooBackfillChunks(span("2026-02-30T00:00:00Z", "2026-09-10T00:00:00Z"))).toThrow(
+      WooBackfillError,
+    );
+    expect(() => wooBackfillChunks(span("2026-09-01T00:00:00", "2026-09-10T00:00:00Z"))).toThrow(
       WooBackfillError,
     );
   });
@@ -255,7 +303,12 @@ describe("the checkpoint, which is where the next run starts", () => {
         chunkDays: 1,
         timezone: BANGKOK,
         fetchedAt: FETCHED_AT,
-        onChunk: (c) => seen.push(c),
+        onChunk: (c) => {
+          // Braced deliberately: `seen.push(c)` returns a number, and the union
+          // `void | Promise<void>` does not absorb a stray return value the way a bare `void` does.
+          // That is the union doing its job -- it is what makes an async callback observable.
+          seen.push(c);
+        },
       }),
     );
 
@@ -313,7 +366,12 @@ describe("the checkpoint, which is where the next run starts", () => {
           chunkDays: 1,
           timezone: BANGKOK,
           fetchedAt: FETCHED_AT,
-          onChunk: (c) => seen.push(c),
+          onChunk: (c) => {
+            // Braced deliberately: `seen.push(c)` returns a number, and the union
+            // `void | Promise<void>` does not absorb a stray return value the way a bare `void` does.
+            // That is the union doing its job -- it is what makes an async callback observable.
+            seen.push(c);
+          },
         }),
       ),
     ).rejects.toThrow(ExtractError);
@@ -321,6 +379,51 @@ describe("the checkpoint, which is where the next run starts", () => {
     // ONE checkpoint, at the end of the first chunk. Advancing past the second would open a hole
     // nothing will ever ask about again: no later run requests a window that is behind the mark.
     expect(seen).toEqual([{ modifiedAfter: "2026-01-02T00:00:00.000Z", chunks: 1, rows: 1 }]);
+  });
+
+  it("AWAITS onChunk, so a durable watermark write cannot lag the run", async () => {
+    // A `=> void` signature accepts an `async` function and drops its promise. The next chunk would
+    // then start while the write was in flight, two writes could land out of order, and a rejected
+    // one would surface as an unhandled rejection while the run reported success. Every one of
+    // those ends with a watermark ahead of what was stored.
+    const order: string[] = [];
+    const { client } = store(() => paged([ORDER]));
+    await drive(
+      runWooBackfill({
+        client,
+        window: THREE_CHUNKS,
+        chunkDays: 1,
+        timezone: BANGKOK,
+        fetchedAt: FETCHED_AT,
+        onChunk: async (c) => {
+          order.push(`start ${c.chunks}`);
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          order.push(`end ${c.chunks}`);
+        },
+      }),
+    );
+
+    // Strictly interleaved: every write finishes before the next one begins. Unawaited, the three
+    // starts would run together and the ends would arrive afterwards.
+    expect(order).toEqual(["start 1", "end 1", "start 2", "end 2", "start 3", "end 3"]);
+  });
+
+  it("propagates a rejection from onChunk instead of reporting success", async () => {
+    const { client } = store(() => paged([ORDER]));
+    await expect(
+      drive(
+        runWooBackfill({
+          client,
+          window: THREE_CHUNKS,
+          chunkDays: 1,
+          timezone: BANGKOK,
+          fetchedAt: FETCHED_AT,
+          onChunk: async () => {
+            throw new Error("the watermark write failed");
+          },
+        }),
+      ),
+    ).rejects.toThrow("the watermark write failed");
   });
 
   it("produces no return value at all from a run that threw", async () => {

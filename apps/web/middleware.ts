@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
+import { GATE_COOKIE, gateToken, isGated, tokensMatch } from "./app/_gate/token";
+
 /**
  * REFRESHING THE SESSION, AND GUARDING THE SIGNED-IN ROUTES.
  *
@@ -17,9 +19,41 @@ import { type NextRequest, NextResponse } from "next/server";
  * including the marketing pages, and a missing environment variable must not take the public site
  * down -- the signed-in routes refuse on their own, which is the correct place for that failure.
  */
-const PROTECTED = ["/dashboard"];
+const PROTECTED = ["/dashboard", "/billing", "/welcome"];
+
+/**
+ * Reachable WITHOUT the pre-launch password.
+ *
+ * Only three things, and each for a reason: the waiting list itself (there is nothing to gate a
+ * stranger from on it), the action that submits it, and the endpoint that accepts the password.
+ * Everything else -- including routes added months from now -- is gated by default, which is the
+ * property a middleware has and a per-page check does not.
+ */
+const PUBLIC_WHILE_GATED = ["/waitlist", "/api/gate"];
 
 export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+
+  // THE PRE-LAUNCH GATE, BEFORE ANYTHING ELSE. A visitor without the password must not reach a
+  // signed-in route, a marketing page, or the sign-in form -- so this runs ahead of the session
+  // refresh rather than beside it.
+  if (isGated() && !PUBLIC_WHILE_GATED.some((prefix) => path.startsWith(prefix))) {
+    const presented = request.cookies.get(GATE_COOKIE)?.value ?? "";
+    const expected = await gateToken(process.env.SITE_PASSWORD as string);
+
+    if (!tokensMatch(presented, expected)) {
+      const waitlist = new URL("/waitlist", request.url);
+      // Carried so a person who unlocks lands where they were headed. It is a PATH from this
+      // request, never a full URL from a query parameter -- the latter is an open redirect.
+      if (path !== "/") waitlist.searchParams.set("from", path);
+      return NextResponse.redirect(waitlist);
+    }
+  }
+
+  return await session(request);
+}
+
+async function session(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) return NextResponse.next();

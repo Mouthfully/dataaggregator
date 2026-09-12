@@ -155,12 +155,22 @@ select app_test.check('anon holds no USAGE on schema app, which is why only publ
 do $$
 declare
   r record;
-  -- STILL TWO. `public.ingest_envelope_rows(jsonb)` was added by
-  -- 20260912000300_ingest_entry_point.sql and is deliberately NOT here: it is executable only by
-  -- `app_ingest`, never by anon, and the assertions below the loop check that directly. A third
-  -- entry in this array would mean the internet could write envelope rows.
+  -- THREE, and the third was added deliberately rather than noticed afterwards.
+  --
+  -- `public.ingest_envelope_rows(jsonb)` was added by 20260912000300_ingest_entry_point.sql and is
+  -- deliberately NOT here: it is executable only by `app_ingest`, never by anon, and the assertions
+  -- below the loop check that directly. An entry for it would mean the internet could write
+  -- envelope rows.
+  --
+  -- `public.join_waitlist(text, text)` IS here, from 20260912000700_waitlist.sql. It is the one
+  -- function in this schema that is MEANT to be called by a stranger: the product is pre-launch and
+  -- the people signing up are by definition not authenticated. It is safe to expose because of what
+  -- it cannot do -- it takes one address, writes one row, reads nothing back, and does nothing on
+  -- conflict, so it cannot be used to ask whether an address is already on the list. `anon` has no
+  -- grant on `public.waitlist` itself, which the table assertions above check.
   v_expected constant text[] := array[
     'public.consume_api_key_credits(bytea, integer)',
+    'public.join_waitlist(text, text)',
     'public.verify_api_key(bytea)'
   ];
   v_found text[] := '{}';
@@ -182,15 +192,16 @@ begin
     perform app_test.check(
       format('%s is an intended anon-executable function', r.sig),
       r.sig = any (v_expected),
-      format('%s is callable by anon, so it is callable by the internet. Two functions are meant '
-             'to be, and both are gated on possession of an API key hash.', r.sig)
+      format('%s is callable by anon, so it is callable by the internet. Three functions are '
+             'meant to be: two gated on possession of an API key hash, and the waiting-list '
+             'write, which is meant for strangers and can read nothing back.', r.sig)
     );
   end loop;
 
   -- The loop above cannot notice a DISAPPEARANCE. This does: a revoke that quietly took the edge's
   -- own entry points with it presents as "every API key is rejected" and costs somebody a day.
   perform app_test.check(
-    'exactly the two intended functions are anon-executable in public',
+    'exactly the three intended functions are anon-executable in public',
     v_found = v_expected,
     format('anon-executable set in public is %s; expected %s', v_found, v_expected)
   );

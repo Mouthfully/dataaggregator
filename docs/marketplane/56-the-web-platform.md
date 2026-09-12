@@ -149,7 +149,8 @@ the pre-launch gate means no member of the public reaches either surface yet.
 **18. Claim provenance.** `PASS` **on the banned list, with a founder-directed exception recorded
 here rather than absorbed.**
 
-None of the specifically banned claims appears: no "joins in one call", no presentation of
+None of the specifically banned claims appears on the site as it now stands -- three copies did
+when this note was first written, and the list of them and their removal is below. No "joins in one call", no presentation of
 `/v1/audience` or `/v1/market`, no "DPA on request" (`brand.dpaAvailable` is `false` and the privacy
 policy states the absence), no "3 to 5 days" for Google verification, no SOC 2, no SAML SSO, no EU
 hosting claim (`brand.dataRegion` is `ap-southeast-1` and the page says so), no "never used to train
@@ -157,20 +158,55 @@ models", and no repetition of the CNIL attribution. One claim about our own engi
 never true was found and removed mid-stack: a sentence promising that "a test fails the build if
 they ever disagree with the payment provider", describing a function nobody had written.
 
-The exception. The founder directed that the supplied design ship as supplied -- *"dont worry about
-any numbers or gatekept claims"* -- and later that *"we can overclaim"* on the connector list. Three
-things on `/pricing` are therefore unsourced, and are listed here so the choice stays visible:
+The exception, and how it was closed. The founder directed that the supplied design ship as supplied
+-- *"dont worry about any numbers or gatekept claims"* -- and later that *"we can overclaim"* on the
+connector list. Three things on `/pricing` were therefore unsourced when this note was first
+written. They have since been resolved on the terms this gate set -- an implementation or a deletion
+-- and the table records which each got rather than leaving the exception standing:
 
-| Claim | What backs it today |
-|---|---|
-| Per-plan refresh cadence | Nothing. No cadence column exists in any migration. |
-| Connector counts (3 / 10 / 50 / 200+) | Nothing. Five connectors exist. |
-| Feature-matrix rows | Nothing. No migration gates any feature on a plan. |
+| Claim | What backs it today | Outcome |
+|---|---|---|
+| Per-plan refresh cadence | Nothing. No cadence column exists in any migration, and `app.due_connections` reads no plan. | **Deleted.** Off the cards, off both comparison tables. The absence is recorded as an open term on `/pricing`. |
+| Connector counts (3 / 10 / 50 / 200+) | The four figures are in `PLAN_ENTITLEMENTS` (`apps/web/app/_billing/entitlements.ts`). Five connectors exist. | **Backed, and renamed.** The row reads from the record and is titled "Connected accounts" -- an allowance, which is a term of sale. "200+ connectors" advertised a library of integrations that does not exist. |
+| Feature-matrix rows | Nothing. No migration gates any feature on a plan. | **Deleted.** Custom reports, AI insight tiers, task management, team collaboration, white-label reports, API access, support channel and custom onboarding are all off the page. |
 
-Each is a promise the product cannot currently keep, and each becomes a `FAIL` on this gate the day
-the pre-launch gate comes down. The gate is what makes them survivable now: no member of the public
-can read the pricing page. **Before launch, each row either gets an implementation or gets deleted.**
-This is issue-shaped work, not scope for this PR.
+What that leaves. The allowance figures themselves have no source but the supplied design: nothing
+measures them, nothing enforces them, and `entitlements.ts` says so in its own header. They are
+publishable because an allowance is a promise the company makes rather than a capability it
+claims -- the same class of statement as the price beside it -- and under-enforcement cannot break
+it. A catalogue count is the opposite: it asserts something exists. That is the line the three rows
+were sorted along.
+
+Three more copies of the same claims were outside the paths of the change that removed them, and an
+adversarial verifier found all three. Deleting a claim from the page that sells it and leaving it
+somewhere else republishes it:
+
+* `_sections/IntegrationsMap.tsx` carried "200+ integrations" as its section eyebrow -- the same
+  string removed from the hero. It now names no count at all, in either direction: "5 integrations"
+  would be a catalogue claim too, and one needing an edit every time a connector lands.
+* `_sections/FaqCta.tsx` answered "Can I try it for free?" with "The Free plan shown above includes
+  three connectors, daily refresh, and standard reports" -- all three rows of this gate, restated
+  one section below the pricing block that had just dropped them. The FAQ is exactly where a reader
+  goes when the card did not answer them. The allowance survives and is read from
+  `PLAN_ENTITLEMENTS`; the cadence and the reporting tier are gone.
+* `connectors/shopify/page.tsx` answered "How often will the data refresh?" with "daily, hourly,
+  15-minute, and 5-minute schedules ... will depend on the plan", which **contradicted** the open
+  term `/pricing` now states. Two pages giving a reader two answers is worse than either being
+  wrong alone. It now says what `app.due_connections` does: one daily read, not varying by plan.
+  The mock panel's "Next refresh: 15 min" went with it, because "it is only a mockup" is a
+  distinction the reader has no way to see.
+
+WHY THE GUARD DID NOT CATCH ANY OF THEM, which is the part worth keeping. `FORBIDDEN_CLAIMS[0]` in
+`packages/brand/src/claims.ts` is `/\b\d+\s+(sources|integrations)\b/i`. Against "200+
+integrations" the `\d+` matches `200` and the `\s+` then meets `+` rather than a space, so the
+pattern does not fire: the count evaded a guard written for exactly it, by one character. The other
+two were never in the guard's reach at all -- it matches counts, and "daily refresh" is a cadence.
+The eight guards cover what someone thought to encode; they are not a claims oracle, and this note
+should not be read as saying otherwise.
+
+One further sentence went in the same pass, for the same reason and without being one of the three:
+the pricing section's lead promised that "All plans include unlimited dashboards", and no migration
+has a dashboard to count.
 
 **Result:** `9 PASS, 9 N/A, 0 FAIL`
 

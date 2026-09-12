@@ -1,6 +1,7 @@
 import { brand, formatAddress } from "@repo/brand";
 import type { Metadata } from "next";
 
+import { PLAN_ENTITLEMENTS, formatAllowance } from "../_billing/entitlements";
 import {
   CURRENCIES,
   CURRENCY_LABEL,
@@ -10,7 +11,7 @@ import {
   formatAmount,
 } from "../_billing/plans";
 import { Footer, SiteHeader } from "../_chrome";
-import { claim } from "../_content";
+import { claim, connectionAllowance } from "../_content";
 
 /**
  * THE PRICING PAGE, at /pricing.
@@ -42,6 +43,26 @@ import { claim } from "../_content";
  * catalogue caps workspaces or members per plan, so those cells read "Not set" rather than carrying
  * a number somebody would plan around. Same rule as the connector pages: an absence is stated, not
  * filled. The open terms at the foot of the page are the same decision applied to the contract.
+ *
+ * WHAT THE MATRIX MAY CLAIM, AND WHAT WAS TAKEN OUT OF IT.
+ *
+ * Every per-plan cell now comes from `PLAN_ENTITLEMENTS` in `app/_billing/entitlements.ts`, so this
+ * page cannot say a plan allows something the product's own record does not. That record publishes
+ * three fields, which is why the Connections group is short and the Reporting and Support groups
+ * are gone entirely.
+ *
+ * Deleted rather than reworded: the per-plan refresh cadence (Daily / Hourly / 15 min / 5 min),
+ * custom reports, AI insight tiers, task management, team collaboration, white-label reports, API
+ * access, support channel and custom onboarding. No migration has a cadence column, and no
+ * migration gates any feature on a subscription -- `public.current_plan` is read by the billing
+ * screen to display a name and by nothing that does work. Each of those rows told a buyer that
+ * paying more switches something on, and nothing switches. A softened version of an unbacked row is
+ * still unbacked and is harder to find on the next pass, so they are off the page.
+ *
+ * "Connectors" became "Connected accounts" for a different reason, and the number survived because
+ * of it. Five connectors exist (`packages/connectors/src/sources`), so "200+ connectors" advertised
+ * a library that is not there. How many ACCOUNTS a plan lets you connect is a term of sale like the
+ * price beside it, and that is what the row now says.
  *
  * THE BILLING ANSWERS ARE READ OUT OF THE CODE, not out of habit. `public.current_plan` in
  * `supabase/migrations/20260912000600_billing.sql` entitles a cancelled subscription until
@@ -94,52 +115,24 @@ const SECTION_LINKS = [
 ] as const;
 
 /**
- * Per-tier summaries and feature lists, transcribed from `app/_sections/Pricing.tsx` and not
- * adjusted. Keyed by the plan id so they are zipped onto `PLAN_DISPLAY` rather than restating its
- * names or its prices.
+ * Per-tier one-line summaries, transcribed from `app/_sections/Pricing.tsx` and not adjusted. Keyed
+ * by the plan id so they are zipped onto `PLAN_DISPLAY` rather than restating its names or prices.
+ *
+ * THE FEATURE LISTS THAT USED TO LIVE HERE ARE GONE, AND THE CARDS ARE SHORTER FOR IT. They sold a
+ * refresh cadence, report tiers, AI insight tiers, task management, collaboration, white-label
+ * reports, API access and a support tier -- nine promises across four cards, none of which any
+ * migration or module gates on a plan. What a card lists now comes from the entitlement record, so
+ * a bullet can only appear once something backs it.
  */
 interface TierNote {
   readonly summary: string;
-  readonly features: readonly string[];
 }
 
 const TIER_NOTES: Record<string, TierNote> = {
-  free: {
-    summary: "Get started and explore.",
-    features: ["3 connectors", "Daily refresh", "Standard reports", "Email support"],
-  },
-  starter: {
-    summary: "For individuals and small teams.",
-    features: [
-      "10 connectors",
-      "Hourly refresh",
-      "Custom reports",
-      "Basic AI insights",
-      "Email support",
-    ],
-  },
-  growth: {
-    summary: "For growing businesses.",
-    features: [
-      "50 connectors",
-      "15 min refresh",
-      "Advanced AI insights",
-      "Task management",
-      "Team collaboration",
-      "Priority support",
-    ],
-  },
-  agency: {
-    summary: "For larger teams and clients.",
-    features: [
-      "200+ connectors",
-      "5 min refresh",
-      "White-label reports",
-      "API access",
-      "Dedicated support",
-      "Custom onboarding",
-    ],
-  },
+  free: { summary: "Get started and explore." },
+  starter: { summary: "For individuals and small teams." },
+  growth: { summary: "For growing businesses." },
+  agency: { summary: "For larger teams and clients." },
 };
 
 const POPULAR_PLAN = "growth";
@@ -149,7 +142,13 @@ const CTA_LABEL = "Get started";
 const PER_MONTH = "/ month";
 const YEARLY_SAVING = "20% off";
 
-/** The four self-serve tiers, composed from the catalogue so no price is written twice. */
+/**
+ * The four self-serve tiers, composed from the catalogue so no price is written twice.
+ *
+ * `features` is a list holding the one entitlement this repository publishes, rather than a string,
+ * so a second one -- a workspace or member cap, if either is ever decided -- lands on all four
+ * cards by being added to the record.
+ */
 function tiersIn(currency: Currency) {
   return PLAN_DISPLAY.map((plan) => ({
     id: plan.plan,
@@ -160,7 +159,7 @@ function tiersIn(currency: Currency) {
         ? null
         : `${formatAmount(plan.yearly[currency], currency)} a year`,
     summary: TIER_NOTES[plan.plan]?.summary ?? "",
-    features: TIER_NOTES[plan.plan]?.features ?? [],
+    features: [connectionAllowance(plan.plan)],
     popular: plan.plan === POPULAR_PLAN,
   }));
 }
@@ -241,10 +240,25 @@ const NOT_SET = "Not set";
 const BY_AGREEMENT = "By agreement";
 const REGION = brand.dataRegion ?? NOT_SET;
 
+/** A cap the record holds as a number, or the words for a cap nobody has decided. */
+function limitCell(limit: number | null): Cell {
+  return limit === null ? NOT_SET : String(limit);
+}
+
 /**
- * The matrix. Free through Agency are the comparison rows in `app/_sections/Pricing.tsx`, extended
- * with the per-tier feature lists that section already prints on the cards. Enterprise is the
- * consistent extension of each row and never a new capability.
+ * The matrix.
+ *
+ * EVERY PER-PLAN CELL IS READ FROM `PLAN_ENTITLEMENTS`, never typed. The connection allowance comes
+ * through `formatAllowance`, which is what keeps Agency's published "200+" a floor instead of
+ * silently becoming a cap of 200; the workspace and member rows print "Not set" because the record
+ * holds null for both, and they will print a figure the day one is decided without this file being
+ * touched. Enterprise has no record -- `app.billing_plan` has four members -- so its cell says the
+ * limit is agreed rather than inventing a fifth tier's numbers.
+ *
+ * WHAT IS NOT HERE. The Reporting and Support groups, the per-plan refresh row and the team
+ * collaboration row were removed rather than softened: see the module comment for the list and for
+ * what was looked for behind each one. The rule they failed is that a row in this table asserts
+ * that a plan decides something, and no plan decides any of them.
  *
  * The four "Data" rows are claims, not features: they hold on every plan because they are
  * properties of the contract every row is emitted under, so each is a tick in all five columns.
@@ -253,14 +267,36 @@ const MATRIX: readonly MatrixGroup[] = [
   {
     group: "Connections",
     rows: [
-      { label: "Connectors", cells: ["3", "10", "50", "200+", BY_AGREEMENT] },
-      { label: "Data refresh", cells: ["Daily", "Hourly", "15 min", "5 min", "5 min"] },
+      {
+        label: "Connected accounts",
+        cells: [
+          formatAllowance(PLAN_ENTITLEMENTS.free.connections),
+          formatAllowance(PLAN_ENTITLEMENTS.starter.connections),
+          formatAllowance(PLAN_ENTITLEMENTS.growth.connections),
+          formatAllowance(PLAN_ENTITLEMENTS.agency.connections),
+          BY_AGREEMENT,
+        ],
+      },
       {
         label: "Workspaces in one organisation",
-        cells: [NOT_SET, NOT_SET, NOT_SET, NOT_SET, BY_AGREEMENT],
+        cells: [
+          limitCell(PLAN_ENTITLEMENTS.free.workspaces),
+          limitCell(PLAN_ENTITLEMENTS.starter.workspaces),
+          limitCell(PLAN_ENTITLEMENTS.growth.workspaces),
+          limitCell(PLAN_ENTITLEMENTS.agency.workspaces),
+          BY_AGREEMENT,
+        ],
       },
-      { label: "Members", cells: [NOT_SET, NOT_SET, NOT_SET, NOT_SET, BY_AGREEMENT] },
-      { label: "Team collaboration", cells: [false, false, true, true, true] },
+      {
+        label: "Members",
+        cells: [
+          limitCell(PLAN_ENTITLEMENTS.free.members),
+          limitCell(PLAN_ENTITLEMENTS.starter.members),
+          limitCell(PLAN_ENTITLEMENTS.growth.members),
+          limitCell(PLAN_ENTITLEMENTS.agency.members),
+          BY_AGREEMENT,
+        ],
+      },
       { label: "Read-only platform credentials", cells: [true, true, true, true, true] },
     ],
   },
@@ -274,33 +310,18 @@ const MATRIX: readonly MatrixGroup[] = [
       { label: "Hosting region", cells: [REGION, REGION, REGION, REGION, REGION] },
     ],
   },
-  {
-    group: "Reporting",
-    rows: [
-      { label: "Standard reports", cells: [true, true, true, true, true] },
-      { label: "Custom reports", cells: [false, true, true, true, true] },
-      { label: "AI insights", cells: [false, "Basic", "Advanced", "Advanced", "Advanced"] },
-      { label: "Task management", cells: [false, false, true, true, true] },
-      { label: "White-label reports", cells: [false, false, false, true, true] },
-      { label: "API access", cells: [false, false, false, true, true] },
-    ],
-  },
-  {
-    group: "Support",
-    rows: [
-      {
-        label: "Support channel",
-        cells: ["Email", "Email", "Priority", "Dedicated", "Named contact"],
-      },
-      { label: "Custom onboarding", cells: [false, false, false, true, true] },
-    ],
-  },
 ];
 
 /** The two glyph labels the cells announce. A bare tick or dash says nothing out loud. */
 const INCLUDED = "Included";
 const NOT_INCLUDED = "Not included";
 
+/**
+ * What the top row counts, said next to it, because "200+" beside anything connector-shaped invites
+ * the reading that two hundred integrations exist. Five do.
+ */
+const MATRIX_NOTE_CONNECTIONS =
+  "A connected account is one account, property or store on one platform. The figure is how many of them a plan covers, and it is not a count of the platforms this product can read.";
 const MATRIX_NOTE_LIMITS =
   "Workspace and member limits are not set on any plan. Nothing in the schema or in the plan catalogue caps either of them, so publishing a figure here would be inventing an entitlement rather than reporting one.";
 const MATRIX_NOTE_REGION =
@@ -421,6 +442,16 @@ const OPEN_TERMS = [
   {
     title: "Workspace and member limits per plan",
     body: "Open, as the comparison table says in the rows themselves. Nothing caps either today.",
+  },
+  /**
+   * The cadence row the comparison table used to carry sold four speeds. `app.due_connections` in
+   * `supabase/migrations/20260908001000_scheduler.sql` is the only schedule in the product and it
+   * reads no plan at all, so the row was deleted and the absence is recorded here instead of being
+   * left as a silence a reader would fill with the old promise.
+   */
+  {
+    title: "How often data is refreshed",
+    body: "Not set per plan. Nothing in this product varies how often a connection is read according to what is paid for it, so no plan buys a faster refresh and none is offered here.",
   },
 ] as const;
 
@@ -785,7 +816,7 @@ export default async function PricingPage({
             </div>
 
             <ul className="mt-5 grid gap-3 md:grid-cols-2">
-              {[MATRIX_NOTE_LIMITS, MATRIX_NOTE_REGION].map((note) => (
+              {[MATRIX_NOTE_CONNECTIONS, MATRIX_NOTE_LIMITS, MATRIX_NOTE_REGION].map((note) => (
                 <li
                   key={note}
                   className="border-line bg-surface text-ink-subtle rounded-lg border px-5 py-4 text-xs leading-[1.7]"

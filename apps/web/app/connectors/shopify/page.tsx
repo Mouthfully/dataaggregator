@@ -77,11 +77,19 @@ const PANEL_FLOW_DATASETS = "Orders · Products · Customers";
 const PANEL_SYNC_STATUS = "Sync complete";
 const PANEL_SYNC_TIME = "Just now";
 
-/** The three example figures, verbatim, each with the design's label. */
+/**
+ * The three example figures, each with the design's label. The two volume figures are the design's
+ * verbatim -- they are obviously illustrative inside a panel chipped "Example connection".
+ *
+ * THE REFRESH FIGURE IS NOT. The design read "15 min", and the FAQ below now states that reads are
+ * daily and do not vary by plan, which is what the scheduler actually does. Leaving the mock at
+ * 15 min would put a contradiction on one page, where "it is only a mockup" is a distinction the
+ * reader has no reason to make and no way to see.
+ */
 const PANEL_STATS = [
   { label: "Orders imported", value: "8,241" },
   { label: "Revenue", value: "$186,240" },
-  { label: "Next refresh", value: "15 min" },
+  { label: "Next refresh", value: "Daily" },
 ] as const;
 
 /** The mock configuration block. `key` is the dimmed column in the design, `value` the lit one. */
@@ -267,8 +275,14 @@ const FAQS = [
   },
   {
     question: "How often will the data refresh?",
+    // THIS ANSWER CONTRADICTED /pricing, WHICH IS WORSE THAN EITHER PAGE BEING WRONG ALONE: a
+    // reader who checks two pages and gets two answers cannot tell which to believe. /pricing now
+    // states that nothing varies the read cadence by plan, and it is right -- `app.due_connections`
+    // (supabase/migrations/20260908001000_scheduler.sql) selects on `last_backfill_at < date_trunc
+    // ('day', p_now)` and never reads a plan or a subscription. There is one cadence, it is daily,
+    // and no plan changes it.
     answer:
-      "The pricing concept includes daily, hourly, 15-minute, and 5-minute schedules. Final refresh availability will depend on the plan and source limits.",
+      "Connections are read once a day, and that does not vary by plan. Sub-daily schedules are not offered.",
   },
   {
     question: "Can I connect my store now?",

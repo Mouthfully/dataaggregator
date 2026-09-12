@@ -31,6 +31,9 @@
 
 import { CLAIMS, type Claim, allowedClaims, brand } from "@repo/brand";
 
+import { entitlementsFor, formatAllowance } from "./_billing/entitlements";
+import type { Plan } from "./_billing/plans";
+
 const ALLOWED = new Map(allowedClaims().map((c: Claim) => [c.id, c]));
 const DECLARED = new Map(CLAIMS.map((c: Claim) => [c.id, c]));
 
@@ -153,6 +156,28 @@ export const ENVELOPE_FIELDS = [
  * `claims.ts` is untouched and still gates everything that goes through `claim()`.
  * ============================================================================================== */
 
+/**
+ * WHAT A PLAN'S CONNECTION ALLOWANCE IS CALLED, WHEREVER IT IS PRINTED.
+ *
+ * THE NOUN IS "CONNECTED ACCOUNTS" AND NOT "CONNECTORS", AND THAT IS THE WHOLE POINT OF THIS
+ * FUNCTION. A connector is a platform this product can read, and `packages/connectors/src/sources`
+ * holds five of them. A figure in the hundreds printed beside the word "connectors" therefore reads
+ * as a catalogue of integrations that does not exist. What a plan actually buys is how many
+ * accounts you may connect -- a term of sale, like the price beside it -- so that is what the cards
+ * and the comparison tables say. Reverting the noun re-publishes a catalogue claim.
+ *
+ * THE NUMBER IS NOT WRITTEN HERE. It comes from `PLAN_ENTITLEMENTS`, which is the one place the
+ * four figures live, and `formatAllowance` is what keeps Agency's published floor a floor rather
+ * than quietly shrinking "200+" to "200".
+ */
+export function connectionAllowance(plan: Plan): string {
+  const { connections } = entitlementsFor(plan);
+  // No plan is on one today, but a record edited to 1 would otherwise print "1 connected accounts".
+  const noun =
+    connections.count === 1 && !connections.atLeast ? "connected account" : "connected accounts";
+  return `${formatAllowance(connections)} ${noun}`;
+}
+
 export const SITE = {
   eyebrow: "Your data, made plain",
   heroLine1: "All your data.",
@@ -162,7 +187,11 @@ export const SITE = {
   ctaPrimary: "Start free",
   ctaSecondary: "Explore dashboard",
   ctaNav: "Explore dashboard",
-  heroChecks: ["No credit card required", "200+ integrations", "Set up in minutes"],
+  // "200+ integrations" was the middle check and is gone: five connectors exist
+  // (`packages/connectors/src/sources`), so the figure counted integrations we do not have. The
+  // same string is still the eyebrow of `_sections/IntegrationsMap.tsx`, which was outside this
+  // change's paths and is reported rather than edited.
+  heroChecks: ["No credit card required", "Set up in minutes"],
   syncPill: "Everything connected. Finally.",
   heroVisualLabel: "Illustrative dashboard",
   platformsEyebrow: "Your favourite platforms. One connected workspace.",

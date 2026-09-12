@@ -42,7 +42,15 @@ import { brand } from "@repo/brand";
  */
 
 /** Section copy. `scripts/check-copy.mjs` refuses a sentence typed into the JSX; caps are CSS. */
-const EYEBROW = "200+ integrations";
+//
+// THE EYEBROW NAMES NO COUNT. The supplied design read "200+ integrations"; five connectors exist
+// (`packages/connectors/src/sources`), so the figure counted integrations this product does not
+// have. The same string was removed from the hero when /pricing was rebuilt on the entitlement
+// record, and this was the copy of it that change reported rather than edited.
+//
+// It is not restated as "5 integrations" either. A number here is a catalogue claim whichever way
+// it points, and it would need updating in a second place every time a connector lands.
+const EYEBROW = "Your tools, connected";
 
 /** The line break inside the heading is the design's, so the two lines are two values. */
 const HEADING_TOP = "All your favorite tools.";

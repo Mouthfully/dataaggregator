@@ -25,13 +25,34 @@
  * COMPARISON TABLE. The reference puts one inside this same section, so it is here. It is the one
  * element allowed to be wider than the body, inside its own horizontal scroller, per the brief's
  * responsive rule.
+ *
+ * WHAT THE CARDS AND THE TABLE MAY SAY, AND WHY THERE IS SO LITTLE OF IT.
+ *
+ * The reference's per-tier bullet lists sold a refresh cadence (Daily / Hourly / 15 min / 5 min),
+ * custom reports, AI insights, task management, team collaboration, white-label reports, API access
+ * and a support tier. None of those is gated on a plan anywhere in this repository -- no migration
+ * has a cadence column and none gates a feature on a subscription -- so every one of them was a
+ * promise the product could not keep, and they are deleted rather than reworded. A vaguer version
+ * of an unbacked claim is still unbacked and is harder to find later.
+ *
+ * WHAT SURVIVES IS THE CONNECTION ALLOWANCE, AND IT IS NO LONGER TYPED HERE. `PLAN_ENTITLEMENTS`
+ * in `app/_billing/entitlements.ts` holds the four figures once; `connectionAllowance` in
+ * `app/_content.ts` turns one into the phrase a card prints. So this section and `/pricing` cannot
+ * disagree with each other or with the catalogue, and the word is "connected accounts" rather than
+ * "connectors" -- five connectors exist, and "200+ connectors" claimed a library, not a limit.
  */
+
+import { PLAN_ENTITLEMENTS, formatAllowance } from "../_billing/entitlements";
+import type { Plan } from "../_billing/plans";
+import { connectionAllowance } from "../_content";
 
 /** Section copy. `scripts/check-copy.mjs` refuses a sentence typed into the JSX, so every line
  *  arrives from here. The eyebrow is stored in sentence case because the capitals are CSS. */
 const EYEBROW = "Pricing";
 const HEADING = "Simple, transparent pricing.";
-const LEAD = "Start free and scale as you grow. All plans include unlimited dashboards.";
+/** "All plans include unlimited dashboards" was here. There is no dashboard entity in any migration
+ *  to count, let alone to promise an unlimited number of, so the clause is gone rather than hedged. */
+const LEAD = "Start free and scale as you grow.";
 
 /** The `.billing-note` under the cards. It names the period the pill indicates, in words. */
 const BILLING_NOTE = "Monthly billing. Upgrade anytime.";
@@ -48,88 +69,106 @@ const BILLING = {
 const CTA_LABEL = "Get started";
 
 /**
- * The four tiers, in the reference's order. Names, prices, periods, one-line summaries and feature
- * lists are transcribed from the reference HTML and not adjusted -- including the Free tier's $0,
- * which is a price like any other.
+ * The four tiers, in the reference's order. Names, prices, periods and one-line summaries are
+ * transcribed from the reference HTML and not adjusted -- including the Free tier's $0, which is a
+ * price like any other.
+ *
+ * The plan id is here so the card can ask the entitlement record what the plan allows instead of
+ * carrying a transcribed bullet list of its own; see the module comment for what those bullets said
+ * and why they are gone.
  */
 const PLANS = [
   {
+    plan: "free",
     name: "Free",
     price: "$0",
     period: "/ month",
     summary: "Get started and explore.",
-    features: ["3 connectors", "Daily refresh", "Standard reports", "Email support"],
     popular: false,
   },
   {
+    plan: "starter",
     name: "Starter",
     price: "$19",
     period: "/ month",
     summary: "For individuals and small teams.",
-    features: [
-      "10 connectors",
-      "Hourly refresh",
-      "Custom reports",
-      "Basic AI insights",
-      "Email support",
-    ],
     popular: false,
   },
   {
+    plan: "growth",
     name: "Growth",
     price: "$49",
     period: "/ month",
     summary: "For growing businesses.",
-    features: [
-      "50 connectors",
-      "15 min refresh",
-      "Advanced AI insights",
-      "Task management",
-      "Team collaboration",
-      "Priority support",
-    ],
     popular: true,
   },
   {
+    plan: "agency",
     name: "Agency",
     price: "$99",
     period: "/ month",
     summary: "For larger teams and clients.",
-    features: [
-      "200+ connectors",
-      "5 min refresh",
-      "White-label reports",
-      "API access",
-      "Dedicated support",
-      "Custom onboarding",
-    ],
     popular: false,
   },
-] as const;
+] as const satisfies ReadonlyArray<{
+  /** A plan id the entitlement record knows, so a typo is a build failure and not a blank card. */
+  plan: Plan;
+  name: string;
+  price: string;
+  period: string;
+  summary: string;
+  popular: boolean;
+}>;
+
+/**
+ * One bullet, because the entitlement record publishes exactly one thing a plan changes.
+ *
+ * A list rather than a bare string so a second entitlement -- a workspace or member cap, if either
+ * is ever decided -- is added here and appears on all four cards at once.
+ */
+function planFeatures(plan: Plan): readonly string[] {
+  return [connectionAllowance(plan)];
+}
 
 const POPULAR_BADGE = "Most popular";
 
 /**
- * The comparison rows, in the reference's order. `true` renders the tick, `false` the em dash, and
- * a string renders itself -- which keeps the count rows (connectors, refresh) and the yes/no rows
- * in one table rather than in two shapes that have to be kept in step by hand.
+ * The comparison rows. `true` renders the tick, `false` the em dash, and a string renders itself --
+ * which keeps a count row and a yes/no row in one table rather than in two shapes that have to be
+ * kept in step by hand.
+ *
+ * ONE ROW, BECAUSE ONE ROW IS WHAT THIS REPOSITORY CAN SAY. The reference's other seven rows --
+ * data refresh, custom reports, advanced AI insights, team collaboration, white-label reports, API
+ * access and priority support -- each claimed that paying more switches something on. Nothing in
+ * any migration reads a plan before doing work, so none of the seven could be kept and none is
+ * reworded into a softer version of itself. The table is left standing with the row that is true so
+ * a row that becomes true later has somewhere to go.
+ *
+ * The cells are read from the entitlement record rather than typed, so this table cannot disagree
+ * with the cards above it.
  */
 const COMPARISON_CAPTION = "Compare plans";
 const COMPARISON_HEAD = ["What's included", "Free", "Starter", "Growth", "Agency"] as const;
 
-const COMPARISON_ROWS = [
-  { label: "Connectors", cells: ["3", "10", "50", "200+"] },
-  { label: "Data refresh", cells: ["Daily", "Hourly", "15 min", "5 min"] },
-  { label: "Custom reports", cells: [false, true, true, true] },
-  { label: "Advanced AI insights", cells: [false, false, true, true] },
-  { label: "Team collaboration", cells: [false, false, true, true] },
-  { label: "White-label reports", cells: [false, false, false, true] },
-  { label: "API access", cells: [false, false, false, true] },
-  { label: "Priority support", cells: [false, false, true, true] },
-] as const satisfies ReadonlyArray<{
+/**
+ * Widened rather than `as const`: with one string row left, an inferred literal type would narrow
+ * `cell` to `string` and the tick and dash branches below would stop compiling -- which would mean
+ * restoring a boolean row later required rewriting the renderer as well as the data.
+ */
+const COMPARISON_ROWS: ReadonlyArray<{
   label: string;
   cells: readonly (string | boolean)[];
-}>;
+}> = [
+  {
+    label: "Connected accounts",
+    cells: [
+      formatAllowance(PLAN_ENTITLEMENTS.free.connections),
+      formatAllowance(PLAN_ENTITLEMENTS.starter.connections),
+      formatAllowance(PLAN_ENTITLEMENTS.growth.connections),
+      formatAllowance(PLAN_ENTITLEMENTS.agency.connections),
+    ],
+  },
+];
 
 /** The two glyph labels the table cells announce. A bare tick or dash says nothing out loud, and
  *  a `aria-label` on a role-less <span> is not guaranteed to be read, so the glyph is hidden and
@@ -199,7 +238,7 @@ export function Pricing() {
             <p className="text-ink-muted mb-5 text-[13px] leading-[1.55]">{plan.summary}</p>
 
             <ul className="mb-7 flex-1">
-              {plan.features.map((feature) => (
+              {planFeatures(plan.plan).map((feature) => (
                 <li key={feature} className="text-ink-muted my-2 flex gap-2 text-[13px]">
                   <span className="text-brand-mint font-bold" aria-hidden="true">
                     &#10003;

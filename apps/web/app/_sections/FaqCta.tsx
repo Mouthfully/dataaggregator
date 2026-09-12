@@ -1,4 +1,5 @@
 import { brand } from "@repo/brand";
+import { connectionAllowance } from "../_content";
 
 /**
  * THE FAQ AND THE CLOSING PANEL -- the reference's `<section id="faq" class="section container
@@ -77,8 +78,14 @@ const QUESTIONS = [
   },
   {
     question: "Can I try it for free?",
-    answer:
-      "The Free plan shown above includes three connectors, daily refresh, and standard reports.",
+    // THE OLD ANSWER RESTATED ALL THREE CLAIMS /pricing HAD JUST DROPPED -- "three connectors,
+    // daily refresh, and standard reports" -- one section below the pricing block that no longer
+    // makes any of them. Deleting a claim from the page that sells it and leaving it in the FAQ
+    // republishes it; the FAQ is where a reader goes precisely when the card did not answer them.
+    //
+    // The allowance is the one part that survives, because `PLAN_ENTITLEMENTS` backs it, and it is
+    // read from there rather than spelled out so the answer cannot drift from the card above it.
+    answer: `The Free plan includes ${connectionAllowance("free")}.`,
   },
   {
     question: "Can I change plans later?",

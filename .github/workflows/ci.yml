@@ -125,6 +125,15 @@ jobs:
         if: ${{ !cancelled() }}
         run: node scripts/check-providers.mjs
 
+      # The product's value is that many platforms arrive in ONE vocabulary, and the way that
+      # decays is not a decision anybody makes -- it is a connector author, reasonably, using the
+      # words their platform used, until the unified store is the union of every vendor's schema
+      # with a shared key. The registry is the single place that says where each platform field
+      # lands; this makes it binding, and makes a silent drop a build failure.
+      - name: Registry guard
+        if: ${{ !cancelled() }}
+        run: node scripts/check-registry.mjs
+
   # Row-level security is the whole tenant-isolation guarantee, so it is a regression gate rather
   # than a one-off check someone once ran. `supabase start` needs Docker-in-Docker and a full
   # Supabase stack; this needs a database, so it runs the real migrations against a plain

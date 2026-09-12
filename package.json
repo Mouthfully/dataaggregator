@@ -24,6 +24,7 @@
     "check:copy": "node scripts/check-copy.mjs",
     "check:dictionary": "node scripts/check-dictionary.mjs",
     "check:providers": "node scripts/check-providers.mjs",
+    "check:registry": "node scripts/check-registry.mjs",
     "check:tokens": "node scripts/check-tokens.mjs"
   },
   "devDependencies": {

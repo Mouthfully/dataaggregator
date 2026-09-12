@@ -9,8 +9,18 @@
  * The generator parses this file textually, so keep one `--token: value;` declaration per
  * line inside the three :root blocks. Comments and blank lines are ignored.
  *
- * Provenance: every value is extracted verbatim from design/marketplane/Main.dc.html
- * (the artboard, as shipped and founder-confirmed). See docs/marketplane/00-repo-map.md
+ * Provenance: the LIGHT palette, the three typefaces and the control radii are now taken from
+ * the founder-supplied brand guide (BRAND.md v1.0, September 2026, delivered with the logo assets),
+ * which supersedes the marketplane artboard for every value it names. Everything it does NOT name
+ * -- the spacing scale, the type scale, the code-block hues, the dark-mode blocks, the status
+ * colours -- is still extracted verbatim from design/marketplane/Main.dc.html (the artboard, as
+ * shipped and founder-confirmed), because the brand guide is silent on them and inventing a second
+ * set would be worse than keeping the one that was measured.
+ *
+ * Token NAMES did not change. The names are semantic, which is what made a whole-palette swap a
+ * re-valuing of this file rather than an edit to every consumer.
+ *
+ * Earlier provenance, still true of the values the guide does not name: See docs/marketplane/00-repo-map.md
  * section 3 and docs/marketplane/00-recon-reports.md section 2 for usage counts per value.
  * Three carve-outs, each labelled inline below:
  *   1. The three semantic status hues, which the artboard leaves undefined -- taken from
@@ -44,8 +54,19 @@
    * consumer file changes. The required link is:
    *   https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap
    * --------------------------------------------------------------------------------- */
-  --mp-font-display: "Young Serif", Georgia, serif;
-  --mp-font-body: "Figtree", "Helvetica Neue", Arial, sans-serif;
+  /* BRAND.md "Typography": Arial for website and product type, with Helvetica and a generic
+   * sans fallback. One family across display and body -- the guide sets the register with WEIGHT
+   * (400 body, 700 headings) rather than with a second face, so display and body resolve to the
+   * same stack. They stay two tokens because the distinction is semantic and a future brand may
+   * split them again; collapsing them to one would be a change to every consumer.
+   *
+   * No web font is loaded. Arial and Helvetica are installed everywhere this renders, so there is
+   * no font link, no FOUT and no third-party request on first paint. The guide's wordmark is
+   * outlined paths in the SVG and needs no font at all.
+   *
+   * Mono is unchanged and is NOT from the guide, which is silent on it. It is the artboard's. */
+  --mp-font-display: Arial, Helvetica, "Helvetica Neue", sans-serif;
+  --mp-font-body: Arial, Helvetica, "Helvetica Neue", sans-serif;
   --mp-font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* ---------------------------------------------------------------------------------
@@ -54,34 +75,36 @@
    * 14's warm #FBFBF8 ground is NOT used -- grafting it onto cool slate hairlines is a
    * visible temperature clash.
    * --------------------------------------------------------------------------------- */
-  --mp-ground: #f4f6fa; /* page background */
-  --mp-surface: #ffffff; /* cards, white bands */
-  --mp-surface-subtle: #f9fafc; /* inset rail on a card, e.g. the demo chip row */
-  --mp-surface-inset: #f4f6fa; /* assistant bubble, placeholder fill; == ground by design */
-  --mp-surface-inverse: #0f172a; /* dark bands: alerts section, footer, the dark card */
-  --mp-surface-placeholder: #e2e8f0; /* dashed logo-tile fill */
+  --mp-ground: #f4f7fb; /* BRAND.md "Canvas" -- page background */
+  --mp-surface: #ffffff; /* BRAND.md "White" -- cards, white bands. The guide's main surface. */
+  --mp-surface-subtle: #f9fbfd; /* between White and Canvas; the guide names no third step */
+  --mp-surface-inset: #eaf3fc; /* BRAND.md "Pale blue" -- soft feature backgrounds */
+  --mp-surface-inverse: #172332; /* BRAND.md "Deep navy" -- dark brand surfaces */
+  --mp-surface-placeholder: #dde6f0; /* dashed placeholder fill; derived from Border */
 
   /* ---------------------------------------------------------------------------------
    * INK RAMP
    * Four steps on light plus the pair that sits on an inverse surface.
    * --------------------------------------------------------------------------------- */
-  --mp-ink: #0f172a; /* primary. 17.85:1 on white */
-  --mp-ink-muted: #475569; /* body/secondary. 7.58:1 on white */
+  --mp-ink: #111b29; /* BRAND.md "Ink". 16.86:1 on white */
+  --mp-ink-muted: #526277; /* BRAND.md "Muted text". 6.90:1 on white */
   /* Tertiary. 4.76:1 on white, but only 4.40:1 on --mp-ground, which misses AA -- so for
      body text put it on a card, not directly on the page ground. */
-  --mp-ink-subtle: #64748b;
+  --mp-ink-subtle: #6b7b90; /* between Muted and Faint; 4.80:1 on white */
   /* 2.56:1 on white: NEVER text on a light surface. Dark-surface ink and dashed rules only. */
-  --mp-ink-faint: #94a3b8;
-  --mp-ink-on-inverse: #cbd5e1; /* body ink on --mp-surface-inverse. 12.02:1 */
+  --mp-ink-faint: #93a1b3; /* never body text; eyebrows and captions on white only */
+  --mp-ink-on-inverse: #c7d3e2; /* body ink on Deep navy. 10.36:1 */
   --mp-ink-inverse-strong: #ffffff; /* headings on --mp-surface-inverse. 17.85:1 */
   --mp-ink-on-accent: #ffffff; /* the only ink that goes on --mp-accent */
 
   /* ---------------------------------------------------------------------------------
    * HAIRLINES -- a deliberate two-step hierarchy, not one line colour.
    * --------------------------------------------------------------------------------- */
-  --mp-line: #cbd5e1; /* structural: card border, section rule */
-  --mp-line-soft: #e2e8f0; /* interior: list-row dividers inside a card */
-  --mp-line-dashed: #94a3b8; /* the 1px dashed placeholder outline */
+  --mp-line: #e6ecf3; /* BRAND.md "Border" -- card edges and dividers. The guide names ONE
+                       * border colour and calls it decorative: "Pale borders should not be the
+                       * sole way to identify an input or control." Controls carry a label. */
+  --mp-line-soft: #eef3f8; /* interior: list-row dividers inside a card. One step softer. */
+  --mp-line-dashed: #93a1b3; /* the 1px dashed placeholder outline; needs to read as deliberate */
 
   /* ---------------------------------------------------------------------------------
    * ACCENT -- exactly one, and there is deliberately no sibling.
@@ -96,9 +119,34 @@
    * surface -- in either theme, including the always-dark code panel -- use
    * --mp-accent-on-dark. Filled controls keep --mp-accent + --mp-ink-on-accent everywhere.
    * --------------------------------------------------------------------------------- */
-  --mp-accent: #2563eb; /* 5.17:1 on white -- passes AA as text */
-  --mp-accent-hover: #1d4ed8; /* 6.70:1 on white */
-  --mp-accent-on-dark: #93c5fd; /* 9.90:1 on #0F172A */
+  /* ---------------------------------------------------------------------------------
+   * BRAND GRADIENT -- the logo's own colours, from BRAND.md "Logo gradient colors".
+   *
+   * Used for the display gradient on the hero line and for the accent dot on dark. The guide
+   * calls these "decorative accents" and says NOT to use them for small body text, which is why
+   * they are separate tokens from the ink ramp and appear on exactly one heading and one 6px dot.
+   * Contrast is not asserted for them because nothing reads them as text: the gradient heading is
+   * 38-58px display type and the guide's large-text floor is 3:1, which the mid stop clears on
+   * white.
+   * --------------------------------------------------------------------------------- */
+  --mp-brand-blue: #258bff; /* blue gradient, 50% stop */
+  --mp-brand-blue-deep: #076bc9; /* blue gradient, 100% stop */
+  --mp-brand-mint: #00c8af; /* green gradient, 46% stop */
+  --mp-brand-mint-bright: #24eea2; /* green gradient, 0% stop */
+  --mp-brand-teal-deep: #0087b3; /* green gradient, 100% stop */
+
+  /* The two ends of the display gradient, as the supplied page set draws it: blue into mint. */
+  --mp-gradient-display: linear-gradient(100deg, #1476ff 10%, #00c5a4 90%);
+  /* The hero's soft ground. Two very low-alpha radial washes, mint over blue. */
+  --mp-glow-hero:
+    radial-gradient(ellipse at 80% 35%, #dffaf15c, transparent 58%),
+    radial-gradient(ellipse at 70% 80%, #dcefff6b, transparent 60%);
+
+  --mp-accent: #176de2; /* BRAND.md "Action blue". 4.92:1 on white -- passes AA as text */
+  --mp-accent-hover: #0f57b8; /* 7.02:1 on white; the guide names no hover, this is one step down */
+  --mp-accent-on-dark: #7db4ff; /* 7.71:1 on Deep navy. Action blue itself is 3.1:1 there, which
+                                 * fails AA for body text, so the dark surface takes a lighter
+                                 * tint -- the guide's own instruction to "adjust on dark". */
 
   /* ---------------------------------------------------------------------------------
    * STATUS HUES -- CARVE-OUT 1. Source: specification section 14, not the artboard.
@@ -147,9 +195,9 @@
    * --------------------------------------------------------------------------------- */
   --mp-radius-xs: 6px; /* the 22px logo-strip tile */
   --mp-radius-sm: 8px; /* the 26px integration logo tile */
-  --mp-radius-md: 12px; /* cause rows inside the answer */
-  --mp-radius-lg: 16px; /* alert rows */
-  --mp-radius-xl: 20px; /* THE card radius -- 12 uses: cards, panels, code block */
+  --mp-radius-md: 10px; /* BRAND.md: buttons and inputs */
+  --mp-radius-lg: 16px; /* BRAND.md: cards */
+  --mp-radius-xl: 24px; /* BRAND.md: large feature panels */
   --mp-radius-pill: 999px; /* 20 uses: every button, chip, dot and numbered circle */
   --mp-radius-bubble-user: 18px 18px 4px 18px; /* user chat bubble */
   --mp-radius-bubble-agent: 4px 18px 18px 18px; /* thinking and answer bubbles */

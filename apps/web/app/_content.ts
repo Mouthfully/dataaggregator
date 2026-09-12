@@ -132,3 +132,198 @@ export const ENVELOPE_FIELDS = [
   { field: "attribution_window", note: "required on every conversion count" },
   { field: "fx_rate", note: "the rate that produced a converted amount" },
 ] as const;
+
+/* ==============================================================================================
+ * THE SITE COPY.
+ *
+ * Every sentence the marketing site, the dashboard and the sign-in screen render, held here rather
+ * than typed into the JSX. Two reasons, and the second is the one that matters.
+ *
+ * 1. `scripts/check-copy.mjs` refuses a JSX text node of five or more words ending in terminal
+ *    punctuation. Almost every line below is exactly that.
+ * 2. The guard's own module comment explains why it exists: a sentence typed straight into the JSX
+ *    "renders exactly like an approved one ... and ships an unreviewed promise". Holding the copy in
+ *    one module does not make it reviewed, but it makes it REVIEWABLE -- the whole surface of what
+ *    the product says is this file, and a reader can check it against the brand guide in one pass
+ *    instead of walking every component.
+ *
+ * These are NOT claims in the `claims.ts` sense and deliberately do not pretend to be. A claim
+ * carries a specification citation and is withheld when the capability behind it does not exist;
+ * this is brand copy, supplied by the founder with the design, and it renders unconditionally.
+ * `claims.ts` is untouched and still gates everything that goes through `claim()`.
+ * ============================================================================================== */
+
+export const SITE = {
+  eyebrow: "Your data, made plain",
+  heroLine1: "All your data.",
+  heroLine2: "One clear view.",
+  heroLead:
+    "Connect your tools, unify your data, and turn it into insights — in minutes. No code, no hassle.",
+  ctaPrimary: "Start free",
+  ctaSecondary: "Explore dashboard",
+  ctaNav: "Explore dashboard",
+  heroChecks: ["No credit card required", "200+ integrations", "Set up in minutes"],
+  syncPill: "Everything connected. Finally.",
+  heroVisualLabel: "Illustrative dashboard",
+  platformsEyebrow: "Your favourite platforms. One connected workspace.",
+  footerTagline: "All your data. One clear view.",
+  footerNote: "Built for businesses everywhere.",
+  footerNote2: "Global platforms. Local possibilities.",
+} as const;
+
+/** The primary navigation. Labels are structural, so they are not sentences. */
+export const NAV = [
+  { href: "/#product", label: "Product" },
+  { href: "/#integrations", label: "Integrations" },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/signin", label: "Sign in" },
+] as const;
+
+/** The platform strip under the hero. Wordmarks, not logos, so nothing is hotlinked. */
+export const PLATFORMS = [
+  "Google Ads",
+  "Meta Ads",
+  "Shopify",
+  "TikTok Ads",
+  "HubSpot",
+  "Stripe",
+  "YouTube",
+  "Google Analytics",
+] as const;
+
+/** The three feature cards. */
+export const FEATURES = [
+  {
+    id: "numbers",
+    title: "The numbers that matter",
+    body: "Revenue, orders, spend, and return on ad spend sit together. Clear comparisons make changes easier to spot.",
+  },
+  {
+    id: "action",
+    title: "Your next best action",
+    body: "Prioritized insights help your team move from seeing a problem to doing something about it.",
+  },
+  {
+    id: "sync",
+    title: "Every source in sync",
+    body: "Connection health and recent sync activity make it clear where your data is coming from.",
+  },
+] as const;
+
+/* ---------------------------------------------------------------------------------------------
+ * THE DASHBOARD, AND WHY ITS NUMBERS ARE HERE.
+ *
+ * Every figure below is ILLUSTRATIVE and comes from the supplied design, not from a database. The
+ * dashboard route renders no live data because there is none: `envelope_rows` holds zero rows.
+ *
+ * They live in this module rather than in the component for one specific reason -- when the real
+ * read path lands, the component changes from mapping over these constants to mapping over a fetch,
+ * and they are deleted in one piece. A figure typed into the JSX would have to be hunted. The screen
+ * itself is labelled as a concept, in the UI, by `SITE_DASHBOARD.notice`.
+ * --------------------------------------------------------------------------------------------- */
+
+export const SITE_DASHBOARD = {
+  eyebrow: "Client workspace",
+  heroLine1: "A little less noise.",
+  heroLine2: "A lot more clarity.",
+  lead: "One calm place to understand performance, find opportunities, and keep your next steps moving.",
+  notice: "Product concept · Illustrative data",
+  workspace: "Northstar Studio",
+  workspaceInitials: "NS",
+  title: "Business overview",
+  period: "Jun 1 – Jun 30, 2026",
+} as const;
+
+export const DASHBOARD_NAV = [
+  { id: "overview", label: "Overview" },
+  { id: "reports", label: "Reports" },
+  { id: "sources", label: "Sources" },
+  { id: "tasks", label: "Tasks" },
+  { id: "settings", label: "Settings" },
+] as const;
+
+export const DASHBOARD_METRICS = [
+  { id: "revenue", label: "Revenue", value: "$186,240", delta: "+18.6%" },
+  { id: "orders", label: "Orders", value: "8,241", delta: "+12.4%" },
+  { id: "spend", label: "Ad spend", value: "$34,360", delta: "+6.8%" },
+  { id: "roas", label: "ROAS", value: "5.42x", delta: "+11.2%" },
+] as const;
+
+export const DASHBOARD_CHANNELS = [
+  {
+    id: "google",
+    channel: "Google Ads",
+    revenue: "$78,460",
+    rd: "+24.1%",
+    spend: "$12,650",
+    sd: "+7.3%",
+    roas: "6.20x",
+    od: "+15.6%",
+  },
+  {
+    id: "meta",
+    channel: "Meta Ads",
+    revenue: "$56,220",
+    rd: "+14.2%",
+    spend: "$13,180",
+    sd: "+6.1%",
+    roas: "4.27x",
+    od: "+7.6%",
+  },
+  {
+    id: "shopify",
+    channel: "Shopify",
+    revenue: "$51,560",
+    rd: "+17.9%",
+    spend: "$8,530",
+    sd: "+6.8%",
+    roas: "6.04x",
+    od: "+12.3%",
+  },
+] as const;
+
+export const DASHBOARD_INSIGHTS = [
+  {
+    id: "up",
+    title: "Revenue is up 18.6%",
+    body: "You generated $186,240 this month, up 18.6% from last month.",
+  },
+  {
+    id: "leads",
+    title: "Google Ads leads efficiency",
+    body: "Google Ads achieved 6.20x ROAS, highest among your channels.",
+  },
+  {
+    id: "week",
+    title: "Your best week was Jun 22–28",
+    body: "You generated $52,480, 28% higher than the monthly average.",
+  },
+] as const;
+
+export const DASHBOARD_PRODUCTS = [
+  { id: "mug", name: "Everyday Mug", units: "1,842 units sold", value: "$36,840", delta: "+22.6%" },
+  {
+    id: "bottle",
+    name: "Insulated Bottle",
+    units: "1,276 units sold",
+    value: "$28,930",
+    delta: "+16.4%",
+  },
+  { id: "tote", name: "Canvas Tote", units: "983 units sold", value: "$19,560", delta: "+11.9%" },
+] as const;
+
+export const DASHBOARD_ACTIVITY = [
+  {
+    id: "connected",
+    title: "Connected Google Ads",
+    body: "Ad account synced successfully",
+    when: "2 hours ago",
+  },
+  {
+    id: "report",
+    title: "Generated June performance report",
+    body: "Your report is ready to view",
+    when: "5 hours ago",
+  },
+  { id: "orders", title: "Synced 8,241 orders", body: "Shopify data updated", when: "1 day ago" },
+] as const;

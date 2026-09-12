@@ -66,6 +66,15 @@ const EXEMPT = [
   "README.md",
   "packages/brand/**",
   "scripts/check-brand.mjs",
+  // THE WORDMARK ARTWORK. The logo is the product name, drawn -- an SVG whose paths spell it and
+  // whose <title> and element ids name it. That is not a second home for the string in the sense
+  // this guard polices; it is the artwork the brand file POINTS AT, via brand.logoPath. The guard's
+  // own rule is that nothing which renders or deploys carries an identity string "of its own", and
+  // this file carries the brand file's.
+  //
+  // Narrow deliberately: one directory, image assets only. Any .ts/.tsx/.css that ever appears
+  // there is still scanned, and an .svg anywhere else is too.
+  "apps/web/public/brand/*.svg",
 ];
 
 /**

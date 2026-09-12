@@ -65,6 +65,17 @@ const EXEMPT = [
   "**/README.md",
   TOKENS_FILE,
   "scripts/check-tokens.mjs",
+  // BRAND ARTWORK -- the same category as design/**: hard-coded colour that must never be edited,
+  // only placed. The founder-supplied brand guide is explicit about both halves. It says to "use
+  // the supplied SVG paths as the master artwork" and to "preserve the gradient directions and
+  // overlay geometry in the SVG", and separately forbids recolouring: "do not ... recolor
+  // individual parts". A logo whose gradients resolved to var(--mp-accent) would follow a token
+  // change and stop being the logo.
+  //
+  // NARROW ON PURPOSE. This is one directory holding image assets, not "public" and not "any svg".
+  // An .svg elsewhere, and every .css/.ts/.tsx in this directory if one ever appears, is still
+  // scanned -- the extension list below is what keeps the exemption to artwork.
+  "apps/web/public/brand/*.svg",
 ];
 
 /** 3, 4, 6 or 8 hex digits, and nothing longer masquerading as one. */

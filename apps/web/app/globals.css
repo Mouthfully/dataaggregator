@@ -45,7 +45,30 @@
   --font-body: var(--mp-font-body);
   --font-mono: var(--mp-font-mono);
 
+  /* brand gradient -- decorative only, never small text. See tokens.css. */
+  --color-brand-blue: var(--mp-brand-blue);
+  --color-brand-mint: var(--mp-brand-mint);
+
   /* radii */
   --radius-xl: var(--mp-radius-xl);
   --radius-pill: var(--mp-radius-pill);
+}
+
+/* ------------------------------------------------------------------------------------------
+ * Two composite values that are gradients rather than colours, so they have no Tailwind utility
+ * to map onto. They are declared in the token file like everything else; these two classes are
+ * the only way they reach an element, and both read a `var()` -- no literal is written here.
+ * ------------------------------------------------------------------------------------------ */
+.brand-gradient-text {
+  background: var(--mp-gradient-display);
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero-glow::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -70px -30px -50px;
+  background: var(--mp-glow-hero);
 }

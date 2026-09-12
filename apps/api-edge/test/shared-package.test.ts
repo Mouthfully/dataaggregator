@@ -13,8 +13,11 @@ describe("a shared workspace package under workerd", () => {
   it("imports raw TypeScript with no build step", () => {
     // A literal, not a self-comparison: comparing the token to itself would pass even with the
     // whole chain broken.
+    // The literal moves when the brand does -- it was the artboard's cool ground until the palette
+    // was re-sourced to the brand guide's Canvas. That it has to be edited here is the point: a
+    // self-comparison would pass with the whole chain broken.
     // tokens-guard-ignore: asserts the value that crossed the runtime boundary.
-    expect(token("--mp-ground")).toBe("#f4f6fa");
+    expect(token("--mp-ground")).toBe("#f4f7fb");
   });
 
   it("exposes the same generated { light, dark } map both runtimes see", () => {

@@ -31,8 +31,8 @@
  * has to assemble by reading five normalisers.
  */
 
-import type { MetricName } from "./metrics.js";
-import type { Source } from "./source.js";
+import type { MetricName } from "./metrics.ts";
+import type { Source } from "./source.ts";
 
 /**
  * What happens to one field a connector reads.

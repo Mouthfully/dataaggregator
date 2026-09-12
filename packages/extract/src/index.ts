@@ -6,7 +6,7 @@ export {
   type BackfillWindow,
   type PlanInput,
   type StepBudget,
-} from "./backfill.js";
+} from "./backfill.ts";
 export {
   ExtractError,
   backoffMs,
@@ -18,11 +18,11 @@ export {
   type FailureKind,
   type FetchOptions,
   type MetaThrottle,
-} from "./http.js";
+} from "./http.ts";
 export {
   GOOGLE_ADS_TIERS,
   SURVIVAL_ACCOUNTS,
   accountCapacity,
   type AccessTier,
   type Capacity,
-} from "./capacity.js";
+} from "./capacity.ts";

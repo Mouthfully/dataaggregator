@@ -8,7 +8,7 @@ import {
   quotaAllowsAnother,
   runReport,
   runReportPages,
-} from "./client.js";
+} from "./client.ts";
 
 const TOKEN = "ya29.a0-THE-CUSTOMERS-ACCESS-TOKEN";
 const PROPERTY = "properties/123456";

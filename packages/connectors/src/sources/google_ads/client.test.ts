@@ -11,7 +11,7 @@ import {
   readBudget,
   search,
   searchPages,
-} from "./client.js";
+} from "./client.ts";
 
 const ACCESS_TOKEN = "ya29.a0-THE-CUSTOMERS-ACCESS-TOKEN";
 const DEVELOPER_TOKEN = "THE-WORKSPACES-OWN-DEVELOPER-TOKEN";

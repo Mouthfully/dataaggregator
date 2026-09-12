@@ -34,8 +34,8 @@ import {
   type Ga4ReportRequest,
   Ga4ClientError,
   runReportPages,
-} from "./client.js";
-import { normalizeGa4Report } from "./normalize.js";
+} from "./client.ts";
+import { normalizeGa4Report } from "./normalize.ts";
 
 /** The dimensions and metrics a daily pull asks for. */
 export interface Ga4ReportDefinition {

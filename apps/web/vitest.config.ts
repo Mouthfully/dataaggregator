@@ -7,6 +7,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [react()],
   test: {
-    include: ["app/**/*.test.tsx"],
+    // BOTH EXTENSIONS. This read `*.test.tsx` only, and the cost was silent: `_work-email.test.ts`
+    // -- the tests for the rule that decides who may sign up -- sat in the tree for several
+    // commits and never executed once. A test that cannot run is worse than a missing one,
+    // because it reports as coverage.
+    include: ["app/**/*.test.ts", "app/**/*.test.tsx"],
   },
 });

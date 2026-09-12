@@ -50,7 +50,7 @@ import {
   type MetaInsightsRow,
   type MetaLevel,
   metaAccountId,
-} from "./normalize.js";
+} from "./normalize.ts";
 
 /** Overridable so tests never resolve a real host. The version matches @repo/oauth's endpoints. */
 export const META_GRAPH_BASE = "https://graph.facebook.com/v21.0";

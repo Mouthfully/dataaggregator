@@ -13,7 +13,7 @@ import {
   getInsightsPages,
   parseMetaUsage,
   usageAllowsAnother,
-} from "./client.js";
+} from "./client.ts";
 
 const TOKEN = "EAA-THE-CUSTOMERS-LONG-LIVED-TOKEN";
 const ACCOUNT = "act_000000000000001";

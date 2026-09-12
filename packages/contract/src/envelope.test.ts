@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { envelopeRowSchema, envelopeSchema, upsertKey } from "./envelope.js";
-import { COMMERCE_METRICS, METRICS } from "./metrics.js";
-import { isProvisional, RESTATEMENT_CLOCKS, restatesUntil } from "./restatement.js";
+import { envelopeRowSchema, envelopeSchema, upsertKey } from "./envelope.ts";
+import { COMMERCE_METRICS, METRICS } from "./metrics.ts";
+import { isProvisional, RESTATEMENT_CLOCKS, restatesUntil } from "./restatement.ts";
 
 /** A minimal valid row. Each test bends one thing about it. */
 function row(overrides: Record<string, unknown> = {}) {

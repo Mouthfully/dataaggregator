@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { METRICS, type MetricName } from "./metrics.js";
+import { METRICS, type MetricName } from "./metrics.ts";
 import {
   FIELD_REGISTRY,
   type Disposition,
@@ -8,8 +8,8 @@ import {
   fieldsFor,
   mappedFields,
   metricsFor,
-} from "./registry.js";
-import { SOURCES } from "./source.js";
+} from "./registry.ts";
+import { SOURCES } from "./source.ts";
 
 /** Every disposition in the registry, flattened, with where it came from. */
 function allDispositions(): { source: string; field: string; disposition: Disposition }[] {

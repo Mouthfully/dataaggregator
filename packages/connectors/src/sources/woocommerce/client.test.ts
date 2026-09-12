@@ -6,7 +6,7 @@ import {
   normaliseStoreUrl,
   ordersUrl,
   readPagination,
-} from "./client.js";
+} from "./client.ts";
 
 const CRED = { key: "ck_a1b2c3", secret: "cs_9z8y7x" };
 const QUERY = {

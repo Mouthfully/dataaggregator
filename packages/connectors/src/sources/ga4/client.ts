@@ -28,7 +28,7 @@
  */
 
 import { type FetchOptions, fetchWithRetry } from "@repo/extract";
-import type { Ga4Report } from "./normalize.js";
+import type { Ga4Report } from "./normalize.ts";
 
 /** `POST {base}/{property}:runReport`. Overridable so tests never resolve a real host. */
 export const GA4_DATA_API_BASE = "https://analyticsdata.googleapis.com/v1beta";

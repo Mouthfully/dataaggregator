@@ -10,13 +10,13 @@ import {
   MIXED_ACTION_TYPES,
   SPARSE_WINDOWS,
   VALUE_ONLY,
-} from "./fixtures.js";
+} from "./fixtures.ts";
 import {
   type MetaActionWindow,
   type MetaInsightsRow,
   type MetaLevel,
   normalizeMetaInsights,
-} from "./normalize.js";
+} from "./normalize.ts";
 
 const TIMEZONE = "Asia/Bangkok";
 const FETCHED_AT = "2026-09-08T02:00:00Z";

@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck",
     "test": "pnpm -r test",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
@@ -29,6 +29,13 @@
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
+    "@repo/connections": "workspace:*",
+    "@repo/connectors": "workspace:*",
+    "@repo/store": "workspace:*",
+    "@repo/vault": "workspace:*",
+    "@types/node": "catalog:",
+    "stripe": "^22.6.2",
+    "tsx": "^4.23.13",
     "typescript": "catalog:"
   },
   "pnpm": {

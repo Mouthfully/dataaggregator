@@ -53,8 +53,8 @@ import {
   type WooWalkOptions,
   type WooWindow,
   fetchOrdersWindow,
-} from "./client.js";
-import { type WooOrder, assertWooTimezone, normalizeWooOrders } from "./normalize.js";
+} from "./client.ts";
+import { type WooOrder, assertWooTimezone, normalizeWooOrders } from "./normalize.ts";
 
 /**
  * How much MODIFIED time one chunk covers, and therefore how often the watermark can advance.

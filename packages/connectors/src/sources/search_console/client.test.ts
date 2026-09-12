@@ -8,8 +8,8 @@ import {
   querySearchAnalytics,
   querySearchAnalyticsPages,
   searchAnalyticsUrl,
-} from "./client.js";
-import { SearchConsoleNormalizeError } from "./normalize.js";
+} from "./client.ts";
+import { SearchConsoleNormalizeError } from "./normalize.ts";
 
 const TOKEN = "ya29.a0-THE-CUSTOMERS-ACCESS-TOKEN";
 const SITE = "sc-domain:example.test";

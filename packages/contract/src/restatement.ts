@@ -28,7 +28,7 @@
  * re-pull thirty days later.
  */
 
-import type { Source } from "./source.js";
+import type { Source } from "./source.ts";
 
 export interface RestatementClock {
   /** Days a row stays open after its anchor, or null where the platform publishes no window. */

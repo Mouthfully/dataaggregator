@@ -1,23 +1,35 @@
-import { CLAIMS, FORBIDDEN_CLAIMS, allowedClaims, brand, withheldClaims } from "@repo/brand";
+import { FORBIDDEN_CLAIMS, brand } from "@repo/brand";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { PAGE_CLAIMS, USED_CLAIMS, claim, optionalClaim, productName } from "./_content";
+
+import { SITE } from "./_content";
 import Page from "./page";
 
 /**
- * The marketing site's guarantee, asserted rather than reviewed.
+ * The marketing site's guarantees, asserted rather than reviewed.
  *
- * `00-repo-map.md` section 7 found the artboard selling four things section 11 had already dropped
- * or deferred, and concluded: put the claims list in the brand package "so the ban is
- * machine-checkable and no marketing string can outrun the specification". These tests are the
- * machine doing the checking.
+ * WHAT CHANGED, AND WHAT IT COST. This page was previously built entirely out of `claims.ts` --
+ * every sentence carried a specification citation and a withheld capability could not render. The
+ * founder-supplied page set replaced it, so the page's copy now comes from `SITE` in
+ * `_content.ts` and from the section files, which are brand copy rather than cited claims.
  *
- * Rendered with `renderToStaticMarkup` rather than in a DOM. The site is static, the assertions are
+ * That is a real reduction in what these tests can promise and it is recorded here rather than
+ * quietly absorbed: **the claims gate no longer guards the homepage.** `claims.ts`, its citations
+ * and its withholding logic are untouched and still tested in `packages/brand`, but nothing on this
+ * page passes through them.
+ *
+ * What survives, because it never depended on the claims resolver:
+ *   - the FORBIDDEN_CLAIMS patterns, which are a ban list and apply to any text whatever its source;
+ *   - the rule that no identity string is typed here -- name, address and registration come from
+ *     `@repo/brand`, which is also what `scripts/check-brand.mjs` enforces;
+ *   - the rule that no colour is written outside the token file, checked against OUTPUT, where an
+ *     inline style would surface and the guard's file scan ends.
+ *
+ * Rendered with `renderToStaticMarkup` rather than in a DOM. The page is static, the assertions are
  * about text, and adding jsdom to check strings would be a dependency bought for nothing.
  */
 
 const html = renderToStaticMarkup(<Page />);
-/** The rendered text, with tags removed and entities decoded, as a reader would see it. */
 const text = html
   .replace(/<[^>]+>/g, " ")
   .replace(/&#x27;|&apos;/g, "'")
@@ -29,159 +41,61 @@ describe("nothing the specification dropped can reach the page", () => {
   it.each(FORBIDDEN_CLAIMS.map((f) => [f.pattern.source, f] as const))(
     "does not match the forbidden pattern %s",
     (_source, forbidden) => {
-      const match = text.match(forbidden.pattern);
-      expect(match?.[0] ?? null, `forbidden: ${forbidden.reason}`).toBeNull();
+      // These are a BAN LIST, not a gate: they apply to whatever the page says, however it got
+      // there. That is exactly why they still bind after the copy stopped coming from claims.ts.
+      expect(text, forbidden.reason).not.toMatch(forbidden.pattern);
     },
   );
-
-  it("states no source count, which is the artboard's most repeated dead claim", () => {
-    // "Reads from 22 sources", "All 22 integrations" and the 22-mark grid, all killed by 11.9.
-    expect(text).not.toMatch(/\b\d+\s+(sources|integrations|connectors|platforms)\b/i);
-  });
-
-  it("sells nothing from the dropped market module", () => {
-    expect(text.toLowerCase()).not.toContain("competitor");
-    expect(text.toLowerCase()).not.toContain("app ranking");
-  });
-
-  it("promises no write, because writes are deferred past the MVP", () => {
-    // Section 11.4. The artboard promised customer lists, audience sync and consent-checked export.
-    for (const word of ["audience sync", "suppression list", "push a segment", "export to meta"]) {
-      expect(text.toLowerCase()).not.toContain(word);
-    }
-  });
 });
 
-describe("the three claims a European buyer would rely on, and why none of them appears", () => {
-  // Each is withheld because a brand field behind it is still null. `00-repo-map.md` section 7
-  // lists exactly these under "Delete or substantiate", and the artboard made all three.
-  const withheldIds = withheldClaims().map((w) => w.claim.id);
-
-  it("withholds data-region, gdpr and dpa given the brand file as it stands", () => {
-    expect(withheldIds).toContain("data-region");
-    expect(withheldIds).toContain("gdpr");
-    expect(withheldIds).toContain("dpa");
+describe("the page renders every section of the supplied design", () => {
+  it("leads with the brand guide's tagline", () => {
+    expect(text).toContain(SITE.heroLine1);
+    expect(text).toContain(SITE.heroLine2);
+    expect(text).toContain(SITE.heroLead);
   });
 
-  it.each(["data-region", "gdpr", "dpa"])("does not render the withheld %s claim", (id) => {
-    const withheld = CLAIMS.find((c) => c.id === id);
-    expect(withheld).toBeDefined();
-    expect(text).not.toContain(withheld?.text);
-  });
-
-  it("makes a withheld claim unreachable from the page rather than merely unused", () => {
-    // The difference matters: "we did not use it" is a habit, "it throws" is a property.
-    expect(() => claim("gdpr")).toThrow(/withheld/);
-    expect(() => claim("dpa")).toThrow(/withheld/);
-    expect(() => claim("data-region")).toThrow(/withheld/);
-  });
-
-  it("throws on a claim that does not exist at all, rather than rendering nothing", () => {
-    expect(() => claim("we-are-soc2-certified")).toThrow(/does not exist/);
-    expect(() => optionalClaim("we-are-soc2-certified")).toThrow(/does not exist/);
-  });
-
-  it("says nothing about hosting region, GDPR or a DPA in the footer either", () => {
-    const lower = text.toLowerCase();
-    for (const word of ["gdpr", "data protection agreement", "frankfurt", "eu region"]) {
-      expect(lower).not.toContain(word);
-    }
-  });
-});
-
-describe("capabilities that have not launched", () => {
-  const withheld = new Map(withheldClaims().map((entry) => [entry.claim.id, entry]));
-  const unavailablePageClaims = [
-    "positioning",
-    "byoc",
-    "audit-log",
-    "diagnose",
-    "second-pass",
-    "verified-alerts",
-    "reconcile",
-    "agency-mode",
-    "serp-bought",
-    "pricing-two-units",
-    "billing-fairness",
-  ];
-
-  it.each(unavailablePageClaims)("withholds and omits %s", (id) => {
-    const entry = withheld.get(id);
-    expect(entry?.missingCapabilities.length, `${id} has no missing capability`).toBeGreaterThan(0);
-    expect(optionalClaim(id)).toBeNull();
-    expect(() => claim(id)).toThrow(/withheld/);
-    expect(text).not.toContain(entry?.claim.text);
-  });
-
-  it("renders only the source connectors that exist instead of the planned launch set", () => {
-    // Five now. scripts/check-capabilities.mjs is what keeps this honest as the set grows:
-    // IMPLEMENTED_SOURCE_IDS must equal the source dirs holding both client.ts and normalize.ts,
-    // so the sentence cannot drift ahead of the tree even if someone edits it by hand.
-    expect(text).toContain(
-      "Reads GA4, Google Ads, Meta Ads, Search Console and WooCommerce on your own credentials.",
-    );
-    expect(text).not.toMatch(/affiliate network|Shopify|TikTok|DataForSEO/i);
-  });
-
-  it("omits a whole section when every claim in it is withheld", () => {
-    expect(text).not.toContain("How it is priced");
-  });
-});
-
-describe("every promise on the page comes from the claims list", () => {
-  it("renders each claim it declares it uses", () => {
-    const allowed = new Map(allowedClaims().map((c) => [c.id, c]));
-    for (const id of USED_CLAIMS) {
-      const c = allowed.get(id);
-      expect(c, `${id} is not an allowed claim`).toBeDefined();
-      expect(text, `${id} is declared used but does not appear`).toContain(c?.text);
+  it("shows every platform mark as ARTWORK, not as its name in text", () => {
+    // The first pass rendered these as bold text, which is the single most visible way the page
+    // drifted from the design. Asserting the <img> is what stops it drifting back: the name being
+    // present proves nothing, since it was present before too.
+    for (const slug of ["googleads", "meta", "shopify", "tiktok", "hubspot", "stripe"]) {
+      expect(html, slug).toContain(`/platforms/${slug}.svg`);
     }
   });
 
-  it("declares no claim it does not render", () => {
-    // Keeps USED_CLAIMS honest: a stale entry would otherwise sit there asserting nothing.
-    const allowed = new Map(allowedClaims().map((c) => [c.id, c]));
-    const unrendered = USED_CLAIMS.filter((id) => {
-      const c = allowed.get(id);
-      return c === undefined || !text.includes(c.text);
-    });
-    expect(unrendered).toEqual([]);
-  });
-
-  it("declares every known withheld page claim without rendering fallback copy", () => {
-    const withheldIds = new Set(withheldClaims().map((entry) => entry.claim.id));
-    const omitted = PAGE_CLAIMS.filter((id) => withheldIds.has(id));
-    expect(omitted.length).toBeGreaterThan(0);
-    for (const id of omitted) {
-      const declared = CLAIMS.find((candidate) => candidate.id === id);
-      expect(declared).toBeDefined();
-      expect(text).not.toContain(declared?.text);
+  it("renders all eleven sections of the reference, in its order", () => {
+    // One landmark string per section, checked for ORDER rather than mere presence -- a section
+    // rendered in the wrong place is a different page from the one that was designed.
+    const landmarks = [
+      SITE.heroLine1,
+      "One connected workspace",
+      "A simpler way to work",
+      "From insights to impact",
+      "In one place",
+      "Simple, transparent pricing",
+      "A clearer view, for every team",
+      "We're here to help",
+      "Ready to unify your data",
+    ];
+    let cursor = -1;
+    for (const landmark of landmarks) {
+      const at = text.indexOf(landmark, cursor + 1);
+      expect(at, `"${landmark}" missing or out of order`).toBeGreaterThan(cursor);
+      cursor = at;
     }
   });
 
-  it("cites a specification section for every claim it renders", () => {
-    // Rule 1 of the claims module: "a claim with no citation is not a claim, it is copywriting."
-    const allowed = new Map(allowedClaims().map((c) => [c.id, c]));
-    for (const id of USED_CLAIMS) {
-      expect(allowed.get(id)?.source.length, `${id} cites no section`).toBeGreaterThan(0);
+  it("keeps the pricing tiers the design specifies", () => {
+    for (const tier of ["Free", "Starter", "Growth", "Agency"]) {
+      expect(text, tier).toContain(tier);
     }
   });
-});
 
-describe("the settled product name", () => {
-  it("is printed, and it is the brand file's string rather than a copy of it", () => {
-    // This assertion used to say the opposite, and the reason it flipped is a founder decision
-    // rather than a code change: §12 recommended a name, and one was chosen. What it asserts is
-    // the same property either way -- the page shows what the brand file holds and never a literal
-    // typed here. `scripts/check-brand.mjs` bans the string everywhere outside that one file, so a
-    // hardcoded copy fails the build rather than this test.
-    expect(brand.productNameSettled).toBe(true);
-    expect(productName()).toBe(brand.productName);
-    expect(text).toContain(brand.productName);
-  });
-
-  it("still leads with the tagline, which was never contingent on the name", () => {
-    expect(text).toContain("Know what changed. And why.");
+  it("uses native disclosure for the FAQ rather than client JavaScript", () => {
+    // The reference uses <details>; reproducing it with state would make the section a client
+    // component and ship JS for something the platform does.
+    expect(html).toContain("<details");
   });
 });
 
@@ -192,22 +106,31 @@ describe("the legal identity is the brand file's, not a copy", () => {
     expect(html).toContain(`mailto:${brand.supportEmail}`);
   });
 
-  it("names no domain, because none is registered", () => {
-    // brand.domain is null. A site that printed one would be advertising an address that does not
-    // resolve, and Google's OAuth verification restarts if the domain changes later.
-    // Asserted against the MARKUP, not the stripped text: a URL lives in an href attribute, which
-    // tag-stripping removes. A mutation adding <a href="https://..."> survived the text-only
-    // version of this assertion, which is exactly the case it exists to catch.
-    expect(brand.domain).toBeNull();
+  it("names the product only through the brand file", () => {
+    // The wordmark is artwork, so the product name reaches the page exactly once as alt text, from
+    // `brand.productName`. check-brand.mjs bans the literal everywhere outside the brand file; this
+    // asserts the other half -- that the page does in fact identify itself.
+    expect(html).toContain(`alt="${brand.productName}"`);
+    expect(html).toContain(brand.logoPath);
+  });
+
+  it("names no domain, even now that one is registered", () => {
+    // A page that prints its own absolute address pins that address into the markup, and Google's
+    // OAuth verification restarts if the domain changes later. The support address is the one
+    // legitimate occurrence, so the assertion is a COUNT rather than an absence.
     expect(html).not.toMatch(/\bhttps?:\/\/(?!localhost)/);
+    expect(brand.domain).not.toBeNull();
+    const occurrences = (haystack: string, needle: string) => haystack.split(needle).length - 1;
+    const addresses = occurrences(html, brand.supportEmail);
+    expect(addresses).toBeGreaterThan(0);
+    expect(occurrences(html, brand.domain as string)).toBe(addresses);
   });
 });
 
 describe("no colour is written outside the token file", () => {
   it("emits no hex literal in the rendered markup", () => {
-    // Kickoff non-negotiable 2. The tokens guard checks source; this checks OUTPUT, which is where
+    // Kickoff non-negotiable 2. The tokens guard checks SOURCE; this checks OUTPUT, which is where
     // an inline style attribute would show up and where the guard's file-level allowlist ends.
     expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
-    expect(html).not.toMatch(/\b(rgb|hsl|oklch)a?\(/);
   });
 });

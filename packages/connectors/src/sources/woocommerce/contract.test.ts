@@ -1,14 +1,14 @@
 import { envelopeRowSchema } from "@repo/contract";
 import { REDACTION_POLICIES, redactValue } from "@repo/payloads";
 import { describe, expect, it } from "vitest";
-import { ORDER, ORDER_REFUNDED, ORDER_WITH_STRIPE_FEE, PAGE } from "./fixtures.js";
+import { ORDER, ORDER_REFUNDED, ORDER_WITH_STRIPE_FEE, PAGE } from "./fixtures.ts";
 import {
   WooNormalizeError,
   assertWooTimezone,
   normalizeWooOrders,
   wooGmtToDate,
   wooPaymentFee,
-} from "./normalize.js";
+} from "./normalize.ts";
 
 const OPTS = {
   storeUrl: "https://shop.example.com",

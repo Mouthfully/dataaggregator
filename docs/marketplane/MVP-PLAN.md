@@ -28,8 +28,12 @@ joints. **One and a half are connected.**
 every metric they emit is already in `METRICS`, and every export is now reachable. What is missing is
 everything *between* a normalised row and a screen.
 
-Confirmed against the live `numbadee` project: `envelope_rows` 0, `connections` 0, `workspaces` 0,
+Confirmed against the live project: `envelope_rows` 0, `connections` 0, `workspaces` 0,
 `api_keys` 0. Nothing is observable because nothing has ever been written.
+
+> **Naming.** Every note before 53 calls that project `numbadee`. It is the same project under a
+> different display name — the ref never changed, so nothing that was applied to it was reapplied.
+> See `53-the-rename.md`. The product is `uniplain` from 2026-09-12.
 
 ---
 
@@ -174,5 +178,7 @@ Recorded because a plan that hides its own errors is worth less than one that sh
   Routing step 3 through it would produce nothing useful.
 - **`/v1/performance` is not broken — it is unconfigured.** It returns 503 naming the missing binding
   on every request until `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_JWT_SECRET` are set.
-- **The API key prefix is `mp_`** (Marketplane) while `brand.ts` and `config.toml` both say
-  `numbadee`. The `CHECK` constraint is what binds; changing it is a migration, not a config edit.
+- **The API key prefix is `mp_`** (Marketplane) while `brand.ts` and `config.toml` now both say
+  `uniplain`. The rename did not close this and deliberately did not try: the `CHECK` constraint is
+  what binds, so changing the prefix is a migration over live key rows, not a config edit. It is
+  also the one identity string a customer has already pasted into their own code.

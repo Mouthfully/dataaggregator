@@ -13,7 +13,7 @@ import {
   NEGATIVE_CLICKS,
   QUERY_THAT_IS_A_PAGE_URL,
   STRING_METRIC,
-} from "./fixtures.js";
+} from "./fixtures.ts";
 import {
   SEARCH_CONSOLE_CURRENCY,
   SEARCH_CONSOLE_TIMEZONE,
@@ -25,7 +25,7 @@ import {
   parseSearchConsoleMetric,
   parseSearchConsolePosition,
   totalsByDate,
-} from "./normalize.js";
+} from "./normalize.ts";
 
 const FETCHED_AT = "2026-09-11T02:00:00Z";
 const FIRST_SEEN_AT = "2026-08-14T06:00:00Z";

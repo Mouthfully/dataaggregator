@@ -6,9 +6,9 @@ import {
   type Ga4BackfillBatch,
   runGa4Backfill,
   windowToRequest,
-} from "./backfill.js";
-import { Ga4ClientError, type Ga4ClientOptions } from "./client.js";
-import { GA4_METRIC_MAP } from "./normalize.js";
+} from "./backfill.ts";
+import { Ga4ClientError, type Ga4ClientOptions } from "./client.ts";
+import { GA4_METRIC_MAP } from "./normalize.ts";
 
 const FETCHED_AT = "2026-09-08T02:00:00Z";
 const PROPERTY = "properties/123456";

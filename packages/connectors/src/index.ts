@@ -35,7 +35,7 @@ export {
   type Ga4BackfillBatch,
   type Ga4BackfillOptions,
   type Ga4ReportDefinition,
-} from "./sources/ga4/backfill.js";
+} from "./sources/ga4/backfill.ts";
 export {
   GA4_DATA_API_BASE,
   GA4_MAX_PAGE_ROWS,
@@ -51,7 +51,7 @@ export {
   type Ga4PropertyQuota,
   type Ga4ReportRequest,
   type QuotaGroup,
-} from "./sources/ga4/client.js";
+} from "./sources/ga4/client.ts";
 export {
   GA4_METRIC_MAP,
   Ga4NormalizeError,
@@ -61,7 +61,7 @@ export {
   type Ga4NormalizeErrorCode,
   type Ga4Report,
   type NormalizeOptions,
-} from "./sources/ga4/normalize.js";
+} from "./sources/ga4/normalize.ts";
 
 // -------------------------------------------------------------------------------------------
 // Google Ads
@@ -82,7 +82,7 @@ export {
   type GoogleAdsBudgetReading,
   type GoogleAdsClientOptions,
   type GoogleAdsPage,
-} from "./sources/google_ads/client.js";
+} from "./sources/google_ads/client.ts";
 export {
   GOOGLE_ADS_ACCOUNT_FIELDS,
   GOOGLE_ADS_ATTRIBUTION_WINDOW,
@@ -100,11 +100,21 @@ export {
   type GoogleAdsNormalizeOptions,
   type GoogleAdsRow,
   type GoogleAdsSearchResponse,
-} from "./sources/google_ads/normalize.js";
+} from "./sources/google_ads/normalize.ts";
 
 // -------------------------------------------------------------------------------------------
 // Meta Ads
 // -------------------------------------------------------------------------------------------
+export {
+  META_DEFAULT_REPORT,
+  MetaBackfillError,
+  assertMetaReport,
+  runMetaBackfill,
+  type MetaBackfillBatch,
+  type MetaBackfillErrorCode,
+  type MetaBackfillOptions,
+  type MetaReportDefinition,
+} from "./sources/meta_ads/backfill.ts";
 export {
   META_GRAPH_BASE,
   META_MAX_PAGE_ROWS,
@@ -123,7 +133,7 @@ export {
   type MetaInsightsPage,
   type MetaInsightsRequest,
   type MetaUsage,
-} from "./sources/meta_ads/client.js";
+} from "./sources/meta_ads/client.ts";
 export {
   META_ACTION_WINDOWS,
   META_CONVERSION_ACTIONS,
@@ -139,11 +149,25 @@ export {
   type MetaLevel,
   type MetaNormalizeErrorCode,
   type MetaNormalizeOptions,
-} from "./sources/meta_ads/normalize.js";
+} from "./sources/meta_ads/normalize.ts";
 
 // -------------------------------------------------------------------------------------------
 // Search Console
 // -------------------------------------------------------------------------------------------
+export {
+  SEARCH_CONSOLE_BACKFILL_CHUNK_DAYS,
+  SEARCH_CONSOLE_DEFAULT_REPORTS,
+  SearchConsoleBackfillError,
+  orderSearchConsoleReports,
+  runSearchConsoleBackfill,
+  searchConsoleBackfillChunks,
+  type SearchConsoleBackfillBatch,
+  type SearchConsoleBackfillErrorCode,
+  type SearchConsoleBackfillOptions,
+  type SearchConsoleCheckpoint,
+  type SearchConsoleReportName,
+  type SearchConsoleSpan,
+} from "./sources/search_console/backfill.ts";
 export {
   SEARCH_CONSOLE_API_BASE,
   SEARCH_CONSOLE_DATA_STATE,
@@ -160,7 +184,7 @@ export {
   type SearchAnalyticsRequest,
   type SearchConsoleClientOptions,
   type SearchConsolePage,
-} from "./sources/search_console/client.js";
+} from "./sources/search_console/client.ts";
 export {
   SEARCH_CONSOLE_ANONYMITY_THRESHOLDED,
   SEARCH_CONSOLE_CURRENCY,
@@ -184,7 +208,7 @@ export {
   type SearchConsoleNormalizeErrorCode,
   type SearchConsoleNormalizeOptions,
   type SearchConsoleNormalizeResult,
-} from "./sources/search_console/normalize.js";
+} from "./sources/search_console/normalize.ts";
 
 // -------------------------------------------------------------------------------------------
 // WooCommerce
@@ -199,7 +223,7 @@ export {
   type WooBackfillErrorCode,
   type WooBackfillOptions,
   type WooCheckpoint,
-} from "./sources/woocommerce/backfill.js";
+} from "./sources/woocommerce/backfill.ts";
 export {
   WOO_API_PATH,
   WOO_FLOOR_MAX_PAGES,
@@ -226,7 +250,7 @@ export {
   type WooWalkOptions,
   type WooWindow,
   type WooWindowPage,
-} from "./sources/woocommerce/client.js";
+} from "./sources/woocommerce/client.ts";
 export {
   WOO_FEE_META_KEYS,
   WooNormalizeError,
@@ -238,4 +262,4 @@ export {
   type WooNormalizeErrorCode,
   type WooNormalizeOptions,
   type WooOrder,
-} from "./sources/woocommerce/normalize.js";
+} from "./sources/woocommerce/normalize.ts";

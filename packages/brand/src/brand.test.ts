@@ -24,7 +24,7 @@ describe("the brand file", () => {
   it("leaves genuinely unknown fields null rather than guessing them", () => {
     // Each of these is unresolved for a recorded reason, and a plausible-looking placeholder
     // would be worse than a null: null withholds a claim, a placeholder ships a false one.
-    expect(brand.domain).toBeNull(); // support is on one domain, the artboard hard-codes another
+    expect(brand.apiBaseUrl).toBeNull(); // the Worker is on workers.dev; no hostname routes to it
     expect(brand.vatNumber).toBeNull(); // not supplied; a wrong VAT number is worse than none
     // ap-southeast-1: a project IS now provisioned, in the nearest Supabase region to Thailand.
     // The `data-region` claim stays withheld anyway -- see the capability test below.
@@ -37,8 +37,24 @@ describe("the brand file", () => {
     // unchanged: the string lives in exactly one file, and `scripts/check-brand.mjs` both bans it
     // everywhere else and match-tests the infrastructure files that must carry it.
     expect(brand.productNameSettled).toBe(true);
-    expect(brand.productName).toBe("numbadee");
+    expect(brand.productName).toBe("Uniplain");
     expect(brand.productName.trim()).toBe(brand.productName);
+  });
+
+  it("puts the support address on the product's own domain", () => {
+    // The legal notice the founder supplied names this address, so the imprint and the brand file
+    // cannot be allowed to disagree. Asserting the RELATIONSHIP rather than the literal is what
+    // catches the half-move: changing the domain and leaving the address on the old one is the
+    // failure mode, and an equality assertion on the address alone would pass right through it.
+    expect(brand.supportEmail.split("@")[1]).toBe(brand.domain);
+  });
+
+  it("holds the settled domain, and the product name is its registrable label", () => {
+    // These two are not independent facts that happen to agree -- the domain is the product name.
+    // Asserting the relationship rather than the two strings is what would catch half a rename:
+    // changing `productName` and leaving `domain` on the old one still passes two equality tests.
+    expect(brand.domain).toBe("uniplain.com");
+    expect(brand.domain?.split(".")[0]).toBe(brand.productName.toLowerCase());
   });
 });
 
@@ -210,30 +226,49 @@ describe("the forbidden-claims list", () => {
   });
 });
 
-describe("siteUrl, with the domain unsettled", () => {
+describe("siteUrl, now that the domain is settled", () => {
   it("uses an explicit override before anything else", () => {
     expect(siteUrl({ PUBLIC_SITE_URL: "https://staging.example/", VERCEL_URL: "ignored" })).toBe(
       "https://staging.example",
     );
   });
 
-  it("falls back to Vercel's per-deployment URL, so previews work with no domain at all", () => {
-    expect(siteUrl({ VERCEL_URL: "web-abc123.vercel.app" })).toBe("https://web-abc123.vercel.app");
+  it("resolves to the canonical domain in production", () => {
+    expect(siteUrl({ NODE_ENV: "production" })).toBe(`https://${brand.domain}`);
   });
 
-  it("falls back to localhost in development", () => {
+  it("prefers a preview's own URL over the canonical domain", () => {
+    // A preview build carries VERCEL_URL and NODE_ENV=production both. If the domain won, every
+    // link in the build under review would point at the live site instead of at itself.
+    expect(siteUrl({ NODE_ENV: "production", VERCEL_URL: "web-abc123.vercel.app" })).toBe(
+      "https://web-abc123.vercel.app",
+    );
+  });
+
+  it("still falls back to localhost in development rather than to the live domain", () => {
+    // This one only became possible to get wrong when the domain was set. Ordering the canonical
+    // domain ahead of this branch would send a developer to production to check their own work,
+    // and every assertion here would still have passed except this one.
     expect(siteUrl({})).toBe("http://localhost:3000");
+    expect(siteUrl({ NODE_ENV: "development" })).toBe("http://localhost:3000");
+  });
+});
+
+describe("apiUrl, which is a different origin from the site", () => {
+  it("uses an explicit override", () => {
+    expect(apiUrl({ PUBLIC_API_URL: "https://api.staging.example/" })).toBe(
+      "https://api.staging.example",
+    );
   });
 
-  it("refuses to guess in production rather than emit a wrong absolute URL", () => {
-    // A placeholder string would have made this case silently succeed and put a fake hostname in
-    // an email. Null plus a throw is the safer pair.
-    expect(() => siteUrl({ NODE_ENV: "production" })).toThrow(/no public URL available/);
-  });
-
-  it("derives the API URL from the site URL until apiBaseUrl is settled", () => {
-    expect(apiUrl({ PUBLIC_SITE_URL: "https://staging.example" })).toBe(
-      "https://staging.example/api",
+  it("refuses rather than deriving an API URL from the site's domain", () => {
+    // It used to return `${siteUrl(env)}/api`. That was harmless only because `siteUrl` threw in
+    // production while the domain was null; with the domain set, the same line would have
+    // returned https://uniplain.com/api -- a URL that resolves, serves the marketing site, and
+    // looks right in a log. The site serves no /api route.
+    expect(() => apiUrl({ NODE_ENV: "production" })).toThrow(/no API base URL available/);
+    expect(() => apiUrl({ PUBLIC_SITE_URL: "https://staging.example" })).toThrow(
+      /different origin/,
     );
   });
 });

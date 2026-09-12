@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { restatementEventSchema } from "./restatement-event.js";
+import { restatementEventSchema } from "./restatement-event.ts";
 
 /** A valid event: conversions moved from 41 to 47 after Meta restated the window. */
 function event(overrides: Record<string, unknown> = {}) {

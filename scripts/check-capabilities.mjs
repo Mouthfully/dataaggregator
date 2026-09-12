@@ -66,14 +66,52 @@ const declared = sourceList(readText(CLAIMS_FILE));
 const implemented = implementedSources();
 const findings = [];
 
-// REACHABILITY. Every implemented source must be re-exported from the package barrel, for both
-// halves it owns: the client that fetches and the normaliser that turns a response into envelope
-// rows. Exporting one without the other is the same defect at half scale -- `woocommerce` exported
-// its normaliser and not the client feeding it, so nothing outside the package could fetch an order.
+// REACHABILITY, AND IT IS A COMPLETENESS CHECK RATHER THAN A PRESENCE ONE.
+//
+// The first version of this asked only whether the barrel MENTIONED `./sources/<s>/client.js`. It
+// passed while five page-walker generators were missing from it -- `searchPages`,
+// `getInsightsPages`, `querySearchAnalyticsPages`, `fetchOrdersPages` and `fetchOrdersWindow`,
+// which are precisely the functions a scheduled pull calls. The barrel named every module and
+// re-exported two thirds of what they contained, and a presence check cannot see that.
+//
+// So every name a source's client or normaliser exports must be re-exported. An alias counts
+// (`search as googleAdsSearch`), because the name is still reachable.
 const barrel = readText(BARREL);
+
+/** Top-level export names of a module, generators and types included. */
+function moduleExports(rel) {
+  const text = readText(rel);
+  const names = new Set();
+  for (const m of text.matchAll(
+    /^export\s+(?:declare\s+)?(?:async\s+)?(?:function\*?|const|let|var|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/gm,
+  )) {
+    names.add(m[1]);
+  }
+  return [...names];
+}
+
+/** Names the barrel re-exports from one module, following `x as y` to x. */
+function barrelExportsFrom(source, half) {
+  const block = barrel.match(
+    new RegExp(`export \\{([^}]*)\\} from "\\./sources/${source}/${half}\\.js";`),
+  );
+  if (block === null) return null;
+  return block[1]
+    .split(",")
+    .map((entry) =>
+      entry
+        .replace(/\btype\b/g, "")
+        .trim()
+        .split(/\s+as\s+/)[0]
+        .trim(),
+    )
+    .filter(Boolean);
+}
+
 for (const source of implemented) {
   for (const half of ["client", "normalize"]) {
-    if (!barrel.includes(`./sources/${source}/${half}.js`)) {
+    const exported = barrelExportsFrom(source, half);
+    if (exported === null) {
       findings.push({
         file: BARREL,
         line: 1,
@@ -83,6 +121,20 @@ for (const source of implemented) {
           "package can import it. The connector claim counts this source as implemented, which " +
           "makes the marketing sentence true about the tree and false about the product.",
       });
+      continue;
+    }
+    for (const name of moduleExports(`${SOURCES_DIR}/${source}/${half}.ts`)) {
+      if (!exported.includes(name)) {
+        findings.push({
+          file: BARREL,
+          line: 1,
+          column: 1,
+          message:
+            `${source}/${half}.ts exports "${name}", which the barrel does not re-export. A ` +
+            "connector half that is two thirds reachable is still a connector nothing can drive: " +
+            "the page walkers are the functions a scheduled pull calls.",
+        });
+      }
     }
   }
 }
@@ -128,7 +180,7 @@ process.exit(
     notes: [
       "the connector claim is derived from packages/brand because brand cannot import connectors",
       "a claimable source has both client.ts and normalize.ts under packages/connectors/src/sources",
-      "and both halves must be re-exported from the barrel -- claimable is not the same as reachable",
+      "and EVERY name both halves export must be re-exported -- a presence check missed five page walkers",
     ],
     warn,
     summary:

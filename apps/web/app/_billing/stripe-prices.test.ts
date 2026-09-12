@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { amountFor, lookupKey } from "../../../../scripts/create-stripe-prices";
-import { INTERVALS, PLAN_DISPLAY } from "./plans";
+import { CURRENCIES, INTERVALS, PLAN_DISPLAY } from "./plans";
 
 /**
  * The price-creation script derives its amounts from PLAN_DISPLAY rather than restating them.
@@ -10,10 +10,16 @@ import { INTERVALS, PLAN_DISPLAY } from "./plans";
  */
 describe("the amounts the script would create", () => {
   it.each(PLAN_DISPLAY.filter((p) => p.plan !== "free"))(
-    "$name matches the pricing page, in cents",
+    "$name matches the pricing page, in minor units, in every currency",
     (entry) => {
-      expect(amountFor(entry.plan, "month")).toBe(entry.monthly * 100);
-      expect(amountFor(entry.plan, "year")).toBe(entry.yearly * 100);
+      for (const currency of CURRENCIES) {
+        expect(amountFor(entry.plan, "month", currency), currency).toBe(
+          entry.monthly[currency] * 100,
+        );
+        expect(amountFor(entry.plan, "year", currency), currency).toBe(
+          entry.yearly[currency] * 100,
+        );
+      }
     },
   );
 
@@ -22,20 +28,30 @@ describe("the amounts the script would create", () => {
     // rather than here, against a real account.
     for (const entry of PLAN_DISPLAY.filter((p) => p.plan !== "free")) {
       for (const interval of INTERVALS) {
-        expect(Number.isInteger(amountFor(entry.plan, interval))).toBe(true);
+        for (const currency of CURRENCIES) {
+          expect(Number.isInteger(amountFor(entry.plan, interval, currency))).toBe(true);
+        }
       }
     }
   });
 
   it("charges more for a year than a month, which a mixed-up interval would invert", () => {
     for (const entry of PLAN_DISPLAY.filter((p) => p.plan !== "free")) {
-      expect(amountFor(entry.plan, "year")).toBeGreaterThan(amountFor(entry.plan, "month"));
+      for (const currency of CURRENCIES) {
+        expect(amountFor(entry.plan, "year", currency)).toBeGreaterThan(
+          amountFor(entry.plan, "month", currency),
+        );
+      }
     }
   });
 
   it("makes a year cheaper than twelve months, or the annual plan is a penalty", () => {
     for (const entry of PLAN_DISPLAY.filter((p) => p.plan !== "free")) {
-      expect(amountFor(entry.plan, "year")).toBeLessThan(amountFor(entry.plan, "month") * 12);
+      for (const currency of CURRENCIES) {
+        expect(amountFor(entry.plan, "year", currency)).toBeLessThan(
+          amountFor(entry.plan, "month", currency) * 12,
+        );
+      }
     }
   });
 });

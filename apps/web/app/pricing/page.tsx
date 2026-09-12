@@ -1,7 +1,14 @@
 import { brand, formatAddress } from "@repo/brand";
 import type { Metadata } from "next";
 
-import { PLAN_DISPLAY } from "../_billing/plans";
+import {
+  CURRENCIES,
+  CURRENCY_LABEL,
+  PLAN_DISPLAY,
+  type Currency,
+  asCurrency,
+  formatAmount,
+} from "../_billing/plans";
 import { Footer, SiteHeader } from "../_chrome";
 import { claim } from "../_content";
 
@@ -61,14 +68,19 @@ export const metadata: Metadata = {
 
 const HERO_EYEBROW = "Pricing";
 const HERO_HEADING_TOP = "Every plan, side by side.";
-const HERO_HEADING_BOTTOM = "Priced in US dollars.";
+const HERO_HEADING_BOTTOM = "Priced in your currency.";
 
 const HERO_LEAD =
   "Four plans you can buy yourself and one that starts with a conversation. The four prices below come from the same catalogue the checkout reads, so the page and the charge cannot be typed apart.";
 
-/** Said once, in full, because a price with no currency becomes a support ticket. */
+const CURRENCY_PROMPT = "Show prices in";
+
+/**
+ * Said once, in full, because a price with no currency becomes a support ticket -- and because the
+ * two facts below are the ones people are surprised by later.
+ */
 const CURRENCY_NOTE =
-  "All amounts on this page are in US dollars. Tax is added by the payment provider at checkout according to where you are, so an invoice total can be higher than the figure on the card.";
+  "Prices are set in each currency rather than converted from one, so they do not move with the exchange rate. The currency of a subscription is fixed when it starts and cannot be changed afterwards, so pick the one you want to be invoiced in. Tax is added at checkout according to where you are, so an invoice total can be higher than the figure shown.";
 
 const TERM_NOTE =
   "Monthly and yearly are both listed rather than hidden behind a switch. A yearly term is twenty per cent off twelve months, which is why the annual figure is not twelve times the monthly one.";
@@ -138,15 +150,20 @@ const PER_MONTH = "/ month";
 const YEARLY_SAVING = "20% off";
 
 /** The four self-serve tiers, composed from the catalogue so no price is written twice. */
-const TIERS = PLAN_DISPLAY.map((plan) => ({
-  id: plan.plan,
-  name: plan.name,
-  monthly: `$${plan.monthly}`,
-  yearly: plan.yearly === 0 ? null : `$${plan.yearly} a year`,
-  summary: TIER_NOTES[plan.plan]?.summary ?? "",
-  features: TIER_NOTES[plan.plan]?.features ?? [],
-  popular: plan.plan === POPULAR_PLAN,
-}));
+function tiersIn(currency: Currency) {
+  return PLAN_DISPLAY.map((plan) => ({
+    id: plan.plan,
+    name: plan.name,
+    monthly: formatAmount(plan.monthly[currency], currency),
+    yearly:
+      plan.yearly[currency] === 0
+        ? null
+        : `${formatAmount(plan.yearly[currency], currency)} a year`,
+    summary: TIER_NOTES[plan.plan]?.summary ?? "",
+    features: TIER_NOTES[plan.plan]?.features ?? [],
+    popular: plan.plan === POPULAR_PLAN,
+  }));
+}
 
 /* The fifth tier. */
 const ENTERPRISE_NAME = "Enterprise";
@@ -440,7 +457,27 @@ function MatrixCell({ value }: { value: Cell }) {
   );
 }
 
-export default function PricingPage() {
+/**
+ * The currency is a QUERY PARAMETER, not a cookie or a geo-guess.
+ *
+ * Three reasons, and the third is the one that decided it. A URL can be shared and quoted back --
+ * "the price on /pricing?currency=thb" is a thing two people can look at together. It needs no
+ * consent banner, because nothing is stored. And it cannot be wrong about where somebody is: a
+ * Thai founder on a US VPN sees whatever they picked, not whatever an IP database thinks.
+ *
+ * CHECKOUT DOES ITS OWN DETECTION. Stripe reads the customer's local currency from their IP and
+ * uses it when the price supports it, so this selector governs what the PAGE says, and the two
+ * agree by construction because both read the same catalogue.
+ */
+export default async function PricingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ currency?: string }>;
+}) {
+  const { currency: raw } = await searchParams;
+  const currency = asCurrency(raw);
+  const tiers = tiersIn(currency);
+
   return (
     <>
       <SiteHeader />
@@ -506,6 +543,31 @@ export default function PricingPage() {
           </ul>
         </nav>
 
+        {/* THE CURRENCY SELECTOR. Plain links, not a control: each is a real URL somebody can
+            bookmark or paste into a message, and it works with no JavaScript at all. `rel=nofollow`
+            keeps three near-identical pages out of the index competing with each other. */}
+        <nav aria-label="Currency" className="mx-auto max-w-[1200px] px-8 pb-6">
+          <ul className="flex flex-wrap items-center gap-2">
+            <li className="text-ink-subtle mr-1 text-xs">{CURRENCY_PROMPT}</li>
+            {CURRENCIES.map((option) => (
+              <li key={option}>
+                <a
+                  href={`/pricing?currency=${option}`}
+                  rel="nofollow"
+                  aria-current={option === currency ? "true" : undefined}
+                  className={
+                    option === currency
+                      ? "bg-surface-inset text-accent rounded-md px-3 py-1.5 text-xs font-bold"
+                      : "border-line text-ink-muted hover:text-ink rounded-md border px-3 py-1.5 text-xs transition-colors"
+                  }
+                >
+                  {CURRENCY_LABEL[option]}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
         {/* THE FOUR SELF-SERVE TIERS. Prices come from PLAN_DISPLAY; see the module note. */}
         <section
           id="plans"
@@ -517,7 +579,7 @@ export default function PricingPage() {
           </h2>
 
           <ul className="grid grid-cols-1 gap-4 min-[390px]:grid-cols-2 md:grid-cols-4 md:gap-6">
-            {TIERS.map((tier) => (
+            {tiers.map((tier) => (
               <li
                 key={tier.id}
                 className={`bg-surface relative flex flex-col rounded-lg border px-5 py-6 ${

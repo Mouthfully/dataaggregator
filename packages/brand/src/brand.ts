@@ -141,7 +141,15 @@ export const brand: Brand = {
   faviconPath: "/brand/favicon.svg",
 
   defaultLocale: "en",
-  defaultCurrency: "EUR",
+  // USD, and it is not a free choice. The product is priced in USD, EUR and THB, and Stripe
+  // requires every Price in an account to share ONE default currency -- multi-currency is
+  // `currency_options` on the same Price, not separate Prices. So this names the base the
+  // catalogue is built on rather than a preference, and `DEFAULT_CURRENCY` in
+  // apps/web/app/_billing/plans.ts is the same fact where the checkout can read it.
+  //
+  // It said EUR until the three currencies were priced, which made it the one value in the
+  // repository that disagreed with the pricing page.
+  defaultCurrency: "USD",
 
   // ap-southeast-1 (Singapore). The nearest Supabase region to Thailand and the one the schema's
   // own `organisations.data_region` CHECK already allows. Recording it does NOT publish the

@@ -4,7 +4,13 @@ import { redirect } from "next/navigation";
 import { isAuthConfigured } from "../_auth/env";
 import { currentUser, supabaseServer } from "../_auth/server";
 import { openBillingPortal, startCheckout } from "../_billing/actions";
-import { PLAN_DISPLAY, type Plan } from "../_billing/plans";
+import {
+  DEFAULT_CURRENCY,
+  PLAN_DISPLAY,
+  type Plan,
+  asCurrency,
+  formatAmount,
+} from "../_billing/plans";
 import { isBillingConfigured, stripeClient } from "../_billing/stripe";
 import { Footer, SiteHeader } from "../_chrome";
 
@@ -76,6 +82,13 @@ export default async function BillingPage() {
     .maybeSingle();
 
   const activePlan = (plan as Plan | null) ?? "free";
+
+  // The currency this organisation is already billed in, once it has a subscription: Stripe fixes
+  // a customer's currency at their first one and it cannot change afterwards. Before that there is
+  // nothing to be consistent with, so the default applies.
+  const billingCurrency = asCurrency(
+    (subscription as { currency?: string } | null)?.currency ?? DEFAULT_CURRENCY,
+  );
   const invoices = await recentInvoices(organisation.id as string);
 
   return (
@@ -124,7 +137,7 @@ export default async function BillingPage() {
                 <li key={entry.plan} className="border-line bg-surface rounded-lg border p-5">
                   <p className="text-ink text-sm font-bold">{entry.name}</p>
                   <p className="font-display text-ink mt-1 text-2xl font-bold tracking-[-0.03em]">
-                    ${entry.monthly}
+                    {formatAmount(entry.monthly[billingCurrency], billingCurrency)}
                   </p>
                   <p className="text-ink-subtle text-xs">{COPY.perMonth}</p>
 

@@ -31,31 +31,99 @@ export type Plan = (typeof PLANS)[number];
 export const INTERVALS = ["month", "year"] as const;
 export type Interval = (typeof INTERVALS)[number];
 
+/**
+ * THE CURRENCIES, AND WHY USD IS FIRST.
+ *
+ * Stripe requires every Price in an account to share ONE default currency, and multi-currency is
+ * expressed as `currency_options` on that same Price rather than as separate Price objects. So this
+ * order is not cosmetic: the head of the list is the default, the rest are options, and the six
+ * price ids stay six.
+ *
+ * Checkout picks a customer's local currency from their IP when the Price supports it, and falls
+ * back to the default when it does not.
+ */
+export const CURRENCIES = ["usd", "eur", "thb"] as const;
+export type Currency = (typeof CURRENCIES)[number];
+
+export const DEFAULT_CURRENCY: Currency = "usd";
+
+/** What each currency is called and how its amounts are written, for a page that must say which. */
+export const CURRENCY_LABEL: Record<Currency, string> = {
+  usd: "USD",
+  eur: "EUR",
+  thb: "THB",
+};
+
 export interface PlanDisplay {
   readonly plan: Plan;
   readonly name: string;
-  /** Monthly price in whole currency units, as the pricing table prints it. */
-  readonly monthly: number;
-  /** What a year costs when paid annually. Twenty per cent off twelve months, per the design. */
-  readonly yearly: number;
+  /**
+   * Monthly price per currency, in whole units, as the pricing table prints it.
+   *
+   * CHOSEN, NOT CONVERTED. These are not the USD figure through an exchange rate -- a price that
+   * moves with the euro is a price nobody can put on a slide, and ฿683.42 is not a price, it is a
+   * conversion. Each is a round local number somebody decided. The consequence is that the three
+   * columns are not equal in value on any given day, which is true of every product priced this
+   * way and is the intended trade.
+   */
+  readonly monthly: Record<Currency, number>;
+  /**
+   * What a year costs when paid annually, per currency.
+   *
+   * DERIVED BY THE STATED RULE -- twelve months less the annual discount, rounded -- and asserted
+   * in `plans.test.ts` for every currency. The monthly figures are a judgement; the discount is a
+   * promise, so it is arithmetic rather than another set of numbers to keep in step.
+   */
+  readonly yearly: Record<Currency, number>;
 }
 
-/**
- * `yearly` is WRITTEN OUT rather than computed from `monthly`.
- *
- * A `monthly * 12 * 0.8` in this file would be a rule, and a rule is exactly the thing that stops
- * being true the first time one plan gets a different discount. The arithmetic is checked by a test
- * instead, which fails loudly if someone edits one number and not the other -- and can be deleted
- * for a single plan the day its discount differs, without touching the other three.
- */
-export const PLAN_DISPLAY: readonly PlanDisplay[] = [
-  { plan: "free", name: "Free", monthly: 0, yearly: 0 },
-  { plan: "starter", name: "Starter", monthly: 19, yearly: 182 },
-  { plan: "growth", name: "Growth", monthly: 49, yearly: 470 },
-  { plan: "agency", name: "Agency", monthly: 99, yearly: 950 },
-];
+/** Twelve months less the stated discount, rounded to a whole unit. */
+function annual(monthly: number): number {
+  return Math.round(monthly * 12 * (1 - ANNUAL_DISCOUNT));
+}
 
 export const ANNUAL_DISCOUNT = 0.2;
+
+/**
+ * The monthly figure in each currency. Everything else on this page is derived from it.
+ *
+ * The day one plan needs a discount that is not the annual one, give that plan explicit `yearly`
+ * numbers instead of calling `annual()` -- a rule widened to fit an exception stops catching the
+ * typo it was written for.
+ */
+const MONTHLY: Record<Exclude<Plan, "free">, Record<Currency, number>> = {
+  starter: { usd: 19, eur: 18, thb: 690 },
+  growth: { usd: 49, eur: 45, thb: 1790 },
+  agency: { usd: 99, eur: 90, thb: 3590 },
+};
+
+function entry(plan: Exclude<Plan, "free">, name: string): PlanDisplay {
+  const monthly = MONTHLY[plan];
+  return {
+    plan,
+    name,
+    monthly,
+    yearly: {
+      usd: annual(monthly.usd),
+      eur: annual(monthly.eur),
+      thb: annual(monthly.thb),
+    },
+  };
+}
+
+const FREE_AMOUNTS: Record<Currency, number> = { usd: 0, eur: 0, thb: 0 };
+
+export const PLAN_DISPLAY: readonly PlanDisplay[] = [
+  { plan: "free", name: "Free", monthly: FREE_AMOUNTS, yearly: FREE_AMOUNTS },
+  entry("starter", "Starter"),
+  entry("growth", "Growth"),
+  entry("agency", "Agency"),
+];
+
+/** The amount a plan costs, for one currency and interval, in whole units. */
+export function amountOf(entry: PlanDisplay, interval: Interval, currency: Currency): number {
+  return interval === "month" ? entry.monthly[currency] : entry.yearly[currency];
+}
 
 /** The environment variable holding a plan's Stripe price id, by plan and interval. */
 export function priceEnvName(plan: Plan, interval: Interval): string {
@@ -109,4 +177,33 @@ export function planForPriceId(
     }
   }
   return null;
+}
+
+/**
+ * An amount, written the way its currency is written.
+ *
+ * `Intl` rather than a `$` glued to a number: baht is written ฿1,790 and a euro amount is written
+ * differently again, and a hard-coded symbol in front of every currency is how a price becomes
+ * wrong in two of the three. It also groups thousands, which matters the moment THB appears --
+ * "34464" is not a price anybody can read.
+ *
+ * No minor units are shown. Every amount in this catalogue is a whole unit by construction, and
+ * "$19.00" reads like a form field rather than a price.
+ */
+export function formatAmount(whole: number, currency: Currency): string {
+  return new Intl.NumberFormat("en", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+    // `narrowSymbol`, or THB renders as "THB 1,790" in an English locale while USD and EUR get
+    // their symbols -- one of the three priced differently from the others for no reason a reader
+    // could guess. With it, all three read ฿1,790 / $1,790 / €1,790.
+    currencyDisplay: "narrowSymbol",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(whole);
+}
+
+/** Narrow an arbitrary string -- a query parameter, a cookie -- to a currency we actually price in. */
+export function asCurrency(value: string | undefined | null): Currency {
+  return CURRENCIES.includes(value as Currency) ? (value as Currency) : DEFAULT_CURRENCY;
 }

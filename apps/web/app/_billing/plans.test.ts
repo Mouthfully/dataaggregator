@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   ANNUAL_DISCOUNT,
+  CURRENCIES,
+  DEFAULT_CURRENCY,
+  amountOf,
+  asCurrency,
+  formatAmount,
   BillingConfigError,
   INTERVALS,
   PLANS,
@@ -22,25 +27,61 @@ describe("the plan catalogue", () => {
   });
 
   it.each(PLAN_DISPLAY.filter((p) => p.plan !== "free"))(
-    "$name's yearly price is twelve months less the stated discount",
+    "$name's yearly price is twelve months less the stated discount, IN EVERY CURRENCY",
     (entry) => {
-      // Rounded to the nearest whole unit, which is how the numbers are written. If a plan ever
-      // gets a different discount, delete ITS case rather than loosening this one -- a rule that
-      // has been widened to fit an exception stops catching the typo it was written for.
-      const expected = Math.round(entry.monthly * 12 * (1 - ANNUAL_DISCOUNT));
-      expect(entry.yearly).toBe(expected);
+      // Per currency, because the discount is the promise and the monthly figure is the judgement.
+      // A currency added with a hand-written yearly number that quietly differs is exactly what
+      // this catches. If a plan ever gets a different discount, delete ITS case rather than
+      // loosening this one -- a rule widened to fit an exception stops catching the typo.
+      for (const currency of CURRENCIES) {
+        const expected = Math.round(entry.monthly[currency] * 12 * (1 - ANNUAL_DISCOUNT));
+        expect(entry.yearly[currency], currency).toBe(expected);
+      }
     },
   );
 
+  it("prices every plan in every currency, with no gap", () => {
+    // A missing currency would render `undefined` as a price, or `NaN` after arithmetic. Both look
+    // like a rendering bug rather than a catalogue one, which is why this is asserted here.
+    for (const entry of PLAN_DISPLAY) {
+      for (const currency of CURRENCIES) {
+        expect(Number.isFinite(entry.monthly[currency]), `${entry.plan}/${currency}`).toBe(true);
+        expect(Number.isFinite(entry.yearly[currency]), `${entry.plan}/${currency}`).toBe(true);
+      }
+    }
+  });
+
+  it("keeps USD as the default, which Stripe requires to be one value for every price", () => {
+    expect(DEFAULT_CURRENCY).toBe("usd");
+    expect(CURRENCIES[0]).toBe(DEFAULT_CURRENCY);
+  });
+
+  it("charges more per year than per month in every currency", () => {
+    for (const entry of PLAN_DISPLAY.filter((p) => p.plan !== "free")) {
+      for (const currency of CURRENCIES) {
+        expect(amountOf(entry, "year", currency)).toBeGreaterThan(
+          amountOf(entry, "month", currency),
+        );
+      }
+    }
+  });
+
   it("charges nothing for free, on either interval", () => {
     const free = PLAN_DISPLAY.find((p) => p.plan === "free");
-    expect(free?.monthly).toBe(0);
-    expect(free?.yearly).toBe(0);
+    for (const currency of CURRENCIES) {
+      expect(free?.monthly[currency]).toBe(0);
+      expect(free?.yearly[currency]).toBe(0);
+    }
   });
 
   it("orders the plans from cheapest to dearest, as the pricing table renders them", () => {
-    const monthly = PLAN_DISPLAY.map((p) => p.monthly);
-    expect([...monthly].sort((a, b) => a - b)).toEqual(monthly);
+    for (const currency of CURRENCIES) {
+      const monthly = PLAN_DISPLAY.map((p) => p.monthly[currency]);
+      expect(
+        [...monthly].sort((a, b) => a - b),
+        currency,
+      ).toEqual(monthly);
+    }
   });
 });
 
@@ -94,5 +135,37 @@ describe("price ids", () => {
     );
     expect(new Set(names).size).toBe(names.length);
     expect(names).toHaveLength(6);
+  });
+});
+
+describe("how an amount is written", () => {
+  it("gives every currency its symbol, not a code for one and symbols for the others", () => {
+    // Without `narrowSymbol`, an English locale renders THB as "THB 1,790" while USD and EUR get
+    // their symbols -- one of the three formatted differently for no reason a reader could guess.
+    expect(formatAmount(1790, "usd")).toBe("$1,790");
+    expect(formatAmount(1790, "eur")).toBe("€1,790");
+    expect(formatAmount(1790, "thb")).toBe("฿1,790");
+  });
+
+  it("groups thousands, because 34464 is not a price anyone can read", () => {
+    expect(formatAmount(34464, "thb")).toContain(",");
+  });
+
+  it("shows no minor units, since every amount in the catalogue is a whole one", () => {
+    expect(formatAmount(19, "usd")).toBe("$19");
+    expect(formatAmount(0, "usd")).toBe("$0");
+  });
+});
+
+describe("narrowing an arbitrary currency string", () => {
+  it("accepts the three we price in", () => {
+    for (const currency of CURRENCIES) expect(asCurrency(currency)).toBe(currency);
+  });
+
+  it("falls back to the default for anything else, rather than rendering undefined", () => {
+    // This reads a query parameter, so the input is whatever a stranger types into the URL bar.
+    for (const bad of ["gbp", "", "USD", "../etc", undefined, null]) {
+      expect(asCurrency(bad)).toBe(DEFAULT_CURRENCY);
+    }
   });
 });

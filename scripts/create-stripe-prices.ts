@@ -22,28 +22,52 @@
 import Stripe from "stripe";
 
 import {
+  CURRENCIES,
+  DEFAULT_CURRENCY,
   INTERVALS,
   PLAN_DISPLAY,
+  type Currency,
   type Interval,
   type Plan,
+  amountOf,
   priceEnvName,
 } from "../apps/web/app/_billing/plans.ts";
 
-/** USD, as the pricing page states. A price with no currency is a support ticket. */
-const CURRENCY = "usd";
+/**
+ * ONE PRICE PER PLAN AND INTERVAL, CARRYING ALL THREE CURRENCIES.
+ *
+ * Stripe expresses multi-currency as `currency_options` on a single Price, not as separate Price
+ * objects -- so three currencies do not mean eighteen prices, eighteen lookup keys and eighteen
+ * environment variables. It stays six of each.
+ *
+ * Two consequences worth knowing. Stripe requires every Price in an account to share ONE default
+ * currency, which is why DEFAULT_CURRENCY is not a per-plan choice. And Checkout picks a customer's
+ * local currency from their IP when the Price supports it, falling back to the default when it does
+ * not -- so a visitor in Bangkok is offered baht without this app detecting anything.
+ */
 
 /** Stable across runs and across accounts, so a re-run finds what a previous run made. */
 function lookupKey(plan: Plan, interval: Interval): string {
   return `plan_${plan}_${interval}`;
 }
 
-function amountFor(plan: Plan, interval: Interval): number {
+function amountFor(plan: Plan, interval: Interval, currency: Currency): number {
   const entry = PLAN_DISPLAY.find((p) => p.plan === plan);
   if (!entry) throw new Error(`no display entry for plan ${plan}`);
-  const whole = interval === "month" ? entry.monthly : entry.yearly;
-  // Stripe takes the smallest currency unit. USD has two decimal places; this script is USD-only
-  // and says so, rather than pretending to handle zero-decimal currencies it never sees.
-  return whole * 100;
+  // Stripe takes the smallest currency unit. All three of these have two decimal places -- baht has
+  // satang, so THB is x100 like the others. A zero-decimal currency (JPY, KRW) would need this to
+  // ask, and `CURRENCIES` deliberately contains none, so it does not pretend to.
+  return amountOf(entry, interval, currency) * 100;
+}
+
+/** The non-default currencies, in the shape Stripe's `currency_options` takes. */
+function currencyOptions(plan: Plan, interval: Interval) {
+  const options: Record<string, { unit_amount: number }> = {};
+  for (const currency of CURRENCIES) {
+    if (currency === DEFAULT_CURRENCY) continue;
+    options[currency] = { unit_amount: amountFor(plan, interval, currency) };
+  }
+  return options;
 }
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -83,8 +107,11 @@ async function main(argv: readonly string[]): Promise<number> {
     for (const interval of INTERVALS) {
       const price = await findOrCreatePrice(stripe, product.id, entry.plan, interval);
       lines.push(`${priceEnvName(entry.plan, interval)}=${price.id}`);
+      const amounts = CURRENCIES.map(
+        (c) => `${c}:${amountFor(entry.plan, interval, c) / 100}`,
+      ).join(" ");
       process.stderr.write(
-        `  ${entry.name.padEnd(9)} ${interval.padEnd(5)} ${String(amountFor(entry.plan, interval) / 100).padStart(6)} ${CURRENCY.toUpperCase()}  ${price.id}\n`,
+        `  ${entry.name.padEnd(9)} ${interval.padEnd(5)} ${amounts.padEnd(34)} ${price.id}\n`,
       );
     }
   }
@@ -116,7 +143,7 @@ async function findOrCreatePrice(
   const found = existing.data[0];
 
   if (found) {
-    const wanted = amountFor(plan, interval);
+    const wanted = amountFor(plan, interval, DEFAULT_CURRENCY);
     if (found.unit_amount !== wanted) {
       // A price is IMMUTABLE in Stripe, because invoices reference it. Silently reusing one at the
       // old amount would charge a figure the pricing page no longer shows, so this refuses and says
@@ -132,8 +159,9 @@ async function findOrCreatePrice(
 
   return stripe.prices.create({
     product: productId,
-    currency: CURRENCY,
-    unit_amount: amountFor(plan, interval),
+    currency: DEFAULT_CURRENCY,
+    unit_amount: amountFor(plan, interval, DEFAULT_CURRENCY),
+    currency_options: currencyOptions(plan, interval),
     recurring: { interval },
     lookup_key: key,
     metadata: { plan, interval },

@@ -17,6 +17,15 @@ export {
   restatementEventSchema,
   type RestatementEvent,
 } from "./restatement-event.js";
+export {
+  FIELD_REGISTRY,
+  droppedFields,
+  fieldsFor,
+  mappedFields,
+  metricsFor,
+  type Disposition,
+  type SourceFields,
+} from "./registry.js";
 export { SOURCES, type Source } from "./source.js";
 export {
   ADVERTISING_ENTITY_TYPES,

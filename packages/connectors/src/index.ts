@@ -10,6 +10,14 @@
  * owned by concurrent work, so the export lines are listed in the PR report rather than written
  * into a file another change holds". The PR report is not a file anyone reads twice.
  *
+ * AND THEN IT HAPPENED AGAIN, ONE LAYER DOWN. The first pass at this file enumerated each module's
+ * exports with a pattern that matched `export async function` and missed `export async function*`
+ * -- so every single-page fetcher was exported and every PAGE WALKER was not. Those generators are
+ * the ones a scheduled pull actually calls; `fetchOrdersWindow` carries a comment in its own module
+ * saying "THIS IS THE ONE A SCHEDULED PULL SHOULD CALL". Five of them, invisible to a guard that
+ * only asked whether the barrel MENTIONED each module. It now asks whether the barrel re-exports
+ * every name each module exports, which is the question that was meant all along.
+ *
  * WHAT MADE IT WORSE THAN AN OVERSIGHT: `check-capabilities.mjs` derives the marketing connector
  * claim from directories holding a client AND a normaliser, so the site said "Reads GA4, Google
  * Ads, Meta Ads, Search Console and WooCommerce" while the package exposed two of the five. The
@@ -69,6 +77,7 @@ export {
   budgetAllowsAnother,
   readBudget,
   search as googleAdsSearch,
+  searchPages as googleAdsSearchPages,
   type GoogleAdsBudget,
   type GoogleAdsBudgetReading,
   type GoogleAdsClientOptions,
@@ -105,6 +114,7 @@ export {
   MetaClientError,
   getAdAccount,
   getInsightsPage,
+  getInsightsPages,
   parseMetaUsage,
   usageAllowsAnother,
   type MetaAdAccount,
@@ -145,6 +155,7 @@ export {
   SEARCH_CONSOLE_SEARCH_TYPE_FIELD,
   SearchConsoleClientError,
   querySearchAnalytics,
+  querySearchAnalyticsPages,
   searchAnalyticsUrl,
   type SearchAnalyticsRequest,
   type SearchConsoleClientOptions,
@@ -187,6 +198,8 @@ export {
   WooClientError,
   basicAuthHeader,
   fetchOrdersPage,
+  fetchOrdersPages,
+  fetchOrdersWindow,
   normaliseStoreUrl,
   ordersUrl,
   probeStore,

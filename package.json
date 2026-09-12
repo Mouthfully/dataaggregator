@@ -31,6 +31,7 @@
     "@biomejs/biome": "catalog:",
     "@repo/connections": "workspace:*",
     "@repo/connectors": "workspace:*",
+    "@repo/store": "workspace:*",
     "@repo/vault": "workspace:*",
     "@types/node": "catalog:",
     "tsx": "^4.23.13",

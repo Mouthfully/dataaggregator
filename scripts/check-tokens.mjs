@@ -76,6 +76,13 @@ const EXEMPT = [
   // An .svg elsewhere, and every .css/.ts/.tsx in this directory if one ever appears, is still
   // scanned -- the extension list below is what keeps the exemption to artwork.
   "apps/web/public/brand/*.svg",
+  // THIRD-PARTY TRADEMARK LOGOS. Google Ads, Meta, Shopify, Stripe and the rest, each in its
+  // owner's own colours because every one of those companies' brand guidelines requires it and
+  // forbids recolouring. They are not this product's design decisions and must not follow this
+  // product's tokens -- a Stripe mark that tracked --mp-accent would misrepresent Stripe.
+  //
+  // Same narrowness as the line above: one directory, image assets only.
+  "apps/web/public/platforms/*.svg",
 ];
 
 /** 3, 4, 6 or 8 hex digits, and nothing longer masquerading as one. */

@@ -1,9 +1,14 @@
 export { ATTRIBUTION_WINDOWS, type AttributionWindow } from "./attribution.js";
 export {
+  ADDITIVE_METRICS,
   COMMERCE_METRICS,
   CONVERSION_METRICS,
   METRICS,
+  combineMetric,
+  isAdditive,
   isConversionMetric,
+  weightFor,
+  type Aggregation,
   type MetricName,
 } from "./metrics.js";
 export {

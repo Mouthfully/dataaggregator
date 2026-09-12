@@ -149,8 +149,10 @@ const META_ADS: SourceFields = {
 /**
  * Search Console.
  *
- * The two drops here are the reason the precedence order is written down. They look alike in a
- * normaliser -- both are "read and not emitted" -- and they are opposite decisions.
+ * `ctr` and `position` were the two drops that made the case for writing the precedence order
+ * down: in a normaliser both were one line of "read and not emitted", and they were opposite
+ * decisions. `position` has since gone all the way through rule 3 and become a column; `ctr`
+ * remains a decision rather than a deferral, and this is where the difference is recorded.
  */
 const SEARCH_CONSOLE: SourceFields = {
   source: "search_console",
@@ -165,15 +167,14 @@ const SEARCH_CONSOLE: SourceFields = {
         "gives a different figure from averaging the stored ratio, and nothing says which is " +
         "meant. Computed at read time from columns that cannot disagree. A DECISION, not a gap.",
     },
-    position: {
-      kind: "dropped",
-      reason:
-        "Average SERP rank. Nothing in the dictionary is a rank, and it cannot be derived from " +
-        "anything that is -- so this is the one case precedence rule 3 is for. It is also NOT " +
-        "ADDITIVE: re-aggregating it requires weighting by impressions, so a column alone would " +
-        "be wrong without a vocabulary that can say 'do not SUM this'.",
-      blockedOn: "a rank unit and an aggregation semantic in METRICS; see note 44 section 4",
-    },
+    // PRECEDENCE RULE 3, EXERCISED PROPERLY -- the only entry in this file that reached it.
+    //
+    // It sat here as `dropped` with a `blockedOn` until the dictionary could describe it honestly.
+    // Nothing here is a rank and nothing derives one, so mapping and deriving were both genuinely
+    // exhausted before a column was added. What unblocked it was not the column: it was `METRICS`
+    // gaining an `aggregation` per metric, because this is the first entry in the dictionary that
+    // is NOT ADDITIVE and a rank that something SUMs is worse than a rank nobody stores.
+    position: { kind: "metric", metric: "position" },
     keys: { kind: "dimension", note: "the requested dimensions, positionally" },
   },
 };

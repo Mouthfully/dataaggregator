@@ -70,19 +70,37 @@ export interface PlanDisplay {
   /**
    * What a year costs when paid annually, per currency.
    *
-   * DERIVED BY THE STATED RULE -- twelve months less the annual discount, rounded -- and asserted
-   * in `plans.test.ts` for every currency. The monthly figures are a judgement; the discount is a
+   * DERIVED BY THE STATED RULE -- ten months' money for twelve months' service -- and asserted in
+   * `plans.test.ts` for every currency. The monthly figures are a judgement; the annual term is a
    * promise, so it is arithmetic rather than another set of numbers to keep in step.
    */
   readonly yearly: Record<Currency, number>;
 }
 
-/** Twelve months less the stated discount, rounded to a whole unit. */
+/**
+ * A year costs ten months. Two of the twelve are free.
+ *
+ * WHY A COUNT OF MONTHS RATHER THAN A PERCENTAGE, which is what this was. The rule used to be
+ * twelve months less 20%, rounded, and it produced $182, EUR 173 and THB 6,624 -- numbers no one
+ * would choose, in a currency triplet where rounding them to anything tidier silently changed the
+ * discount. THB Agency was the case that decided it: the nearest round figure to a 20% cut is
+ * THB 34,500, which is 19.9% off, so a page saying "20% off" would have been overstating by a
+ * tenth of a point in one currency and not the others.
+ *
+ * Multiplying by ten cannot have that problem. It lands on a round number in EVERY currency
+ * because the monthly figure was already chosen to be round, and "two months free" is EXACTLY
+ * true rather than true-after-rounding -- there is no percentage left to overstate. The customer
+ * gets 16.7% rather than 20%, which is the trade the founder took knowingly.
+ */
 function annual(monthly: number): number {
-  return Math.round(monthly * 12 * (1 - ANNUAL_DISCOUNT));
+  return monthly * MONTHS_CHARGED_ANNUALLY;
 }
 
-export const ANNUAL_DISCOUNT = 0.2;
+/** Months paid for on an annual term. The other two are the discount. */
+export const MONTHS_CHARGED_ANNUALLY = 10;
+
+/** Months of service an annual term buys. Twelve, or the word "annual" is doing something odd. */
+export const MONTHS_PER_YEAR = 12;
 
 /**
  * The monthly figure in each currency. Everything else on this page is derived from it.

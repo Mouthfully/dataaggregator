@@ -11,11 +11,22 @@ import { GATE_COOKIE, gateToken, isGated, tokensMatch } from "../../_gate/token"
  * The comparison is constant-time and against the DERIVED token rather than the password, so the
  * same code path serves the form and a returning cookie. A wrong password is answered exactly like
  * a missing one, with no hint of how close it was.
+ *
+ * EVERY REDIRECT OUT OF HERE IS A 303, AND THAT IS THE WHOLE OF POST-REDIRECT-GET.
+ * `NextResponse.redirect()` defaults to 307, which PRESERVES the method: the browser takes the
+ * redirect and re-issues the POST against the destination. The destination is a page, a page route
+ * has no POST handler, and the visitor -- who has just been authenticated, cookie and all -- is
+ * shown `405 Method Not Allowed` instead of the site. 303 is the status that means "your POST
+ * succeeded, now GET this instead", which is exactly what happened.
+ *
+ * This survived a round of live checks because `curl` was used to confirm the Set-Cookie header
+ * and never told to follow the redirect the way a browser does. The test below follows it.
  */
+const SEE_OTHER = 303;
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  if (!isGated()) return NextResponse.redirect(new URL("/", request.url));
+  if (!isGated()) return NextResponse.redirect(new URL("/", request.url), SEE_OTHER);
 
   const form = await request.formData();
   const presented = String(form.get("password") ?? "");
@@ -30,10 +41,10 @@ export async function POST(request: NextRequest) {
   const expected = await gateToken(password);
 
   if (!tokensMatch(await gateToken(presented), expected)) {
-    return NextResponse.redirect(new URL("/waitlist?wrong=1", request.url));
+    return NextResponse.redirect(new URL("/waitlist?wrong=1", request.url), SEE_OTHER);
   }
 
-  const response = NextResponse.redirect(new URL(next, request.url));
+  const response = NextResponse.redirect(new URL(next, request.url), SEE_OTHER);
   response.cookies.set(GATE_COOKIE, expected, {
     httpOnly: true,
     sameSite: "lax",

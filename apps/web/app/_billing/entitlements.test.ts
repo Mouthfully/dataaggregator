@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  entitlementsFor,
-  formatAllowance,
-  PLAN_ENTITLEMENTS,
-} from "./entitlements";
+import { entitlementsFor, formatAllowance, PLAN_ENTITLEMENTS } from "./entitlements";
 import { PLAN_DISPLAY, PLANS } from "./plans";
 
 /**

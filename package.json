@@ -34,6 +34,7 @@
     "@repo/store": "workspace:*",
     "@repo/vault": "workspace:*",
     "@types/node": "catalog:",
+    "stripe": "^22.6.2",
     "tsx": "^4.23.13",
     "typescript": "catalog:"
   },

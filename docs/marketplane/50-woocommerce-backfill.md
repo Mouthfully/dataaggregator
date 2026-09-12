@@ -128,6 +128,14 @@ is which.
 Before this PR `date` was UTC-derived and independent of the column, so a zone change moved only the
 label. The hazard is new, and it is mine.
 
+**The fix is a new migration, not an edit to `…000400`.** That file had already been applied to the
+live `numbadee` project when the review arrived. An applied migration is immutable: a project that
+ran the original and a project that runs an edited copy would disagree about what version
+`20260912000400` *means*, and the disagreement is invisible — `supabase_migrations` records the
+version, never the body. So `20260912000500_connection_timezone_immutable.sql` carries the
+amendment, which is also the honest history: the column shipped, a review found a hazard, this
+closed it.
+
 Re-keying every affected row is not something anything here can do yet, so the column is now
 **immutable once set**: null → a zone is allowed (it is how one gets set), the same zone again is
 allowed (a no-op update must not fail), and any other change is refused with a message naming the
@@ -320,6 +328,8 @@ database suite.
 - [x] `pnpm -r build` — `next build` and `wrangler deploy --dry-run` both clean
 - [x] `./supabase/tests/run-local.sh` — twelve suites, **343 assertions**, 0 failures, including the
       new `11_connection_timezone.sql` at 21
+- [x] Both migrations applied to the live `numbadee` project and the trigger exercised there inside
+      a transaction that was rolled back — see below
 
 ### Every new check fires on a real defect
 
@@ -349,6 +359,22 @@ Each mutation was applied to a green tree, the suite run, and the tree restored.
 
 C3 is the one worth reading twice: it is a hole that existed before this PR and that the guard's
 previous version reported as PASS.
+
+### Exercised against the live project
+
+Both migrations are applied to `numbadee`, and the trigger was run there inside a transaction that
+was rolled back, so nothing was left behind.
+
+| probe | result |
+|---|---|
+| `Asia/Bangkok`, `UTC` | accepted |
+| `""`, `Asia/Bangkokk`, `asia/bangkok`, `localtime`, `posixrules`, `EST5EDT`, `Factory`, `UTC+7` | refused |
+| `null` | accepted — it means nobody has told us |
+| `null` → `Asia/Bangkok` | accepted (the setting path) |
+| `Asia/Bangkok` → `Asia/Bangkok` | accepted (a no-op update must not fail) |
+| `Asia/Bangkok` → `America/New_York` | **refused** |
+| `Asia/Bangkok` → `null` | **refused** |
+| the stored value afterwards | `Asia/Bangkok`, untouched |
 
 ### Three things found while writing this, all by a mechanism
 

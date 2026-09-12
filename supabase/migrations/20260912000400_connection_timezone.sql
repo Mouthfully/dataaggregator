@@ -57,31 +57,6 @@ alter table public.connections add column timezone text;
 --
 -- REFUSED AT THE WRITE, NOT AT THE PULL. The alternative is discovering it at 03:00 from a
 -- connector throwing on a value a seed script typed weeks earlier.
---
--- ---------------------------------------------------------------------------------------------
--- AND IT IS IMMUTABLE ONCE SET, WHICH IS A CONSEQUENCE OF THIS MIGRATION AND NOT A PREFERENCE.
---
--- The upsert key is `(workspace_id, source, account_id, entity_id, date, attribution_window)`. This
--- migration is what makes `date` DEPEND on this column: `wooGmtToDate` now buckets a UTC instant in
--- the store's own zone, so an order placed near midnight lands on a different calendar day under a
--- different zone.
---
--- Change the zone on a connection that has already produced rows and the next re-pull of such an
--- order computes a DIFFERENT key. The upsert therefore INSERTS A SECOND ROW instead of updating the
--- first. The old row is not removed and nothing points at it; both are returned by
--- `/v1/performance`, each carrying `orders = 1` and its share of revenue, and the total is silently
--- too HIGH -- the same failure this product sells against, arriving from the opposite direction to
--- the usual one. Orders that are never re-pulled stay on the old date, so the table ends up holding
--- two timezones at once with nothing recording which row is which.
---
--- Correcting a wrong zone therefore means re-keying every row the connection has produced, and
--- nothing in this repository can do that yet. The honest move is to refuse the update and say what
--- it would take, rather than accept it and produce a number nobody can reconcile. `envelope_rows`
--- holds zero rows on every project today, so this costs nothing now and closes the hazard before
--- there is data to damage.
---
--- A CHANGE TO NULL IS REFUSED TOO, and that is not pedantry: allowing it would make
--- `Asia/Bangkok -> null -> America/New_York` a two-step version of the update this refuses.
 -- ---------------------------------------------------------------------------------------------
 create or replace function app.connections_timezone_is_iana()
 returns trigger
@@ -90,21 +65,6 @@ stable
 set search_path = public, pg_catalog, pg_temp
 as $fn$
 begin
-  -- IMMUTABLE ONCE SET. See the note above: the upsert key contains `date`, and `date` now depends
-  -- on this column, so changing it forks every affected order into a second row.
-  if tg_op = 'UPDATE'
-     and old.timezone is not null
-     and new.timezone is distinct from old.timezone then
-    raise exception
-      'connections.timezone is already %, and changing it to % would fork every order this '
-      'connection has already written. The envelope upsert key contains `date`, and `date` is '
-      'computed in this zone -- so a re-pull of an order near midnight writes a SECOND row instead '
-      'of updating the first, and the total goes silently up. Correcting it means re-keying every '
-      'row this connection produced, which nothing here can do yet. Delete the connection''s '
-      'envelope rows and re-ingest, or set the zone correctly before the first run.',
-      quote_literal(old.timezone), coalesce(quote_literal(new.timezone), 'null');
-  end if;
-
   if new.timezone is null then
     return new;
   end if;
@@ -131,20 +91,14 @@ begin
 end;
 $fn$;
 
--- NO `when` CLAUSE, AND IT USED TO HAVE ONE. `when (new.timezone is not null)` was right while the
--- only job was validating a value, and it is wrong now that the trigger also refuses a CHANGE: an
--- update setting the column back to null is exactly one of the paths that must not be taken, and
--- the guard would have skipped it. `update of timezone` still keeps this off every write that does
--- not mention the column.
 create trigger connections_timezone_is_iana
   before insert or update of timezone on public.connections
   for each row
+  when (new.timezone is not null)
   execute function app.connections_timezone_is_iana();
 
 comment on column public.connections.timezone is
   'The IANA zone the store reports in, e.g. Asia/Bangkok. Null means nobody has told us, never '
   'UTC-by-default: it labels dimensions.date on every envelope row this connection produces, and a '
   'guess there is indistinguishable from a measurement. Validated by trigger against '
-  'pg_timezone_names, Area/Location names and UTC only, and IMMUTABLE once set: the envelope '
-  'upsert key contains `date`, which is computed in this zone, so a change forks every affected '
-  'order into a second row.';
+  'pg_timezone_names, Area/Location names and UTC only.';

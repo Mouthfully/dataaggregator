@@ -17,7 +17,18 @@ import { open, seal } from "@repo/vault";
 import type { SourceId, TokenResponse } from "@repo/oauth";
 import { PROVIDERS, providerFor, scopesFor } from "@repo/oauth";
 
-export type ConnectionStatus = "active" | "needs_reauth" | "revoked" | "error";
+/**
+ * Every status a connection can be in. `app.connection_status` must carry the same members.
+ *
+ * A RUNTIME LIST AND NOT ONLY A TYPE, because a type cannot narrow a value read from a database.
+ * `app.connection_status` is `text` on the wire -- PostgREST serialises an enum as a string -- so
+ * an adapter reading a connection row has to either check membership or cast, and a cast here
+ * would let an unknown status through to `connectionHealth`, which would answer about it. The
+ * union is derived from this rather than the other way round so the two cannot separate.
+ */
+export const CONNECTION_STATUSES = ["active", "needs_reauth", "revoked", "error"] as const;
+
+export type ConnectionStatus = (typeof CONNECTION_STATUSES)[number];
 
 /**
  * HOW A CREDENTIAL GOT HERE, AND THEREFORE WHAT IS TRUE ABOUT IT.

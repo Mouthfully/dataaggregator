@@ -3,6 +3,15 @@ export {
   type AuthenticatorPort,
 } from "./authenticator.js";
 export {
+  CONNECTION_COLUMNS,
+  createConnectionStore,
+  decodeBytea,
+  toConnectionRecord,
+  type ConnectionQuery,
+  type ConnectionRecord,
+  type ConnectionStorePort,
+} from "./connections.js";
+export {
   createIngestStore,
   toIngestRow,
   type IngestContext,

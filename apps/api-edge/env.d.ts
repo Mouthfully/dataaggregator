@@ -68,6 +68,25 @@ declare namespace Cloudflare {
      * migration states plainly and bounds with a one-minute TTL.
      */
     readonly SUPABASE_JWT_SECRET?: string;
+
+    /**
+     * The key encryption key every stored credential is sealed under (`@repo/vault`,
+     * `20260908000500_connections.sql`). Base64 of 32 random bytes; `kekFromBase64` refuses
+     * anything else.
+     *
+     * DECLARED AHEAD OF ITS ONLY READER, DELIBERATELY, and that is not a placeholder. The KEK has
+     * to exist BEFORE the first credential is sealed, because a credential sealed under one KEK
+     * cannot be opened under another -- changing it later means re-wrapping every DEK. The thing
+     * that seals the first one is `scripts/seal-connection.mjs` (step 5), which runs before the
+     * route that opens it (step 6). So a deployment configured from this file today is a
+     * deployment that does not have to re-seal tomorrow.
+     *
+     * A WORKER SECRET, and the second one worth stealing after `SUPABASE_JWT_SECRET`. The whole
+     * point of envelope encryption is that the database is worth nothing on its own: the
+     * ciphertext is in Supabase and this is not, so a compromise of either alone yields no
+     * credential. Putting it in `wrangler.jsonc` would undo the entire scheme in one line.
+     */
+    readonly CREDENTIAL_KEK?: string;
   }
 }
 

@@ -23,6 +23,7 @@
     "check:claim-sources": "node scripts/check-claim-sources.mjs",
     "check:copy": "node scripts/check-copy.mjs",
     "check:dictionary": "node scripts/check-dictionary.mjs",
+    "check:providers": "node scripts/check-providers.mjs",
     "check:tokens": "node scripts/check-tokens.mjs"
   },
   "devDependencies": {

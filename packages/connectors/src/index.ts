@@ -190,6 +190,17 @@ export {
 // WooCommerce
 // -------------------------------------------------------------------------------------------
 export {
+  WOO_BACKFILL_CHUNK_DAYS,
+  WooBackfillError,
+  parseRfc3339,
+  runWooBackfill,
+  wooBackfillChunks,
+  type WooBackfillBatch,
+  type WooBackfillErrorCode,
+  type WooBackfillOptions,
+  type WooCheckpoint,
+} from "./sources/woocommerce/backfill.js";
+export {
   WOO_API_PATH,
   WOO_FLOOR_MAX_PAGES,
   WOO_MAX_PAGES_PER_WINDOW,
@@ -219,6 +230,7 @@ export {
 export {
   WOO_FEE_META_KEYS,
   WooNormalizeError,
+  assertWooTimezone,
   normalizeWooOrders,
   parseWooAmount,
   wooGmtToDate,

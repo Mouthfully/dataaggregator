@@ -19,6 +19,15 @@
  * So a source must also be EXPORTED from the barrel. A connector nothing can import is not a
  * capability, and a guard that reads the tree without reading the barrel will keep saying it is.
  *
+ * AND THE THIRD FILE IS CHECKED TOO, WHICH IT WAS NOT. Specification 13.3 makes a connector unit
+ * `{client, normalize, backfill, fixtures, contract.test}`, and this guard read two of the three
+ * code files. `backfill.ts` is THE DRIVER -- it is what a scheduled pull or an ingest run actually
+ * calls, the layer above the page walkers that were missing last time -- so a barrel that dropped
+ * it would leave the connector complete, tested, claimable, and unusable by the one caller that
+ * matters. A source is CLAIMABLE on client + normalise, which is unchanged; a `backfill.ts` that
+ * exists must be fully exported, which is new. Absent is allowed: four of the five sources have no
+ * driver yet, and a guard that demanded one would be asserting a roadmap rather than a fact.
+ *
  * Usage: node scripts/check-capabilities.mjs [--warn]
  */
 
@@ -109,7 +118,12 @@ function barrelExportsFrom(source, half) {
 }
 
 for (const source of implemented) {
-  for (const half of ["client", "normalize"]) {
+  // `backfill.ts` is optional and the other two are not, so the list is built per source rather
+  // than being a constant. Optional means "may be absent", NOT "may be half-exported".
+  const modules = ["client", "normalize"];
+  if (exists(`${repoRoot}/${SOURCES_DIR}/${source}/backfill.ts`)) modules.push("backfill");
+
+  for (const half of modules) {
     const exported = barrelExportsFrom(source, half);
     if (exported === null) {
       findings.push({
@@ -131,8 +145,9 @@ for (const source of implemented) {
           column: 1,
           message:
             `${source}/${half}.ts exports "${name}", which the barrel does not re-export. A ` +
-            "connector half that is two thirds reachable is still a connector nothing can drive: " +
-            "the page walkers are the functions a scheduled pull calls.",
+            "connector module that is two thirds reachable is still a connector nothing can " +
+            "drive: the page walkers and the backfill driver are precisely what a scheduled pull " +
+            "calls, and they are the names a presence check does not see.",
         });
       }
     }
@@ -180,7 +195,8 @@ process.exit(
     notes: [
       "the connector claim is derived from packages/brand because brand cannot import connectors",
       "a claimable source has both client.ts and normalize.ts under packages/connectors/src/sources",
-      "and EVERY name both halves export must be re-exported -- a presence check missed five page walkers",
+      "and EVERY name they export must be re-exported -- a presence check missed five page walkers",
+      "a backfill.ts is optional, and where one exists every name it exports must be re-exported too",
     ],
     warn,
     summary:

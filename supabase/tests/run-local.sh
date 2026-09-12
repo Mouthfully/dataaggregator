@@ -97,3 +97,6 @@ psql -d "$DB" -q -f "$HERE/09_position.sql"
 
 echo "==> ingest entry point suite"
 psql -d "$DB" -q -f "$HERE/10_ingest_entry_point.sql"
+
+echo "==> connection timezone suite"
+psql -d "$DB" -q -f "$HERE/11_connection_timezone.sql"

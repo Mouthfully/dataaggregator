@@ -131,7 +131,7 @@ export function Templates() {
         </span>
         <h2
           id="templates-heading"
-          className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-bold tracking-[-0.03em] md:text-[36px]"
+          className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-normal tracking-[-0.03em] md:text-[36px]"
         >
           {HEADING_TOP}
           <br />

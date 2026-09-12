@@ -89,7 +89,7 @@ export function SimplerWay() {
         <span className="text-ink-faint block text-xs font-bold tracking-[0.14em] uppercase">
           {EYEBROW}
         </span>
-        <h2 className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-bold tracking-[-0.03em] md:text-[36px]">
+        <h2 className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-normal tracking-[-0.03em] md:text-[36px]">
           {HEADING_TOP}
           <br />
           {HEADING_BOTTOM}
@@ -129,7 +129,7 @@ export function SimplerWay() {
             >
               <path d={capability.path} />
             </svg>
-            <h3 className="font-display text-ink mb-2 text-lg leading-[1.3] font-bold tracking-[-0.01em]">
+            <h3 className="font-display text-ink mb-2 text-lg leading-[1.3] font-normal tracking-[-0.01em]">
               {capability.title}
             </h3>
             <p className="text-ink-muted text-sm leading-[1.55]">{capability.body}</p>

@@ -112,7 +112,7 @@ export function Faq() {
         <span className="text-ink-faint block text-[11px] font-bold tracking-[0.14em] uppercase md:text-xs">
           {EYEBROW}
         </span>
-        <h2 className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-bold tracking-[-0.03em] md:text-[36px]">
+        <h2 className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-normal tracking-[-0.03em] md:text-[36px]">
           {HEADING_TOP}
           <br />
           {HEADING_BOTTOM}
@@ -158,7 +158,7 @@ export function FinalCta() {
     <section className="mx-auto mt-5 mb-[45px] max-w-[1200px] px-8 md:mb-[70px]">
       <div className="bg-surface-inset flex flex-col gap-6 rounded-xl p-[30px] md:flex-row md:items-center md:justify-between md:p-12">
         <div className="min-w-0">
-          <h2 className="font-display text-ink text-[28px] leading-[1.16] font-bold tracking-[-0.03em] md:text-[30px]">
+          <h2 className="font-display text-ink text-[28px] leading-[1.16] font-normal tracking-[-0.03em] md:text-[30px]">
             {CTA_HEADING}
           </h2>
           <p className="text-ink-muted mt-2.5 leading-[1.65]">{CTA_LEAD}</p>

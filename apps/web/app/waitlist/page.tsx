@@ -52,7 +52,7 @@ export default async function WaitlistPage({
         <span className="text-ink-faint mt-12 block text-xs font-bold tracking-[0.14em] uppercase">
           {COPY.eyebrow}
         </span>
-        <h1 className="font-display text-ink mt-3 text-[clamp(30px,4vw,44px)] leading-[1.06] font-bold tracking-[-0.045em]">
+        <h1 className="font-display text-ink mt-3 text-[clamp(30px,4vw,44px)] leading-[1.06] font-normal tracking-[-0.045em]">
           {SITE.heroLine1}
           <br />
           <span className="brand-gradient-text">{SITE.heroLine2}</span>

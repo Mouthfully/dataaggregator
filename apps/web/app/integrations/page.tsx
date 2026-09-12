@@ -300,7 +300,7 @@ export default function IntegrationsPage() {
             </span>
             <h1
               id="integrations-heading"
-              className="font-display text-ink mt-2.5 text-[35px] leading-[1.1] font-bold tracking-[-0.03em] md:text-[48px]"
+              className="font-display text-ink mt-2.5 text-[35px] leading-[1.1] font-normal tracking-[-0.03em] md:text-[48px]"
             >
               {HEADING}
             </h1>
@@ -374,7 +374,7 @@ export default function IntegrationsPage() {
                   </span>
                 </span>
 
-                <h3 className="font-display text-ink mt-[22px] text-[21px] leading-[1.3] font-bold tracking-[-0.01em]">
+                <h3 className="font-display text-ink mt-[22px] text-[21px] leading-[1.3] font-normal tracking-[-0.01em]">
                   {connector.name}
                 </h3>
 

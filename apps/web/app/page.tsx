@@ -62,7 +62,7 @@ export default function Page() {
             <span className="text-ink-faint block text-xs font-bold tracking-[0.14em] uppercase">
               {SITE.eyebrow}
             </span>
-            <h1 className="font-display text-ink mt-4 text-[clamp(38px,4.4vw,58px)] leading-[1.06] font-bold tracking-[-0.045em]">
+            <h1 className="font-display text-ink mt-4 text-[clamp(38px,4.4vw,58px)] leading-[1.06] font-normal tracking-[-0.045em]">
               {SITE.heroLine1}
               <br />
               <span className="brand-gradient-text">{SITE.heroLine2}</span>

@@ -2,7 +2,13 @@ import { envelopeRowSchema } from "@repo/contract";
 import { REDACTION_POLICIES, redactValue } from "@repo/payloads";
 import { describe, expect, it } from "vitest";
 import { ORDER, ORDER_REFUNDED, ORDER_WITH_STRIPE_FEE, PAGE } from "./fixtures.js";
-import { WooNormalizeError, normalizeWooOrders, wooGmtToDate, wooPaymentFee } from "./normalize.js";
+import {
+  WooNormalizeError,
+  assertWooTimezone,
+  normalizeWooOrders,
+  wooGmtToDate,
+  wooPaymentFee,
+} from "./normalize.js";
 
 const OPTS = {
   storeUrl: "https://shop.example.com",
@@ -37,31 +43,59 @@ describe("the envelope contract", () => {
   });
 });
 
-describe("trap 1: dates carry no timezone designator", () => {
+describe("trap 1: dates carry no timezone designator, and UTC is not where it ends", () => {
   // THIS SUITE RUNS IN ASIA/BANGKOK -- see vitest.config.ts. In UTC these assertions are
   // WORTHLESS: dropping the `Z` gives the identical string, so the test passes either way. That is
   // not a hypothesis, it is what a mutation run showed. An earlier version of this comment claimed
   // asserting "on the value rather than the runtime" was enough; it was wrong, and the mutation is
   // what proved it.
+  //
+  // THERE ARE NOW TWO CONVERSIONS AND THEY FAIL DIFFERENTLY. The `Z` turns a designator-less string
+  // into the right INSTANT; the store's zone turns that instant into the right DAY. The whole-day
+  // loop below separates all three readings -- correct, no `Z`, and no zone -- because each puts a
+  // different set of hours on a different date.
   it("reads a _gmt timestamp as UTC rather than as the runtime's local time", () => {
-    // 02:00 UTC. Read as Bangkok local it is 2026-09-08T19:00Z -- the PREVIOUS day. This is the
-    // only shape that separates the two readings, because the date moves only when the local
-    // interpretation crosses midnight UTC. A late-evening timestamp does not, which is why the
-    // first draft of this test could not fail.
-    expect(wooGmtToDate("2026-09-09T02:00:00", "t")).toBe("2026-09-09");
+    // 02:00 UTC is 09:00 in Bangkok on the same day. Read as Bangkok LOCAL it would be
+    // 2026-09-08T19:00Z, which is still the 9th in Bangkok -- so this case alone does not separate
+    // the two readings, and the loop below is what does.
+    expect(wooGmtToDate("2026-09-09T02:00:00", "t", "Asia/Bangkok")).toBe("2026-09-09");
   });
 
   it("holds for a whole day of timestamps, not just the one that happens to break", () => {
-    // Every hour of one UTC day must land on that day. Under a local reading, the hours before the
-    // offset roll backwards; under the correct one, none of them do.
+    // UTC+7. Hours 00:00-16:59 UTC are the same calendar day in Bangkok; 17:00 onwards is the
+    // NEXT one. Three readings, three different answers:
+    //
+    //   correct        -> 17 hours on the 9th, 7 on the 10th   (asserted below)
+    //   no `Z`         -> the wall-clock string's own date, so 24 hours on the 9th
+    //   no zone (UTC)  -> 24 hours on the 9th
+    //
+    // So the last seven iterations fail under either mutation, which is the property the previous
+    // version of this loop did not have: it asserted the 9th for all 24 hours, which is exactly
+    // what a normaliser ignoring the store's zone produces.
     for (let hour = 0; hour < 24; hour++) {
       const stamp = `2026-09-09T${String(hour).padStart(2, "0")}:00:00`;
-      expect(wooGmtToDate(stamp, "t"), stamp).toBe("2026-09-09");
+      const expected = hour < 17 ? "2026-09-09" : "2026-09-10";
+      expect(wooGmtToDate(stamp, "t", "Asia/Bangkok"), stamp).toBe(expected);
     }
   });
 
+  it("puts the same instant on different days for stores in different zones", () => {
+    const stamp = "2026-09-09T20:15:00";
+    expect(wooGmtToDate(stamp, "t", "Asia/Bangkok")).toBe("2026-09-10");
+    expect(wooGmtToDate(stamp, "t", "UTC")).toBe("2026-09-09");
+    expect(wooGmtToDate(stamp, "t", "America/New_York")).toBe("2026-09-09");
+  });
+
   it("refuses a timestamp that does carry an offset, rather than guessing", () => {
-    expect(() => wooGmtToDate("2026-09-08T23:30:00+07:00", "t")).toThrow(WooNormalizeError);
+    expect(() => wooGmtToDate("2026-09-08T23:30:00+07:00", "t", "Asia/Bangkok")).toThrow(
+      WooNormalizeError,
+    );
+  });
+
+  it("refuses a zone it does not know, rather than labelling rows with it", () => {
+    expect(() => assertWooTimezone("")).toThrow(WooNormalizeError);
+    expect(() => assertWooTimezone("Mars/Olympus")).toThrow(WooNormalizeError);
+    expect(() => assertWooTimezone("Asia/Bangkok")).not.toThrow();
   });
 });
 

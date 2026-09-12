@@ -13,6 +13,12 @@
  *    The `_gmt` fields ARE UTC; they just do not say so. `Z` is appended explicitly here, and the
  *    non-GMT variants are never read at all.
  *
+ *    AND UTC IS NOT WHERE IT ENDS, which is the half this file shipped without. `dimensions.date`
+ *    is the day in `dimensions.timezone` -- the convention GA4 already follows -- so the UTC
+ *    instant is then bucketed in the STORE'S zone. See `wooGmtToDate`: without that second step a
+ *    UTC+7 store has seven hours of every day filed on the previous date under a label claiming
+ *    otherwise, which is the exact shape of quiet wrong number this product is sold against.
+ *
  * 2. `fee_lines` IS NOT A PAYMENT FEE. It is a merchant-authored surcharge -- a delivery charge, a
  *    packaging fee -- and it ADDS to the order total. Reading it as a cost does not merely produce
  *    a wrong number, it INVERTS THE SIGN on the one figure this product exists to compute. It is
@@ -64,7 +70,8 @@ export type WooNormalizeErrorCode =
   | "missing_date"
   | "missing_currency"
   | "unparseable_value"
-  | "unparseable_date";
+  | "unparseable_date"
+  | "invalid_timezone";
 
 export class WooNormalizeError extends Error {
   constructor(
@@ -105,13 +112,80 @@ export function parseWooAmount(value: string | undefined, field: string): number
 }
 
 /**
- * A WooCommerce `_gmt` timestamp to the calendar date it falls on, in UTC.
+ * Refuse a timezone the runtime does not know.
  *
- * THE `Z` IS THE WHOLE FUNCTION. See trap 1: without it the runtime reads a UTC instant as local
- * time, and an order placed at 23:30 UTC lands on the wrong day in any positive-offset timezone --
- * which is every timezone this product sells into.
+ * Exported because the BACKFILL calls it before its first request: a typo in a seed row would
+ * otherwise be discovered after a page has already been fetched from the merchant's store, and the
+ * refusal would name an order rather than the connection. One implementation, two call sites, so
+ * the two cannot come to disagree about what a timezone is.
+ *
+ * The CANONICAL-form rule -- an `Area/Location` name, or `UTC` -- lives on the column instead, in
+ * `20260912000400_connection_timezone.sql`, because that is where the value is stored and where a
+ * hand-written row would otherwise slip past. This asks only whether the zone is real.
  */
-export function wooGmtToDate(value: string | undefined, field: string): string {
+export function assertWooTimezone(timezone: string): void {
+  if (timezone.trim() === "") {
+    throw new WooNormalizeError(
+      "woocommerce: no timezone. Every envelope row carries one and there is no default -- " +
+        "WooCommerce reports order times in UTC and the day one falls on is a question only the " +
+        "store's own zone can answer.",
+      "invalid_timezone",
+    );
+  }
+  dayFormatter(timezone);
+}
+
+/**
+ * `Intl.DateTimeFormat` is not free and a page is up to a hundred orders, so the formatter for a
+ * zone is built once. The map is keyed by the zone string and a run uses exactly one.
+ */
+const dayFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function dayFormatter(timezone: string): Intl.DateTimeFormat {
+  const cached = dayFormatters.get(timezone);
+  if (cached !== undefined) return cached;
+
+  let made: Intl.DateTimeFormat;
+  try {
+    made = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  } catch {
+    throw new WooNormalizeError(
+      `woocommerce: ${JSON.stringify(timezone)} is not a timezone this runtime knows. Every date ` +
+        "on every row from this store would be labelled with it.",
+      "invalid_timezone",
+    );
+  }
+  dayFormatters.set(timezone, made);
+  return made;
+}
+
+/**
+ * A WooCommerce `_gmt` timestamp to the calendar date it falls on IN THE STORE'S OWN ZONE.
+ *
+ * TWO CONVERSIONS, AND SKIPPING EITHER PRODUCES A PLAUSIBLE WRONG DATE.
+ *
+ * THE `Z` IS THE FIRST. See trap 1: without it the runtime reads a UTC instant as local time, and
+ * an order placed at 23:30 UTC lands on the wrong day in any positive-offset timezone -- which is
+ * every timezone this product sells into.
+ *
+ * THE ZONE IS THE SECOND, AND IT WAS MISSING. This function returned the UTC calendar day while
+ * `dimensions.timezone` on the same row said `Asia/Bangkok`, so the row asserted a day in a zone it
+ * had not been computed in. For a UTC+7 store that misfiles every order between 17:00 and midnight
+ * UTC -- roughly the merchant's whole morning, seven hours of every day, on every row, with
+ * `ok: true`. The envelope's convention is the one GA4 already follows, where `date` comes from the
+ * property's own calendar and `timezone` from `metadata.timeZone`: THE DATE IS THE DAY IN THE
+ * TIMEZONE THE ROW NAMES. `20260908001100_envelope_rows.sql` calls that guarantee co-equal with
+ * currency, and a guarantee that holds for four sources and not the fifth is not one.
+ *
+ * `formatToParts`, not `format`: the output of `format` is a locale's idea of a date, and pinning a
+ * locale that happens to print ISO order today is trusting CLDR not to change its mind.
+ */
+export function wooGmtToDate(value: string | undefined, field: string, timezone: string): string {
   if (value === undefined || value.trim() === "") {
     throw new WooNormalizeError(`woocommerce: ${field} is missing`, "missing_date");
   }
@@ -127,7 +201,20 @@ export function wooGmtToDate(value: string | undefined, field: string): string {
   if (Number.isNaN(ms)) {
     throw new WooNormalizeError(`woocommerce: ${field} is unparseable`, "unparseable_date");
   }
-  return new Date(ms).toISOString().slice(0, 10);
+
+  const parts = dayFormatter(timezone).formatToParts(new Date(ms));
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((entry) => entry.type === type)?.value;
+  const year = part("year");
+  const month = part("month");
+  const day = part("day");
+  if (year === undefined || month === undefined || day === undefined) {
+    throw new WooNormalizeError(
+      `woocommerce: could not read a calendar date for ${field} in ${JSON.stringify(timezone)}`,
+      "unparseable_date",
+    );
+  }
+  return `${year}-${month}-${day}`;
 }
 
 /**
@@ -154,7 +241,13 @@ export interface WooNormalizeOptions {
   readonly orders: readonly WooOrder[];
   /** The merchant's store origin, e.g. "https://shop.example.com". The account this row belongs to. */
   readonly storeUrl: string;
-  /** IANA timezone the store reports in. The envelope requires one and there is no default. */
+  /**
+   * IANA timezone the store reports in. The envelope requires one and there is no default.
+   *
+   * It is not only a label: `dimensions.date` is computed IN it. `public.connections.timezone` is
+   * where it comes from, and a null there means nobody has told us -- which the backfill refuses
+   * to run against rather than assuming UTC.
+   */
   readonly timezone: string;
   /** RFC3339. When this pull happened. */
   readonly fetchedAt: string;
@@ -194,7 +287,11 @@ export function normalizeWooOrders(options: WooNormalizeOptions): EnvelopeRow[] 
       );
     }
 
-    const date = wooGmtToDate(order.date_created_gmt, `order ${order.id} date_created_gmt`);
+    const date = wooGmtToDate(
+      order.date_created_gmt,
+      `order ${order.id} date_created_gmt`,
+      options.timezone,
+    );
     const gross = parseWooAmount(order.total, `order ${order.id} total`);
 
     // Trap 4: refund totals are already negative, so they are ADDED.

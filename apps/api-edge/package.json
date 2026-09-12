@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@repo/connections": "workspace:*",
+    "@repo/connectors": "workspace:*",
     "@repo/contract": "workspace:*",
     "@repo/extract": "workspace:*",
     "@repo/oauth": "workspace:*",

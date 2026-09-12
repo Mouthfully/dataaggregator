@@ -87,6 +87,20 @@ declare namespace Cloudflare {
      * credential. Putting it in `wrangler.jsonc` would undo the entire scheme in one line.
      */
     readonly CREDENTIAL_KEK?: string;
+
+    /**
+     * The secret that gates `POST /v1/ingest/run`. A WORKER SECRET, and NEVER an API key.
+     *
+     * `MVP-PLAN.md` Decision 2 takes a manual trigger over a cron, and this is what stands in front
+     * of it. It is deliberately a different credential from the customer's `mp_live_…` key, which
+     * is read-only by construction -- a token minted from that key carries no `sub`, so
+     * `app.can_write_workspace()` refuses. This route causes WRITES into `envelope_rows` and spends
+     * a merchant's own store's capacity, which is a strictly larger power than reading numbers
+     * back, so it does not share a credential with the smaller one.
+     *
+     * `openssl rand -base64 32`, same as the KEK. Compared in constant time; see `tokenMatches`.
+     */
+    readonly INGEST_TOKEN?: string;
   }
 }
 

@@ -21,8 +21,18 @@ import {
   type PostgrestConfig,
   StoreError,
   createApiKeyAuthenticator,
+  createConnectionStore,
+  createIngestStore,
   createPerformanceStore,
 } from "@repo/store";
+import type { CryptoLike as VaultCrypto } from "@repo/vault";
+import {
+  type IngestReport,
+  IngestError,
+  IngestRunFailure,
+  parseIngestRequest,
+  runIngest,
+} from "./ingest.js";
 import { handlePerformance } from "./performance.js";
 import { type ScheduledOutcome, handleScheduled } from "./webhooks.js";
 
@@ -106,6 +116,229 @@ function storeFailure(error: StoreError, requestId: string): Response {
   );
 }
 
+/**
+ * Which HTTP status each refusal is, and why none of them is 400 by default.
+ *
+ * The operator hitting this route reads one number before they read anything else, and the four
+ * distinct situations here need four distinct next actions: fix the request, fix the connection
+ * row, fix the deployment, or accept that this build cannot do it. Collapsing them into 400 would
+ * send somebody to re-read a request that was correct.
+ */
+const REFUSAL_STATUS: Record<IngestError["refusal"], number> = {
+  bad_request: 400,
+  no_such_connection: 404,
+  // 501, not 400: the request is well formed and this deployment cannot answer it. Same distinction
+  // `storeFailure` draws for `as_of`.
+  unsupported_provider: 501,
+  // 409, not 400 and not 422: the request is fine and the CONNECTION is not ready. The fix is a
+  // column, not a retry with different parameters.
+  no_timezone: 409,
+  connection_unusable: 409,
+  wrong_credential_lane: 409,
+  // A deployment fault, like a missing binding, and answered the same way.
+  bad_kek: 503,
+  // 502, and RETRYABLE -- unlike every other member. The request was fine and the run never began,
+  // so there is no partial progress and no checkpoint to report; trying again is the correct next
+  // move, which is exactly what the other 5xx here does NOT mean.
+  store_unavailable: 502,
+};
+
+/**
+ * Compare the presented ingest token without leaking where it first differs.
+ *
+ * A `===` on secrets returns as soon as two bytes differ, so the time it takes is a function of how
+ * much of the prefix was right -- which over enough requests is a way to learn the secret one
+ * character at a time. The cost of not caring is a remotely guessable write credential; the cost of
+ * caring is a loop over 43 bytes.
+ *
+ * The length is folded into the accumulator rather than short-circuited on, for the same reason.
+ */
+export function tokenMatches(presented: string, expected: string): boolean {
+  const a = new TextEncoder().encode(presented);
+  const b = new TextEncoder().encode(expected);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
+  }
+  return diff === 0;
+}
+
+const BEARER = /^bearer[ \t]+(.+)$/i;
+
+/**
+ * `POST /v1/ingest/run`.
+ *
+ * THE ONLY PLACE `env` BECOMES PORTS. `runIngest` is a boundary over injected ports and knows
+ * nothing about bindings, which is what lets the whole run -- connection, credential, fetch, write
+ * -- be exercised in a test with no network.
+ */
+async function handleIngestRun(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "POST") {
+    return Response.json({ ok: false, error: "method_not_allowed" }, { status: 405 });
+  }
+
+  const config = supabaseConfig(env);
+  const missing = "missing" in config ? [...config.missing] : [];
+  // GATHERED, NOT SHORT-CIRCUITED. An operator configuring a deployment should learn about all
+  // five absent bindings in one response rather than one per attempt.
+  if (!env.INGEST_TOKEN) missing.push("INGEST_TOKEN");
+  if (!env.CREDENTIAL_KEK) missing.push("CREDENTIAL_KEK");
+  if (missing.length > 0) {
+    return Response.json(
+      {
+        ok: false,
+        error: "not_configured",
+        message:
+          `\`/v1/ingest/run\` is missing ${missing.join(", ")} on this deployment. The run, its ` +
+          "ports and their contracts are implemented and tested; this deployment is not configured.",
+      },
+      { status: 503 },
+    );
+  }
+  // Narrowed by the check above; `supabaseConfig` returns the union and TypeScript cannot see that
+  // `missing.length === 0` rules out the error arm.
+  const postgrest = config as PostgrestConfig;
+
+  // A DEDICATED SECRET, NEVER THE API KEY. See the note at the top of `ingest.ts`: the customer's
+  // key is read-only by construction, and this route causes writes and spends the merchant's store.
+  const presented = BEARER.exec((request.headers.get("authorization") ?? "").trim());
+  if (presented?.[1] === undefined) {
+    return Response.json(
+      {
+        ok: false,
+        error: "unauthorized",
+        message:
+          "Send the ingest secret as `Authorization: Bearer <token>`. This is not the API key.",
+      },
+      { status: 401 },
+    );
+  }
+  if (!tokenMatches(presented[1].trim(), env.INGEST_TOKEN ?? "")) {
+    // No detail, and no distinction from a malformed one beyond the message above. A caller
+    // learning that its token was well formed but wrong is a caller being told it is close.
+    return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json(
+      { ok: false, error: "invalid_request", message: "The body is not JSON." },
+      { status: 400 },
+    );
+  }
+
+  const requestId = crypto.randomUUID();
+  try {
+    const parsed = parseIngestRequest(body);
+    const report = await runIngest(parsed, {
+      connections: createConnectionStore(postgrest),
+      ingest: createIngestStore(postgrest),
+      kek: env.CREDENTIAL_KEK ?? "",
+      fetchImpl: fetch,
+      crypto: crypto as unknown as VaultCrypto,
+    });
+    log(report, requestId, null);
+    return Response.json({ ok: true, ...body_of(report) });
+  } catch (error) {
+    if (error instanceof IngestError) {
+      return Response.json(
+        { ok: false, error: error.refusal, message: error.message, request_id: requestId },
+        { status: REFUSAL_STATUS[error.refusal] },
+      );
+    }
+    if (error instanceof IngestRunFailure) {
+      // 502 AND THE COUNTS ANYWAY. A partial run is a failure, and the checkpoint it reached is the
+      // most valuable thing in the response: without it the operator's only safe move is to redo
+      // the whole span.
+      log(error.report, requestId, reasonOf(error.cause));
+      return Response.json(
+        {
+          ok: false,
+          error: "run_incomplete",
+          message: reasonOf(error.cause),
+          request_id: requestId,
+          ...body_of(error.report),
+        },
+        { status: 502 },
+      );
+    }
+    throw error;
+  }
+}
+
+/** The wire shape. snake_case, like every other body this API emits. */
+function body_of(report: IngestReport): Record<string, unknown> {
+  return {
+    source: report.source,
+    connection_id: report.connectionId,
+    pages: report.pages,
+    rows_read: report.rowsRead,
+    rows_written: report.rowsWritten,
+    chunks: report.chunks,
+    splits: report.splits,
+    checkpoint: report.checkpoint,
+    complete: report.complete,
+  };
+}
+
+/**
+ * What a failure is allowed to say.
+ *
+ * REPOSITORY-AUTHORED TEXT ONLY. `WooClientError`, `WooNormalizeError`, `WooBackfillError` and
+ * `StoreError` carry sentences written in this repository for a merchant to read, and none of them
+ * interpolates a credential. Anything else -- an `ExtractError`, whose message carries the request
+ * URL, or a runtime `TypeError` -- is reduced to its NAME, because a store URL is customer data and
+ * a stack is nobody's business. Same rule as `storeFailure`'s: the kind travels, the values do not.
+ */
+export function reasonOf(cause: unknown): string {
+  if (!(cause instanceof Error)) return "the run failed";
+
+  // `WooNormalizeError` IS NOT ON THE ALLOW-LIST, AND IT LOOKS LIKE IT SHOULD BE. Its sentences are
+  // written in this repository for a human to read -- and they interpolate the MERCHANT'S PAYLOAD
+  // into them: `order ${order.id} total` names an order, and `JSON.stringify(value)` prints the raw
+  // field that failed to parse. Both are platform data, and this function is the last gate before a
+  // response body and a log line.
+  //
+  // Its `code` carries the whole diagnosis an operator needs -- `missing_currency` says which field
+  // and what to do -- with none of the values. Found in review; the allow-list had been reasoned
+  // about at the level of "who wrote the sentence" rather than "what the sentence contains".
+  if (cause.name === "WooNormalizeError") {
+    const code = (cause as { code?: unknown }).code;
+    return `an order could not be normalised (${typeof code === "string" ? code : "unknown"})`;
+  }
+
+  // The rest are repository-authored AND value-free. `WooClientError` and `WooBackfillError`
+  // interpolate windows and counts, which are the caller's own inputs and arithmetic over them;
+  // `StoreError` deliberately drops PostgREST's `details` and `hint` because both echo the failing
+  // query. Each was re-read against this rule rather than inherited from the previous list.
+  const named = ["WooClientError", "WooBackfillError", "StoreError"];
+  if (named.includes(cause.name)) return cause.message;
+
+  // Everything else by NAME only. `ExtractError` is why: its message interpolates the request URL,
+  // and the request URL is the merchant's store origin.
+  return `the run failed with ${cause.name}`;
+}
+
+/** Counts and reasons only. No payload, no credential, no store URL. */
+function log(report: IngestReport, requestId: string, failure: string | null): void {
+  console.log(
+    JSON.stringify({
+      route: "/v1/ingest/run",
+      request_id: requestId,
+      connection_id: report.connectionId,
+      pages: report.pages,
+      rows_read: report.rowsRead,
+      rows_written: report.rowsWritten,
+      chunks: report.chunks,
+      splits: report.splits,
+      complete: report.complete,
+      ...(failure === null ? {} : { failure }),
+    }),
+  );
+}
+
 export default {
   /**
    * The scheduled half. Two crons, declared in `wrangler.jsonc` and dispatched by name in
@@ -180,9 +413,14 @@ export default {
       }
     }
 
+    if (pathname === "/v1/ingest/run") {
+      return await handleIngestRun(request, env);
+    }
+
     return Response.json({ ok: false, error: "not_found" }, { status: 404 });
   },
 } satisfies ExportedHandler<Env>;
 
+export { handleIngestRun };
 export { handlePerformance };
 export { handleScheduled };

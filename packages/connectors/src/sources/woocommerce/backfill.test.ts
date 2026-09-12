@@ -160,6 +160,24 @@ describe("RFC3339, and the three things Date.parse accepts that it must not", ()
     expect(() => parseRfc3339("2026-09-11", "t")).toThrow(WooBackfillError);
   });
 
+  it("refuses hour 24, which RFC3339 forbids and Date.parse rolls into the next day", () => {
+    // FOUND IN REVIEW, AND THE FIRST TEST FOR IT WAS IN THE WRONG PACKAGE. `parseRfc3339` lives
+    // here, so a mutation to it is only observable here -- an assertion in `apps/api-edge` passed
+    // against the broken version and proved nothing. The original round trip checked the calendar
+    // DATE only, so hour 24 survived every component check and then `Date.parse` rolled it over.
+    expect(Date.parse("2026-09-11T24:00:00Z")).toBe(Date.parse("2026-09-12T00:00:00Z"));
+    expect(() => parseRfc3339("2026-09-11T24:00:00Z", "t")).toThrow(WooBackfillError);
+    expect(() => parseRfc3339("2026-09-11T00:60:00Z", "t")).toThrow(WooBackfillError);
+    expect(() => parseRfc3339("2026-09-11T00:00:99Z", "t")).toThrow(WooBackfillError);
+
+    // The real boundaries still pass -- the check must not over-refuse.
+    expect(parseRfc3339("2026-09-11T23:59:59Z", "t")).toBe(Date.parse("2026-09-11T23:59:59Z"));
+    expect(parseRfc3339("2026-09-11T00:00:00Z", "t")).toBe(Date.parse("2026-09-11T00:00:00Z"));
+    // An offset still resolves to the instant it names: the components are checked as a wall
+    // clock, and the offset is applied afterwards.
+    expect(parseRfc3339("2026-09-11T23:00:00+07:00", "t")).toBe(Date.parse("2026-09-11T16:00:00Z"));
+  });
+
   it("refuses the loose formats Date.parse happens to understand", () => {
     expect(Number.isFinite(Date.parse("September 11, 2026"))).toBe(true);
     expect(() => parseRfc3339("September 11, 2026", "t")).toThrow(WooBackfillError);

@@ -1,6 +1,13 @@
 import { brand } from "@repo/brand";
 import { FEATURES, PLATFORMS, SITE } from "./_content";
 import { Footer, SiteHeader } from "./_chrome";
+import { Faq, FinalCta } from "./_sections/FaqCta";
+import { FeatureGrid } from "./_sections/FeatureGrid";
+import { IntegrationsMap } from "./_sections/IntegrationsMap";
+import { IntegrationsStrip } from "./_sections/IntegrationsStrip";
+import { Pricing } from "./_sections/Pricing";
+import { SimplerWay } from "./_sections/SimplerWay";
+import { UseCases } from "./_sections/UseCases";
 
 /**
  * The marketing site's first screen, built to the founder-supplied page set (BRAND.md v1.0 and
@@ -93,53 +100,16 @@ export default function Page() {
           <HeroDashboard />
         </section>
 
-        {/* -------------------------------------------------------------------- platforms */}
-        <section className="mx-auto max-w-[1200px] px-8 pt-10 pb-10 text-center">
-          <span className="text-ink-faint block text-xs font-bold tracking-[0.14em] uppercase">
-            {SITE.platformsEyebrow}
-          </span>
-          <ul className="mt-7 flex flex-wrap items-center justify-center gap-x-10 gap-y-5">
-            {PLATFORMS.map((platform) => (
-              <li key={platform} className="text-ink-muted text-sm font-bold">
-                {platform}
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {/* --------------------------------------------------------------------- features */}
-        <section className="mx-auto max-w-[1200px] px-8 py-20">
-          <div className="grid gap-4 md:grid-cols-3">
-            {FEATURES.map((feature) => (
-              <article key={feature.id} className="border-line bg-surface rounded-lg border p-6">
-                <FeatureIcon id={feature.id} />
-                <h2 className="font-display text-ink mt-4 text-xl font-bold tracking-[-0.01em]">
-                  {feature.title}
-                </h2>
-                <p className="text-ink-muted mt-2 text-sm leading-relaxed">{feature.body}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        {/* -------------------------------------------------------------------- final cta */}
-        <section className="mx-auto max-w-[1200px] px-8 pb-20">
-          <div className="bg-surface-inset rounded-xl px-10 py-12 md:flex md:items-center md:justify-between md:gap-6">
-            <div>
-              <h2 className="font-display text-ink text-3xl font-bold tracking-[-0.03em]">
-                {SITE.heroLine1} {SITE.heroLine2}
-              </h2>
-              <p className="text-ink-muted mt-2 max-w-[520px]">{SITE.heroLead}</p>
-            </div>
-            <a
-              href="#start"
-              className="bg-accent text-ink-on-accent hover:bg-accent-hover mt-6 inline-flex min-h-[46px] shrink-0 items-center gap-3 rounded-[10px] px-[22px] text-sm font-bold transition-colors md:mt-0"
-            >
-              {SITE.ctaPrimary}
-              <span aria-hidden="true">&rarr;</span>
-            </a>
-          </div>
-        </section>
+        {/* The reference's order, section for section. Each lives in its own file under
+            _sections/ with its copy colocated -- see that directory for why. */}
+        <IntegrationsStrip />
+        <SimplerWay />
+        <FeatureGrid />
+        <IntegrationsMap />
+        <Pricing />
+        <UseCases />
+        <Faq />
+        <FinalCta />
       </main>
 
       <Footer />

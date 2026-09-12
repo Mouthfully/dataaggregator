@@ -37,7 +37,7 @@ describe("the brand file", () => {
     // unchanged: the string lives in exactly one file, and `scripts/check-brand.mjs` both bans it
     // everywhere else and match-tests the infrastructure files that must carry it.
     expect(brand.productNameSettled).toBe(true);
-    expect(brand.productName).toBe("uniplain");
+    expect(brand.productName).toBe("Uniplain");
     expect(brand.productName.trim()).toBe(brand.productName);
   });
 
@@ -54,7 +54,7 @@ describe("the brand file", () => {
     // Asserting the relationship rather than the two strings is what would catch half a rename:
     // changing `productName` and leaving `domain` on the old one still passes two equality tests.
     expect(brand.domain).toBe("uniplain.com");
-    expect(brand.domain?.split(".")[0]).toBe(brand.productName);
+    expect(brand.domain?.split(".")[0]).toBe(brand.productName.toLowerCase());
   });
 });
 

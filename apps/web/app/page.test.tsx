@@ -2,7 +2,7 @@ import { FORBIDDEN_CLAIMS, brand } from "@repo/brand";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { FEATURES, PLATFORMS, SITE } from "./_content";
+import { SITE } from "./_content";
 import Page from "./page";
 
 /**
@@ -48,25 +48,54 @@ describe("nothing the specification dropped can reach the page", () => {
   );
 });
 
-describe("the page renders the supplied copy, and only from the copy module", () => {
+describe("the page renders every section of the supplied design", () => {
   it("leads with the brand guide's tagline", () => {
     expect(text).toContain(SITE.heroLine1);
     expect(text).toContain(SITE.heroLine2);
     expect(text).toContain(SITE.heroLead);
   });
 
-  it("renders every feature card and every platform mark", () => {
-    for (const feature of FEATURES) {
-      expect(text, feature.id).toContain(feature.title);
-      expect(text, feature.id).toContain(feature.body);
+  it("shows every platform mark as ARTWORK, not as its name in text", () => {
+    // The first pass rendered these as bold text, which is the single most visible way the page
+    // drifted from the design. Asserting the <img> is what stops it drifting back: the name being
+    // present proves nothing, since it was present before too.
+    for (const slug of ["googleads", "meta", "shopify", "tiktok", "hubspot", "stripe"]) {
+      expect(html, slug).toContain(`/platforms/${slug}.svg`);
     }
-    for (const platform of PLATFORMS) expect(text, platform).toContain(platform);
   });
 
-  it("renders the eyebrow and both calls to action", () => {
-    expect(text).toContain(SITE.eyebrow);
-    expect(text).toContain(SITE.ctaPrimary);
-    expect(text).toContain(SITE.ctaSecondary);
+  it("renders all eleven sections of the reference, in its order", () => {
+    // One landmark string per section, checked for ORDER rather than mere presence -- a section
+    // rendered in the wrong place is a different page from the one that was designed.
+    const landmarks = [
+      SITE.heroLine1,
+      "One connected workspace",
+      "A simpler way to work",
+      "From insights to impact",
+      "In one place",
+      "Simple, transparent pricing",
+      "A clearer view, for every team",
+      "We're here to help",
+      "Ready to unify your data",
+    ];
+    let cursor = -1;
+    for (const landmark of landmarks) {
+      const at = text.indexOf(landmark, cursor + 1);
+      expect(at, `"${landmark}" missing or out of order`).toBeGreaterThan(cursor);
+      cursor = at;
+    }
+  });
+
+  it("keeps the pricing tiers the design specifies", () => {
+    for (const tier of ["Free", "Starter", "Growth", "Agency"]) {
+      expect(text, tier).toContain(tier);
+    }
+  });
+
+  it("uses native disclosure for the FAQ rather than client JavaScript", () => {
+    // The reference uses <details>; reproducing it with state would make the section a client
+    // component and ship JS for something the platform does.
+    expect(html).toContain("<details");
   });
 });
 

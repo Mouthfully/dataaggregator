@@ -91,7 +91,15 @@ export interface Brand {
 export const brand: Brand = {
   legalEntity: "Now On Company Limited",
 
-  productName: "uniplain",
+  // Capital U, per the brand guide: "Always one word, with an uppercase U." It was lowercase for
+  // one commit, and the cost showed up immediately -- two independently written page sections each
+  // grew their own `productName.charAt(0).toUpperCase() + ...` to render it correctly, which is a
+  // second copy of one fact appearing twice in a day. The display form belongs here.
+  //
+  // Nothing downstream needs the lowercase form spelled out: the brand guard slugifies this value
+  // before match-testing supabase/config.toml's project_id, and the domain's registrable label is
+  // asserted against it case-insensitively.
+  productName: "Uniplain",
   productNameSettled: true,
   tagline: "Know what changed. And why.",
 

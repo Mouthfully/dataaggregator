@@ -40,6 +40,14 @@ export type StoreFailure =
   | "bad_cursor"
   /** A well-formed parameter this store cannot honour. Answering it anyway would be a lie. */
   | "unsupported_query"
+  /**
+   * A row handed to the WRITE path does not satisfy the envelope, so the batch was refused.
+   *
+   * The read path has no equivalent because it validates on the way OUT, in `handlePerformance`.
+   * Here the check is on the way in, and it is a caller bug rather than an upstream one: a
+   * connector produced a row the contract forbids, and no amount of retrying fixes it.
+   */
+  | "invalid_row"
   /** PostgREST refused, was unreachable, or answered with something unrecognisable. */
   | "upstream";
 
@@ -163,6 +171,14 @@ export async function callPostgrest(
     method?: "GET" | "POST";
     body?: unknown;
     headers?: Record<string, string>;
+    /**
+     * What the caller was doing, for the refusal message only.
+     *
+     * The message read "refused the read" unconditionally, which was true while this module only
+     * read. An operator staring at "the database refused the read with 403" after an ingest run
+     * would look at the wrong half of the system.
+     */
+    action?: "read" | "write";
   },
 ): Promise<unknown> {
   const doFetch = config.fetch ?? fetch;
@@ -200,7 +216,8 @@ export async function callPostgrest(
     // filter values.
     const code = await postgrestCode(response);
     throw new StoreError(
-      `the database refused the read with ${response.status}${code === null ? "" : ` (${code})`}`,
+      `the database refused the ${options.action ?? "read"} with ${response.status}` +
+        `${code === null ? "" : ` (${code})`}`,
       "upstream",
       response.status,
     );

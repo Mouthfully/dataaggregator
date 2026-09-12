@@ -19,9 +19,12 @@ import {
   StoreError,
   TOKEN_TTL_SECONDS,
   createApiKeyAuthenticator,
+  createIngestStore,
   createPerformanceStore,
   decodeCursor,
   mintToken,
+  toEnvelopeRow,
+  toIngestRow,
   type PerformanceQuery,
   type PostgrestConfig,
 } from "@repo/store";
@@ -628,5 +631,201 @@ describe("the route", () => {
     expect(body.message).toContain("SUPABASE_URL");
     expect(body.message).toContain("SUPABASE_ANON_KEY");
     expect(body.message).toContain("SUPABASE_JWT_SECRET");
+  });
+});
+
+// ===============================================================================================
+// THE INGEST WRITE PATH
+//
+// The inverse direction, and the one with the opposite validation posture: the read path validates
+// on the way OUT and its mapper deliberately repairs nothing; this validates on the way IN, because
+// a row the database refuses costs a round trip and comes back as a constraint name with no row
+// index.
+// ===============================================================================================
+
+/** One envelope row in the NESTED shape a normaliser produces. */
+function envelopeRow(overrides: Record<string, unknown> = {}) {
+  return {
+    source: "woocommerce",
+    entity: {
+      type: "order",
+      id: "wc_1001",
+      account_id: "https://shop.example.com",
+      native_entity_type: "shop_order",
+      native_id: "1001",
+    },
+    dimensions: {
+      date: "2026-08-14",
+      currency: "THB",
+      timezone: "Asia/Bangkok",
+      attribution_window: null,
+    },
+    metrics: { orders: 1, revenue: 450 },
+    fetched_at: "2026-08-15T06:00:00.000Z",
+    source_updated_at: null,
+    restates_until: "2026-08-22T06:00:00.000Z",
+    is_provisional: true,
+    first_seen_at: "2026-08-15T06:00:00.000Z",
+    fx_source: null,
+    fx_rate_date: null,
+    fx_rate: null,
+    fx_base: null,
+    ...overrides,
+  } as never;
+}
+
+const CONTEXT = { workspaceId: WORKSPACE, connectionId: null };
+
+function ingestConfig(impl: typeof fetch) {
+  return { url: URL_BASE, apiKey: API_KEY, jwtSecret: SECRET, fetch: impl, now: () => FIXED };
+}
+
+describe("the ingest mapper is the exact inverse of the read mapper", () => {
+  it("stamps tenancy the envelope deliberately does not carry", () => {
+    // A connector never sees a workspace id, so it physically cannot choose one. That is the
+    // property this line protects, not a convenience.
+    const flat = toIngestRow(envelopeRow(), { workspaceId: WORKSPACE, connectionId: "c-1" });
+    expect(flat.workspace_id).toBe(WORKSPACE);
+    expect(flat.connection_id).toBe("c-1");
+  });
+
+  it("flattens entity and dimensions into columns", () => {
+    const flat = toIngestRow(envelopeRow(), CONTEXT);
+    expect(flat.entity_id).toBe("wc_1001");
+    expect(flat.entity_type).toBe("order");
+    expect(flat.account_id).toBe("https://shop.example.com");
+    expect(flat.native_entity_type).toBe("shop_order");
+    expect(flat.date).toBe("2026-08-14");
+    expect(flat.currency).toBe("THB");
+    expect(flat.timezone).toBe("Asia/Bangkok");
+    expect(flat.attribution_window).toBeNull();
+  });
+
+  it("carries EVERY metric column, present or not, from the dictionary rather than a list", () => {
+    // The fifth hand-written metric list is the one a guard cannot see, because it would live in
+    // TypeScript. Sourcing the keys from METRICS is what stops it existing.
+    const flat = toIngestRow(envelopeRow(), CONTEXT);
+    for (const name of Object.keys(METRICS)) {
+      expect(Object.hasOwn(flat, name), `${name} is missing from the ingest payload`).toBe(true);
+    }
+    expect(flat.orders).toBe(1);
+    expect(flat.revenue).toBe(450);
+    // An absent metric is NULL, never 0. "spend: 0" on a day with no spend data is the single most
+    // damaging lie this envelope could tell, and it would be told on every row.
+    expect(flat.spend).toBeNull();
+    expect(flat.position).toBeNull();
+  });
+
+  it("does not send is_provisional, because the upsert derives it", () => {
+    // That derivation is where "is_provisional eventually clears" stops being a claim. A value sent
+    // from here would be ignored at best.
+    expect(Object.hasOwn(toIngestRow(envelopeRow(), CONTEXT), "is_provisional")).toBe(false);
+  });
+
+  it("never writes a payload into raw_key, which is an object key", () => {
+    const flat = toIngestRow(envelopeRow({ raw: { huge: "platform response" } }), CONTEXT);
+    expect(flat.raw_key).toBeNull();
+    expect(JSON.stringify(flat)).not.toContain("huge");
+  });
+
+  it("round-trips through the read mapper without losing a field", async () => {
+    // The strongest available check that the two directions agree, and it needs no database: flatten
+    // an envelope row, feed the result to the READ mapper, and the envelope must come back.
+    const original = envelopeRow();
+    const flat = toIngestRow(original, CONTEXT);
+    const back = envelopeRowSchema.parse(toEnvelopeRow({ ...flat, is_provisional: true }));
+    expect(back).toEqual(envelopeRowSchema.parse(original));
+  });
+});
+
+describe("the ingest store refuses before it writes", () => {
+  it("writes a batch and returns the count the database reports", async () => {
+    const f = fake([{ body: 2 }]);
+    const written = await createIngestStore(ingestConfig(f.impl)).write(
+      [
+        envelopeRow(),
+        envelopeRow({
+          entity: { ...(envelopeRow() as never as { entity: object }).entity, id: "wc_1002" },
+        }),
+      ],
+      CONTEXT,
+    );
+    expect(written).toBe(2);
+
+    const call = f.calls[0] as Call;
+    expect(call.method).toBe("POST");
+    expect(call.url).toBe(`${URL_BASE}/rest/v1/rpc/ingest_envelope_rows`);
+    const body = JSON.parse(call.body as string);
+    expect(body.p_rows).toHaveLength(2);
+  });
+
+  it("mints app_ingest and sends NO workspace_id claim", async () => {
+    const f = fake([{ body: 1 }]);
+    await createIngestStore(ingestConfig(f.impl)).write([envelopeRow()], CONTEXT);
+
+    const claims = claimsOf(f.calls[0] as Call);
+    expect(claims.role).toBe("app_ingest");
+    // The workspace is an argument to a function that does not consult RLS. A claim here would be
+    // decoration that reads like a constraint.
+    expect(Object.keys(claims).sort()).toEqual(["exp", "iat", "role"]);
+  });
+
+  it("makes no request at all for an empty batch", async () => {
+    // A quiet day is a real outcome, not an error, and it costs zero requests.
+    const f = fake([]);
+    expect(await createIngestStore(ingestConfig(f.impl)).write([], CONTEXT)).toBe(0);
+    expect(f.calls).toHaveLength(0);
+  });
+
+  it("refuses the WHOLE batch when one row fails the envelope", async () => {
+    // Skipping the row would store a total quietly too low -- the failure this product sells
+    // against -- and nothing downstream could ever tell it had happened.
+    const f = fake([]);
+    const bad = envelopeRow({ metrics: { conversions: 4 } }); // a conversion with no window
+    await expect(
+      createIngestStore(ingestConfig(f.impl)).write([envelopeRow(), bad], CONTEXT),
+    ).rejects.toThrow(/refusing to write row 1/);
+    expect(f.calls).toHaveLength(0);
+  });
+
+  it("names the failing field, so the connector author knows what to fix", async () => {
+    const f = fake([]);
+    try {
+      await createIngestStore(ingestConfig(f.impl)).write(
+        [
+          envelopeRow({
+            dimensions: {
+              date: "not-a-date",
+              currency: "THB",
+              timezone: "Asia/Bangkok",
+              attribution_window: null,
+            },
+          }),
+        ],
+        CONTEXT,
+      );
+      throw new Error("should have refused");
+    } catch (error) {
+      expect((error as StoreError).failure).toBe("invalid_row");
+      expect((error as Error).message).toMatch(/dimensions\.date/);
+    }
+  });
+
+  it("refuses a partial write rather than reporting success", async () => {
+    // The function returns how many rows it forwarded. A count that disagrees with what was sent is
+    // the same wrong total as a skipped row, arriving by a different route.
+    const f = fake([{ body: 1 }]);
+    await expect(
+      createIngestStore(ingestConfig(f.impl)).write([envelopeRow(), envelopeRow()], CONTEXT),
+    ).rejects.toThrow(/sent 2 row\(s\) and the database reported 1/);
+  });
+
+  it("reports a refused WRITE as a write, not as a read", async () => {
+    // The message was "refused the read" unconditionally. An operator staring at that after an
+    // ingest run would look at the wrong half of the system.
+    const f = fake([{ status: 403, raw: JSON.stringify({ code: "42501" }) }]);
+    await expect(
+      createIngestStore(ingestConfig(f.impl)).write([envelopeRow()], CONTEXT),
+    ).rejects.toThrow(/refused the write with 403 \(42501\)/);
   });
 });

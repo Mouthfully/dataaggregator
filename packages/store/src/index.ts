@@ -3,6 +3,13 @@ export {
   type AuthenticatorPort,
 } from "./authenticator.js";
 export {
+  createIngestStore,
+  toIngestRow,
+  type IngestContext,
+  type IngestStoreConfig,
+  type IngestStorePort,
+} from "./ingest.js";
+export {
   ORDER,
   afterCursor,
   decodeCursor,

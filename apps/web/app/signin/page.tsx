@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
+import { currentUser } from "../_auth/server";
+import { isAuthConfigured } from "../_auth/env";
 import { SiteHeader } from "../_chrome";
 import { AUTH } from "../_content-auth";
 import { SignInForm } from "./form";
@@ -11,18 +14,28 @@ export const metadata: Metadata = {
   robots: { index: false, follow: true },
 };
 
-/**
- * The sign-in screen.
- *
- * WHAT IS REAL HERE AND WHAT IS NOT, stated in the UI rather than only in this comment. The
- * work-email policy in `app/_work-email.ts` is real, tested and enforced on submit. The identity
- * provider is NOT connected: there is no Supabase Auth client in this repository, `auth.users` holds
- * zero rows, and no OAuth redirect URI has been registered with Google -- which
- * `53-the-rename.md` records as the expensive half of settling a domain and deliberately not yet
- * started. So the button is present, the validation runs, and the screen says plainly that it stops
- * there. A sign-in button that silently does nothing is worse than no button.
- */
-export default function SignInPage() {
+/** The callback's reasons, mapped to sentences. The query string is not shown to anyone. */
+const ERRORS: Record<string, string> = {
+  provider: AUTH.errorProvider,
+  exchange: AUTH.errorExchange,
+  work_email: AUTH.errorWorkEmail,
+  missing_code: AUTH.errorMissingCode,
+};
+
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; next?: string }>;
+}) {
+  const { error } = await searchParams;
+
+  // Already signed in: this page has nothing to offer. Checked on the SERVER so the redirect
+  // happens before anything renders, rather than as a flash of the form.
+  if (isAuthConfigured()) {
+    const user = await currentUser();
+    if (user) redirect("/dashboard");
+  }
+
   return (
     <>
       <SiteHeader />
@@ -37,10 +50,15 @@ export default function SignInPage() {
           <p className="text-ink-muted mt-4 leading-relaxed">{AUTH.lead}</p>
 
           <div className="border-line bg-surface mt-8 rounded-xl border p-8">
-            <SignInForm />
+            {isAuthConfigured() ? (
+              <SignInForm initialError={error ? ERRORS[error] : undefined} />
+            ) : (
+              // Configuration is missing. Say so plainly rather than rendering a form that takes an
+              // address and drops it -- the failure belongs in front of whoever deployed this, not
+              // silently behind a button.
+              <p className="text-ink-muted text-sm leading-relaxed">{AUTH.notConfigured}</p>
+            )}
           </div>
-
-          <p className="text-ink-faint mt-6 text-xs leading-relaxed">{AUTH.notice}</p>
         </div>
       </main>
     </>

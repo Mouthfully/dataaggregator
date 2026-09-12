@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 
+import { signOut } from "../_auth/actions";
+import { isAuthConfigured } from "../_auth/env";
+import { currentUser } from "../_auth/server";
+import { currentWorkspace, performanceRows } from "../_auth/workspace";
 import { Footer, SiteHeader } from "../_chrome";
 import {
   DASHBOARD_ACTIVITY,
@@ -10,6 +14,19 @@ import {
   DASHBOARD_PRODUCTS,
   SITE_DASHBOARD,
 } from "../_content";
+
+/**
+ * ALWAYS RENDERED PER REQUEST.
+ *
+ * Without this the route's mode depends on the ENVIRONMENT IT WAS BUILT IN: with no Supabase
+ * variables set, `isAuthConfigured()` is false, the page never touches cookies, and Next
+ * prerenders it as static. A deployment that then sets those variables would serve a cached,
+ * signed-out dashboard to a signed-in person, and the difference would only appear in production.
+ *
+ * A page whose output depends on who is asking is not static, whatever the build happened to
+ * observe.
+ */
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Client dashboard",
@@ -33,7 +50,43 @@ export const metadata: Metadata = {
  * `robots: noindex` above is the other half of that honesty: nothing here should reach a search
  * result as though it were a live product screen.
  */
-export default function DashboardPage() {
+/** The span the screen describes. One place, so the heading and the query cannot disagree. */
+const SPAN = { from: "2026-06-01", to: "2026-06-30" } as const;
+
+const DASH_STATE = {
+  signedOut:
+    "You are not signed in, so this screen shows the illustrative concept rather than your data.",
+  noWorkspace:
+    "Your account has no workspace yet. One is created with your organisation, and nothing has created it.",
+  unavailable:
+    "Your data could not be read just now. The screen below is the illustrative concept.",
+  noRows:
+    "Your workspace has no rows for this period yet. Connect a source and run a backfill to fill it.",
+} as const;
+
+export default async function DashboardPage() {
+  // The middleware already refuses an unauthenticated request to this path. This is the second
+  // check, and it is not redundant: middleware can be misconfigured by a matcher edit, and a page
+  // that renders a workspace must not depend on a routing rule for its access decision.
+  const user = isAuthConfigured() ? await currentUser() : null;
+  const state = user ? await currentWorkspace() : null;
+  const live = state?.kind === "ready" ? state.workspace : null;
+  const performance = live ? await performanceRows(SPAN.from, SPAN.to) : null;
+
+  // Zero rows is the TRUE state of this project today -- envelope_rows is empty -- so it is said
+  // rather than papered over. The designed screen still renders beneath, labelled as a concept,
+  // because a signed-in person with an empty database should still see what the product looks like.
+  const emptyReason =
+    state === null
+      ? DASH_STATE.signedOut
+      : state.kind === "needsOrganisation"
+        ? DASH_STATE.noWorkspace
+        : state.kind === "unavailable"
+          ? DASH_STATE.unavailable
+          : performance && performance.rows.length === 0
+            ? DASH_STATE.noRows
+            : null;
+
   return (
     <>
       <SiteHeader />
@@ -49,18 +102,38 @@ export default function DashboardPage() {
               <br />
               <span className="brand-gradient-text">{SITE_DASHBOARD.heroLine2}</span>
             </h1>
-            <p className="border-line bg-surface text-ink-subtle rounded-[10px] border px-4 py-2 text-xs">
-              {SITE_DASHBOARD.notice}
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="border-line bg-surface text-ink-subtle rounded-md border px-4 py-2 text-xs">
+                {SITE_DASHBOARD.notice}
+              </p>
+              {user === null ? null : (
+                <form action={signOut}>
+                  <button
+                    type="submit"
+                    className="border-line bg-surface text-ink-muted hover:text-ink rounded-md border px-4 py-2 text-xs font-bold transition-colors"
+                  >
+                    Sign out
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
           <p className="text-ink-muted mt-4 max-w-[560px] text-lg leading-relaxed">
             {SITE_DASHBOARD.lead}
           </p>
         </div>
 
+        {emptyReason === null ? null : (
+          <div className="mx-auto max-w-[1200px] px-8 pb-2">
+            <p className="border-line bg-surface text-ink-muted rounded-lg border border-dashed px-5 py-4 text-sm">
+              {emptyReason}
+            </p>
+          </div>
+        )}
+
         <div className="mx-auto max-w-[1200px] px-8 pb-20">
           <div className="border-line bg-surface grid overflow-hidden rounded-xl border md:grid-cols-[232px_1fr]">
-            <Sidebar />
+            <Sidebar workspaceName={live?.name ?? SITE_DASHBOARD.workspace} />
 
             <div className="min-w-0 p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -149,14 +222,14 @@ export default function DashboardPage() {
   );
 }
 
-function Sidebar() {
+function Sidebar({ workspaceName }: { workspaceName: string }) {
   return (
     <aside className="border-line bg-surface-subtle border-b p-5 md:border-r md:border-b-0">
       <div className="border-line bg-surface flex items-center gap-3 rounded-[10px] border px-3 py-2.5">
         <span className="bg-surface-inset text-accent flex h-7 w-7 items-center justify-center rounded-md text-xs font-bold">
           {SITE_DASHBOARD.workspaceInitials}
         </span>
-        <span className="text-ink truncate text-sm font-bold">{SITE_DASHBOARD.workspace}</span>
+        <span className="text-ink truncate text-sm font-bold">{workspaceName}</span>
       </div>
       <nav className="mt-5">
         <ul>

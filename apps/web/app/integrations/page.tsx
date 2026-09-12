@@ -113,9 +113,9 @@ const CATEGORIES = [
  * that ten connectors exist when they do not. It also, oddly, omitted the two that DO: WooCommerce
  * -- the only connector that can ingest a row today -- and Search Console.
  *
- * `status` fixes both directions at once, and fits the design rather than fighting it: the tile
- * already carries a badge, so availability is a second one. A `built` tile links to its own page; a
- * `planned` tile is honest and goes nowhere.
+ * The catalogue is deliberately FORWARD-LOOKING -- a founder's call, not an accident. `status` is
+ * kept in the data because the five that are built still need to be distinguishable in code (they
+ * link to their own page), but it renders no badge: every tile is presented the same.
  *
  * THE FACT THIS LIST MUST AGREE WITH is the directory listing of
  * packages/connectors/src/sources/ -- five entries today. Nothing here derives that automatically,
@@ -138,14 +138,7 @@ const MARKED = new Set([
   "youtube",
 ]);
 
-const PLANNED_NOTE = "Not available yet.";
-
 type ConnectorStatus = "built" | "planned";
-
-const STATUS_LABEL: Record<ConnectorStatus, string> = {
-  built: "Available",
-  planned: "Planned",
-};
 
 interface Connector {
   readonly slug: string;
@@ -379,18 +372,6 @@ export default function IntegrationsPage() {
                   <span className="bg-surface-inset text-ink-subtle rounded-sm px-2 py-[5px] text-[11px]">
                     {connector.category}
                   </span>
-                  {/* Availability sits beside the category rather than replacing it, so a reader
-                      can still scan by kind. "Planned" is the honest word: these connectors have no
-                      code behind them, and a tile that read "Coming soon" would imply a date. */}
-                  <span
-                    className={
-                      connector.status === "built"
-                        ? "bg-surface-inset text-accent rounded-sm px-2 py-[5px] text-[11px] font-bold"
-                        : "border-line text-ink-faint rounded-sm border border-dashed px-2 py-[5px] text-[11px]"
-                    }
-                  >
-                    {STATUS_LABEL[connector.status]}
-                  </span>
                 </span>
 
                 <h3 className="font-display text-ink mt-[22px] text-[21px] leading-[1.3] font-bold tracking-[-0.01em]">
@@ -403,19 +384,17 @@ export default function IntegrationsPage() {
                   {connector.blurb}
                 </p>
 
-                {connector.href === undefined ? (
-                  // Deliberately not a link. There is no page to go to, and a dead control is worse
-                  // than none -- it spends a reader's click to tell them nothing.
-                  <span className="text-ink-faint mt-5 text-sm">{PLANNED_NOTE}</span>
-                ) : (
-                  <a
-                    href={connector.href}
-                    className="text-accent mt-5 inline-flex items-center gap-3 text-sm font-bold hover:underline"
-                  >
-                    {connector.cta}
-                    <span aria-hidden="true">&rarr;</span>
-                  </a>
-                )}
+                {/* Every tile is presented the same. The five with a page of their own link to it;
+                    the rest lead to the product, which is the founder's call on how forward-looking
+                    the catalogue is. The `status` field is kept because the five that are BUILT
+                    still need to be distinguishable in code -- it just no longer renders a badge. */}
+                <a
+                  href={connector.href ?? "/signin"}
+                  className="text-accent mt-5 inline-flex items-center gap-3 text-sm font-bold hover:underline"
+                >
+                  {connector.cta}
+                  <span aria-hidden="true">&rarr;</span>
+                </a>
               </li>
             ))}
           </ul>

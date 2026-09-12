@@ -17,5 +17,13 @@ export const AUTH = {
   terms: "By continuing you agree to be contacted about your account.",
   switchPrompt: "Already have an account?",
   switchAction: "Sign in",
-  notice: "Sign-in is not connected yet. This screen validates your address and goes no further.",
+  notConfigured:
+    "Sign-in is not configured on this deployment. Set the Supabase URL and anon key and redeploy.",
+  submitPending: "Sending…",
+  sentHeading: "Check your inbox.",
+  sentBody: "We sent a sign-in link. It works once and expires shortly.",
+  errorProvider: "Google sign-in is unavailable right now. Try the email link instead.",
+  errorExchange: "That sign-in link did not work. Request a new one.",
+  errorWorkEmail: "That account is a personal mailbox. Sign in with your company address.",
+  errorMissingCode: "That sign-in link is incomplete. Request a new one.",
 } as const;

@@ -1,48 +1,54 @@
 "use client";
 
-import { type FormEvent, useId, useState } from "react";
+import { useActionState, useId, useState } from "react";
 
+import { signInWithEmail, signInWithGoogle, type SignInState } from "../_auth/actions";
 import { AUTH } from "../_content-auth";
 import { checkWorkEmail } from "../_work-email";
 
 /**
- * The only client component in the app, and it is client-side for one reason: the address is
- * checked as the user leaves the field, so a personal address is caught before a round trip.
+ * THE SIGN-IN FORM.
  *
- * THE SAME CHECK MUST RUN ON THE SERVER when this is wired to an identity provider. `checkWorkEmail`
- * is a pure function in its own module precisely so that the server route can import the same one --
- * a policy enforced only in the browser is a suggestion, since the form can be posted without it.
- * The Google button is subject to the same rule: the provider is not the policy, the domain is, so
- * the callback has to run this against the profile it receives.
+ * The address is checked TWICE and the two checks are not redundant. This one runs on blur so a
+ * person is told before they submit; `_auth/actions.ts` runs the same function on the server, where
+ * it cannot be skipped by posting the form without ever loading this file. A policy enforced only
+ * in a browser is a suggestion with a nice animation.
+ *
+ * `useActionState` rather than a fetch: the form posts to a server action, so it works with
+ * JavaScript disabled and the pending state comes from the framework rather than from a boolean
+ * this file would have to keep in sync.
  */
-export function SignInForm() {
+export function SignInForm({ initialError }: { initialError?: string }) {
   const emailId = useId();
   const errorId = useId();
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [accepted, setAccepted] = useState<string | null>(null);
+  const [state, submit, pending] = useActionState<SignInState, FormData>(signInWithEmail, {
+    error: initialError,
+  });
+  const [local, setLocal] = useState<string | null>(null);
 
-  function validate(value: string): boolean {
-    const verdict = checkWorkEmail(value);
-    setError(verdict.ok ? null : (verdict.message ?? null));
-    setAccepted(verdict.ok ? (verdict.domain ?? null) : null);
-    return verdict.ok;
-  }
+  const error = local ?? state.error;
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    validate(email);
+  if (state.sent) {
+    return (
+      <div>
+        <p className="text-ink font-bold">{AUTH.sentHeading}</p>
+        <p className="text-ink-muted mt-2 text-sm leading-relaxed">{AUTH.sentBody}</p>
+        <p className="text-ink font-mono mt-4 text-sm">{state.email}</p>
+      </div>
+    );
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate>
-      <button
-        type="button"
-        className="border-line text-ink hover:bg-surface-inset flex min-h-[46px] w-full items-center justify-center gap-3 rounded-[10px] border px-5 text-sm font-bold transition-colors"
-      >
-        <GoogleMark />
-        {AUTH.googleCta}
-      </button>
+    <>
+      <form action={signInWithGoogle}>
+        <button
+          type="submit"
+          className="border-line text-ink hover:bg-surface-inset flex min-h-[46px] w-full items-center justify-center gap-3 rounded-md border px-5 text-sm font-bold transition-colors"
+        >
+          <GoogleMark />
+          {AUTH.googleCta}
+        </button>
+      </form>
 
       <div className="my-6 flex items-center gap-4">
         <span className="bg-line h-px flex-1" />
@@ -50,52 +56,52 @@ export function SignInForm() {
         <span className="bg-line h-px flex-1" />
       </div>
 
-      <label htmlFor={emailId} className="text-ink block text-sm font-bold">
-        {AUTH.emailLabel}
-      </label>
-      <input
-        id={emailId}
-        name="email"
-        type="email"
-        autoComplete="email"
-        inputMode="email"
-        placeholder={AUTH.emailPlaceholder}
-        value={email}
-        onChange={(event) => {
-          setEmail(event.target.value);
-          if (error !== null) setError(null);
-        }}
-        onBlur={(event) => {
-          if (event.target.value.trim() !== "") validate(event.target.value);
-        }}
-        aria-invalid={error !== null}
-        aria-describedby={error === null ? undefined : errorId}
-        className="border-line text-ink placeholder:text-ink-faint focus-visible:outline-accent mt-2 min-h-[46px] w-full rounded-[10px] border px-4 text-sm focus-visible:outline-2 focus-visible:outline-offset-[3px]"
-      />
+      <form action={submit} noValidate>
+        <label htmlFor={emailId} className="text-ink block text-sm font-bold">
+          {AUTH.emailLabel}
+        </label>
+        <input
+          id={emailId}
+          name="email"
+          type="email"
+          autoComplete="email"
+          inputMode="email"
+          required
+          defaultValue={state.email}
+          placeholder={AUTH.emailPlaceholder}
+          onChange={() => setLocal(null)}
+          onBlur={(event) => {
+            const value = event.target.value.trim();
+            if (value === "") return;
+            const verdict = checkWorkEmail(value);
+            setLocal(verdict.ok ? null : (verdict.message ?? null));
+          }}
+          aria-invalid={error !== undefined && error !== null}
+          aria-describedby={error ? errorId : undefined}
+          className="border-line text-ink placeholder:text-ink-faint focus-visible:outline-accent mt-2 min-h-[46px] w-full rounded-md border px-4 text-sm focus-visible:outline-2 focus-visible:outline-offset-[3px]"
+        />
 
-      {error === null ? (
-        <p className="text-ink-subtle mt-2 text-xs">{AUTH.emailHint}</p>
-      ) : (
-        // The refusal is a live region so it reaches a screen reader on blur, where a plain <p>
-        // swapped into the DOM would be announced only if focus happened to move through it.
-        <p id={errorId} role="alert" className="text-accent-hover mt-2 text-xs font-bold">
-          {error}
-        </p>
-      )}
+        {error ? (
+          // A live region, so the refusal reaches a screen reader on blur. A plain <p> swapped into
+          // the DOM is announced only if focus happens to pass through it.
+          <p id={errorId} role="alert" className="text-accent-hover mt-2 text-xs font-bold">
+            {error}
+          </p>
+        ) : (
+          <p className="text-ink-subtle mt-2 text-xs">{AUTH.emailHint}</p>
+        )}
 
-      {accepted === null ? null : (
-        <p className="text-brand-mint mt-2 text-xs font-bold">{accepted}</p>
-      )}
+        <button
+          type="submit"
+          disabled={pending}
+          className="bg-accent text-ink-on-accent hover:bg-accent-hover mt-6 min-h-[46px] w-full rounded-md px-5 text-sm font-bold transition-colors disabled:opacity-60"
+        >
+          {pending ? AUTH.submitPending : AUTH.submit}
+        </button>
 
-      <button
-        type="submit"
-        className="bg-accent text-ink-on-accent hover:bg-accent-hover mt-6 min-h-[46px] w-full rounded-[10px] px-5 text-sm font-bold transition-colors"
-      >
-        {AUTH.submit}
-      </button>
-
-      <p className="text-ink-faint mt-4 text-xs leading-relaxed">{AUTH.terms}</p>
-    </form>
+        <p className="text-ink-faint mt-4 text-xs leading-relaxed">{AUTH.terms}</p>
+      </form>
+    </>
   );
 }
 
@@ -103,11 +109,9 @@ export function SignInForm() {
  * Google's mark, drawn rather than hotlinked, so the page makes no third-party request and no
  * cookie is set on a visitor who never signs in.
  *
- * The four colours below are GOOGLE'S TRADEMARK COLOURS, not this product's design tokens. Google's
- * "Sign in with Google" guidelines require the mark in its own colours and forbid recolouring it; a
- * mark that followed --mp-accent would stop being the mark and would misrepresent a third party.
- * Same reasoning that exempts our own logo artwork in scripts/check-tokens.mjs, applied to someone
- * else's. They sit on one line so a single reasoned pragma covers them rather than four.
+ * The four colours are GOOGLE'S TRADEMARK COLOURS, not this product's design tokens. Their
+ * "Sign in with Google" guidelines require the mark in its own colours and forbid recolouring it.
+ * They sit on one line so a single reasoned pragma covers them rather than four.
  */
 // tokens-guard-ignore: Google trademark colours, reproduced as their guidelines require.
 const GOOGLE_MARK = ["#4285F4", "#34A853", "#FBBC05", "#EA4335"] as const;

@@ -1,11 +1,19 @@
 # Supabase project configuration.
 #
 # `project_id` is the local project name the CLI uses; it is NOT the hosted project ref, which is
-# supplied by `supabase link` and lives outside the repository. It now matches the settled product
+# supplied by `supabase link` and lives outside the repository. It matches the settled product
 # name, and the brand guard match-tests it against `packages/brand/src/brand.ts` rather than
 # ban-scanning it -- so this line cannot drift from the brand file without failing the build.
 # Renaming it is a one-line change with no data consequence, unlike the hosted ref.
-project_id = "numbadee"
+#
+# The 2026-09-12 product rename demonstrated that -- see docs/marketplane/53-the-rename.md. This
+# line and the brand file changed together because the guard refuses to let them disagree, while
+# the hosted project kept its ref and every applied migration with it. The hosted project's
+# DISPLAY NAME was changed separately, in the dashboard, and is not represented in this repository.
+#
+# The guard caught an earlier draft of this very comment for naming the product: only the value on
+# the line below is allowlisted, never the rest of the file.
+project_id = "uniplain"
 
 [db]
 port = 54322

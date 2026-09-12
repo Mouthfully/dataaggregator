@@ -26,21 +26,34 @@ export interface Brand {
   /** Registered legal entity. Appears on invoices, the imprint and every contract. */
   readonly legalEntity: string;
   /**
-   * Product name. NOT SETTLED — specification section 12 only recommends "Marketplane"
-   * ("if forced to one"). Every occurrence routes through this constant and the package scope is
-   * `@repo/*`, so settling on a different name is a one-line change here and no npm rename.
+   * Product name. SETTLED: `uniplain`, which supersedes `numbadee`. See
+   * docs/marketplane/53-the-rename.md.
+   *
+   * This field used to claim that changing it was "a one-line change here and no npm rename".
+   * The rename tested that claim and it held: outside this file and its test, the only
+   * occurrence anywhere in code was `supabase/config.toml`'s `project_id`, which the brand guard
+   * match-tests against this value rather than letting it drift. Every rendered occurrence goes
+   * through `productName()` in `apps/web/app/_content.ts`, which reads this constant.
    */
   readonly productName: string;
   readonly productNameSettled: boolean;
   readonly tagline: string;
   /**
-   * Primary domain. UNRESOLVED and blocking: the support address is on zwitchy.io while the
-   * design artboard hard-codes api.marketplane.dev. Cheap in code, expensive in practice — OAuth
-   * redirect URIs are registered with Google and Meta, and specification section 3.5 records
-   * Google's sensitive-scope verification as unbounded (documented 3-5 days, observed at over ten
-   * weeks). Changing the domain after that clock starts restarts it.
+   * Primary domain. RESOLVED: `uniplain.com`, registered by the founder and serving the web app.
+   *
+   * This was the field the rest of the file called "blocking", and what made it expensive was
+   * never the code — it is that OAuth redirect URIs are registered with Google and Meta, and
+   * specification section 3.5 records Google's sensitive-scope verification as unbounded
+   * (documented 3-5 days, observed at over ten weeks). Changing the domain after that clock
+   * starts restarts it. The clock has not started, which is why settling it now is cheap and
+   * settling it later would not have been.
    */
   readonly domain: string | null;
+  /**
+   * Public base URL of the API, which is a SEPARATE ORIGIN from the site: the site is a Next app
+   * on Vercel and the API is a Cloudflare Worker. Null until a hostname on `domain` routes to
+   * that Worker — see `apiUrl()` for why null here refuses rather than deriving one from the site.
+   */
   readonly apiBaseUrl: string | null;
   readonly supportEmail: string;
   /** Not yet distinct from support. Set when a legal inbox exists. */
@@ -78,14 +91,27 @@ export interface Brand {
 export const brand: Brand = {
   legalEntity: "Now On Company Limited",
 
-  productName: "numbadee",
+  productName: "uniplain",
   productNameSettled: true,
   tagline: "Know what changed. And why.",
 
-  domain: null,
+  domain: "uniplain.com",
+
+  // Null deliberately, and not the same kind of unknown the domain was. `api-edge` is deployed at
+  // a workers.dev hostname, which is a deployment detail and not a public product URL; no
+  // hostname on `domain` routes to the Worker yet. Filling this in is adding a DNS record and a
+  // wrangler route, not a decision.
   apiBaseUrl: null,
 
-  supportEmail: "support@help.zwitchy.io",
+  // Moved onto the product domain with the rename, on the founder's instruction.
+  //
+  // VERIFIED NOT YET DELIVERABLE at the time of writing: the zone has one CNAME and no MX record,
+  // and Cloudflare Email Routing on it exists but reads `enabled: false, status: unconfigured`.
+  // Mail to this address bounces until that is finished. It is recorded here rather than deferred
+  // because the address is the founder's decision and the MX records are a five-minute task; what
+  // must not happen is the two drifting apart silently, so `brand.test.ts` asserts the address is
+  // on `domain` and 53-the-rename.md carries the delivery check as an open item.
+  supportEmail: "contact@uniplain.com",
   legalEmail: null,
 
   postalAddress: {
@@ -127,20 +153,23 @@ export function formatAddress(separator = ", "): string {
 /**
  * The site's base URL for the current environment.
  *
- * `brand.domain` is the CANONICAL PUBLIC domain and is deliberately null until it is settled. That
- * does not block development, because nothing before launch needs the canonical name:
+ * `brand.domain` is the CANONICAL PUBLIC domain, and it is now set. The order is unchanged:
  *
  *   1. An explicit override, for a deployment that knows its own URL.
  *   2. Vercel's own per-deployment URL, injected on every preview build.
- *   3. The canonical domain, once it exists.
- *   4. localhost, for local development.
+ *   3. localhost, for local development.
+ *   4. The canonical domain.
  *
- * Only step 3 needs an answer, and only for two things: production, and the OAuth redirect URIs
- * registered with Google and Meta. Everything else runs on steps 1, 2 and 4.
+ * Steps 2 and 3 both precede the canonical domain, and while the domain was null the order among
+ * them was untestable. It is load-bearing now. Step 2 keeps a preview build from advertising
+ * itself as production -- a preview that emitted `https://uniplain.com` would send the reader to
+ * the live site instead of the build under review -- and step 3 keeps a dev server from doing the
+ * same thing to the developer.
  *
- * In production with none of them set this throws rather than silently emitting a wrong absolute
- * URL into an email or an invoice, which is the failure mode a placeholder string would have
- * hidden.
+ * The production throw below is now unreachable while `brand.domain` is set. It stays because what
+ * it guards is the invariant and not the current value: if the domain is ever unset again, this
+ * must refuse rather than silently emit a wrong absolute URL into an email or an invoice, which is
+ * the failure mode a placeholder string would have hidden.
  *
  * `env` is REQUIRED and has no default. This package is compiled into both the Next app and the
  * Workers runtime, and `process.env` does not exist in workerd -- a Worker's environment arrives as
@@ -154,21 +183,42 @@ export function siteUrl(env: Record<string, string | undefined>): string {
   const vercel = env.VERCEL_PROJECT_PRODUCTION_URL ?? env.VERCEL_URL;
   if (vercel) return `https://${vercel.replace(/\/$/, "")}`;
 
+  // Development is checked BEFORE the canonical domain, not after. While `brand.domain` was null
+  // the two could be written in either order and nobody would notice; now they cannot. A dev
+  // server that fell through to the domain would print `https://uniplain.com/...` into every
+  // local link and email preview, sending the developer to production to check their own work.
+  if (env.NODE_ENV !== "production") return "http://localhost:3000";
+
   if (brand.domain) return `https://${brand.domain}`;
 
-  if (env.NODE_ENV === "production") {
-    throw new Error(
-      "siteUrl(): no public URL available. Set PUBLIC_SITE_URL, or settle brand.domain. " +
-        "Refusing to guess -- a wrong absolute URL in an email or invoice is worse than a failed build.",
-    );
-  }
-  return "http://localhost:3000";
+  throw new Error(
+    "siteUrl(): no public URL available. Set PUBLIC_SITE_URL, or settle brand.domain. " +
+      "Refusing to guess -- a wrong absolute URL in an email or invoice is worse than a failed build.",
+  );
 }
 
-/** The public API base URL, resolved the same way. Takes its environment for the same reason. */
+/**
+ * The public API base URL. Takes its environment for the same reason as `siteUrl`.
+ *
+ * NOT resolved the same way, and this is the part that changed when the domain was settled. The
+ * API is a Cloudflare Worker; the site is a Next app on Vercel. They are different origins, and
+ * `apps/web` serves no `/api` route at all.
+ *
+ * This used to fall back to `${siteUrl(env)}/api`. While `brand.domain` was null that fallback was
+ * harmless in production, because `siteUrl` threw before it could produce anything. Setting the
+ * domain removed the throw, and the same line would then have returned `https://uniplain.com/api`
+ * -- a URL that resolves, serves the marketing site's 404, and looks entirely plausible in a log.
+ *
+ * So it refuses instead. A missing API URL is a deployment that has not been finished; an API URL
+ * pointing at the wrong origin is a deployment that appears finished and is not.
+ */
 export function apiUrl(env: Record<string, string | undefined>): string {
   const explicit = env.PUBLIC_API_URL;
   if (explicit) return explicit.replace(/\/$/, "");
   if (brand.apiBaseUrl) return brand.apiBaseUrl.replace(/\/$/, "");
-  return `${siteUrl(env)}/api`;
+  throw new Error(
+    "apiUrl(): no API base URL available. Set PUBLIC_API_URL, or settle brand.apiBaseUrl. " +
+      "Refusing to derive one from the site URL -- the API is a different origin, and a URL on " +
+      "the site's domain would resolve to the marketing site rather than fail.",
+  );
 }

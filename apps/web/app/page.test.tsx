@@ -192,14 +192,32 @@ describe("the legal identity is the brand file's, not a copy", () => {
     expect(html).toContain(`mailto:${brand.supportEmail}`);
   });
 
-  it("names no domain, because none is registered", () => {
-    // brand.domain is null. A site that printed one would be advertising an address that does not
-    // resolve, and Google's OAuth verification restarts if the domain changes later.
+  it("names no domain, even now that one is registered", () => {
+    // This assertion used to rest on `brand.domain` being null, and settling the domain is exactly
+    // the event that would have quietly retired it. The property it was protecting never depended
+    // on the null: a page that prints its own absolute address pins that address into the markup,
+    // and Google's OAuth verification restarts if the domain changes later.
+    //
     // Asserted against the MARKUP, not the stripped text: a URL lives in an href attribute, which
     // tag-stripping removes. A mutation adding <a href="https://..."> survived the text-only
     // version of this assertion, which is exactly the case it exists to catch.
-    expect(brand.domain).toBeNull();
     expect(html).not.toMatch(/\bhttps?:\/\/(?!localhost)/);
+    // And the domain must not reach the page by any other route either -- a bare hostname in
+    // text, or a protocol-relative href, both slip past the pattern above.
+    //
+    // The support address is the ONE legitimate occurrence, because it is on the domain by
+    // construction, so the assertion is a COUNT rather than an absence: every appearance of the
+    // domain in the markup must be an appearance of the support address.
+    //
+    // The obvious way to write this is to strip the address and then assert the domain is absent.
+    // That version was written first and a mutation survived it: stripping `brand.domain` instead
+    // of `brand.supportEmail` -- a one-word slip, and a plausible one -- makes the assertion
+    // vacuously true and no test anywhere notices. Counting has no such degree of freedom.
+    expect(brand.domain).not.toBeNull();
+    const occurrences = (haystack: string, needle: string) => haystack.split(needle).length - 1;
+    const addresses = occurrences(html, brand.supportEmail);
+    expect(addresses).toBeGreaterThan(0); // or the count below is 0 === 0 and proves nothing
+    expect(occurrences(html, brand.domain as string)).toBe(addresses);
   });
 });
 

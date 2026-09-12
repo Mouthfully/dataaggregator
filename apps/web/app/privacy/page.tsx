@@ -444,9 +444,7 @@ export default function PrivacyPage() {
             <h1 className="font-display text-ink mt-2.5 text-[32px] leading-[1.1] font-bold tracking-[-0.03em] md:text-[42px]">
               {HEADING}
             </h1>
-            <p className="text-ink-muted mt-5 text-base leading-[1.7] md:text-[17px]">
-              {LEAD}
-            </p>
+            <p className="text-ink-muted mt-5 text-base leading-[1.7] md:text-[17px]">{LEAD}</p>
 
             <dl className="border-line-soft mt-7 flex flex-wrap gap-x-10 gap-y-3 border-t pt-5 text-[13px]">
               <div>
@@ -454,9 +452,7 @@ export default function PrivacyPage() {
                   {LAST_UPDATED_LABEL}
                 </dt>
                 <dd className="text-ink mt-1 font-bold">
-                  <time dateTime={LAST_UPDATED.iso}>
-                    {LAST_UPDATED.display}
-                  </time>
+                  <time dateTime={LAST_UPDATED.iso}>{LAST_UPDATED.display}</time>
                 </dd>
               </div>
               <div>
@@ -484,9 +480,7 @@ export default function PrivacyPage() {
           className="mx-auto max-w-[1200px] px-8 pb-10 md:pb-14"
         >
           <div className="bg-surface-inset rounded-xl p-6 md:p-9">
-            <p className="text-ink-muted max-w-[760px] text-sm leading-[1.7]">
-              {HEADLINE_NOTE}
-            </p>
+            <p className="text-ink-muted max-w-[760px] text-sm leading-[1.7]">{HEADLINE_NOTE}</p>
 
             <h2
               id="controller-heading"
@@ -499,9 +493,7 @@ export default function PrivacyPage() {
               {CONTROLLER_ROWS.map((row) => (
                 <div key={row.key} className="min-w-0">
                   <dt className="text-ink-subtle text-xs">{row.key}</dt>
-                  <dd className="text-ink mt-1 text-sm leading-[1.55] font-bold">
-                    {row.value}
-                  </dd>
+                  <dd className="text-ink mt-1 text-sm leading-[1.55] font-bold">{row.value}</dd>
                 </div>
               ))}
               <div className="min-w-0">
@@ -545,9 +537,7 @@ export default function PrivacyPage() {
                 <span className="text-ink-subtle mt-2 text-[11px] font-bold tracking-[0.1em] uppercase">
                   {role.role}
                 </span>
-                <p className="text-ink-muted mt-4 text-[15px] leading-[1.7]">
-                  {role.body}
-                </p>
+                <p className="text-ink-muted mt-4 text-[15px] leading-[1.7]">{role.body}</p>
               </li>
             ))}
           </ul>
@@ -567,9 +557,7 @@ export default function PrivacyPage() {
               >
                 {INVENTORY_HEADING}
               </h2>
-              <p className="text-ink-muted mt-3 text-sm leading-[1.7]">
-                {INVENTORY_LEAD}
-              </p>
+              <p className="text-ink-muted mt-3 text-sm leading-[1.7]">{INVENTORY_LEAD}</p>
             </div>
 
             <div className="border-line bg-surface mt-6 overflow-x-auto rounded-lg border">
@@ -590,10 +578,7 @@ export default function PrivacyPage() {
                 </thead>
                 <tbody>
                   {INVENTORY_ROWS.map((row) => (
-                    <tr
-                      key={row.category}
-                      className="border-line-soft border-b last:border-b-0"
-                    >
+                    <tr key={row.category} className="border-line-soft border-b last:border-b-0">
                       <th
                         scope="row"
                         className="text-ink px-5 py-4 align-top text-[13px] font-bold"
@@ -628,23 +613,15 @@ export default function PrivacyPage() {
           </h2>
 
           <div className="grid gap-10 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-16">
-            <nav
-              aria-label="Contents"
-              className="lg:sticky lg:top-8 lg:self-start"
-            >
+            <nav aria-label="Contents" className="lg:sticky lg:top-8 lg:self-start">
               <h3 className="text-ink-faint text-[11px] font-bold tracking-[0.14em] uppercase md:text-xs">
                 Contents
               </h3>
               <ol className="mt-4 space-y-2">
                 {CLAUSES.map((clause, index) => (
                   <li key={clause.id} className="text-[13px] leading-[1.5]">
-                    <a
-                      href={`#${clause.id}`}
-                      className="text-ink-muted hover:text-accent"
-                    >
-                      <span className="text-ink-faint mr-2 tabular-nums">
-                        {index + 1}
-                      </span>
+                    <a href={`#${clause.id}`} className="text-ink-muted hover:text-accent">
+                      <span className="text-ink-faint mr-2 tabular-nums">{index + 1}</span>
                       {clause.title}
                     </a>
                   </li>
@@ -689,10 +666,7 @@ export default function PrivacyPage() {
                           key={point}
                           className="text-ink-muted my-2.5 flex gap-3 text-[15px] leading-[1.7]"
                         >
-                          <span
-                            aria-hidden="true"
-                            className="text-ink-faint shrink-0 font-bold"
-                          >
+                          <span aria-hidden="true" className="text-ink-faint shrink-0 font-bold">
                             &#8212;
                           </span>
                           {point}
@@ -732,9 +706,7 @@ export default function PrivacyPage() {
                   <dt className="text-ink text-[13px] font-bold sm:w-[240px] sm:shrink-0">
                     {item.term}
                   </dt>
-                  <dd className="text-ink-subtle text-[13px] leading-[1.6]">
-                    {item.note}
-                  </dd>
+                  <dd className="text-ink-subtle text-[13px] leading-[1.6]">{item.note}</dd>
                 </div>
               ))}
             </dl>

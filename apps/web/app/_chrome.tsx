@@ -72,6 +72,17 @@ export function Footer() {
           <p className="mt-1">{SITE.footerNote2}</p>
           {/* A registration number is an identifier, not a sentence, so it is written inline. */}
           <p className="mt-4">Company registration {brand.companyRegistration}</p>
+
+          {/* Linked from every page, because a policy reachable only by typing its URL is not
+              published in any sense a regulator or a customer would accept. */}
+          <p className="mt-3 flex gap-4">
+            <a className="text-accent hover:underline" href="/terms">
+              Terms
+            </a>
+            <a className="text-accent hover:underline" href="/privacy">
+              Privacy
+            </a>
+          </p>
         </div>
       </div>
     </footer>

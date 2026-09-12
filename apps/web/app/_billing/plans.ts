@@ -5,9 +5,20 @@
  * The amounts here are for DISPLAY. Stripe holds the authoritative price behind each price id, and
  * checkout charges what Stripe says, never what this file says. Keeping the display amount here
  * anyway is a deliberate, bounded duplication: a marketing page cannot make a network call to
- * Stripe to render a pricing table. What closes the gap is `assertPricesMatchStripe` below, run as
- * a test rather than trusted -- so a price changed in the Stripe dashboard and not here is a
- * failing build, not a customer discovering it at checkout.
+ * Stripe to render a pricing table.
+ *
+ * WHAT BOUNDS IT, AND WHAT DOES NOT. `plans.test.ts` checks the annual arithmetic against the
+ * stated discount, so a number edited in one place and not the other is a failing build.
+ *
+ * NOTHING HERE CHECKS THESE AGAINST STRIPE, and that limit is stated rather than implied. An
+ * earlier version of this comment promised a function named `assertPricesMatchStripe` that was
+ * never written; an agent read the comment and turned it into a sentence on the pricing page
+ * telling customers a test guarded the amounts. A comment describing code that does not exist is
+ * not a harmless aspiration -- it is a claim, and it propagates.
+ *
+ * A price changed in the Stripe dashboard and not here would render stale. Nobody is ever CHARGED
+ * what this file says -- checkout charges what Stripe holds -- so the damage is a wrong number on
+ * a page, not a wrong charge.
  *
  * THE PRICE IDS COME FROM THE ENVIRONMENT. They differ between test mode and live mode, and
  * hard-coding either means the wrong one ships to the other. A missing id is a refusal, not a

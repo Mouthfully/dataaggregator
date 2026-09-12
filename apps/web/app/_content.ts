@@ -174,6 +174,7 @@ export const SITE = {
 /** The primary navigation. Labels are structural, so they are not sentences. */
 export const NAV = [
   { href: "/integrations", label: "Integrations" },
+  { href: "/pricing", label: "Pricing" },
   { href: "/docs", label: "Documentation" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/signin", label: "Sign in" },

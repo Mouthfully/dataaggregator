@@ -11,8 +11,10 @@ import { claim } from "../_content";
  * IT IS THE LONG FORM OF `app/_sections/Pricing.tsx`, NOT A SECOND OPINION ON PRICE. The four
  * self-serve tiers, their summaries and their feature lists are that section's, and the numbers are
  * not re-typed here at all: `PLAN_DISPLAY` in `app/_billing/plans.ts` is the catalogue the checkout
- * reads, and `assertPricesMatchStripe` fails the build if it drifts from the payment provider. A
- * price typed into a marketing page is a price that can disagree with the one charged.
+ * reads. A price typed into a marketing page is a price that can disagree with the one charged.
+ *
+ * NOTHING VALIDATES THESE AGAINST STRIPE. `plans.test.ts` checks the annual arithmetic and
+ * `stripe-prices.test.ts` checks what the creation script would send, but neither calls Stripe.
  *
  * THE YEARLY FIGURES ARE RENDERED HERE, AND THE HOMEPAGE SECTION'S REASON FOR NOT RENDERING THEM
  * NO LONGER APPLIES. That section's module comment says the yearly amounts "do not exist anywhere
@@ -62,7 +64,7 @@ const HERO_HEADING_TOP = "Every plan, side by side.";
 const HERO_HEADING_BOTTOM = "Priced in US dollars.";
 
 const HERO_LEAD =
-  "Four plans you can buy yourself and one that starts with a conversation. The four prices below come from the same catalogue the checkout reads, and a test fails the build if they ever disagree with the payment provider.";
+  "Four plans you can buy yourself and one that starts with a conversation. The four prices below come from the same catalogue the checkout reads, so the page and the charge cannot be typed apart.";
 
 /** Said once, in full, because a price with no currency becomes a support ticket. */
 const CURRENCY_NOTE =
@@ -161,8 +163,8 @@ const ENTERPRISE_LEAD =
  */
 const ENTERPRISE_POINTS = [
   {
-    title: "More connectors",
-    body: "More than the Agency plan lists, agreed with you before you sign rather than metered into a surprise afterwards.",
+    title: "Limits agreed, not metered",
+    body: "Whatever this plan covers is written down before you sign rather than metered into a surprise afterwards.",
   },
   {
     title: "More workspaces in one organisation",
@@ -173,8 +175,8 @@ const ENTERPRISE_POINTS = [
     body: claim("tenant-isolation"),
   },
   {
-    title: "An invoice instead of a card",
-    body: "The four plans above are bought with a card through the checkout. This one can be invoiced instead, on terms written into the agreement.",
+    title: "Billing arranged with you",
+    body: "The four plans above are bought with a card through the checkout. How this one is paid for is part of the conversation, and nothing is decided here in advance of it.",
   },
   {
     title: "A named person to contact",
@@ -844,7 +846,10 @@ export default function PricingPage() {
 
           <dl className="border-line-soft grid border-t md:grid-cols-2">
             {OPEN_TERMS.map((term) => (
-              <div key={term.title} className="border-line-soft border-b py-5 md:px-6 md:first:pl-0">
+              <div
+                key={term.title}
+                className="border-line-soft border-b py-5 md:px-6 md:first:pl-0"
+              >
                 <dt className="text-ink text-sm font-bold">{term.title}</dt>
                 <dd className="text-ink-muted mt-2 text-[13px] leading-[1.7]">{term.body}</dd>
               </div>
@@ -923,7 +928,10 @@ export default function PricingPage() {
                   &rarr;
                 </span>
               </a>
-              <a href="#compare" className="text-accent-on-dark self-center text-sm font-bold hover:underline">
+              <a
+                href="#compare"
+                className="text-accent-on-dark self-center text-sm font-bold hover:underline"
+              >
                 {COMPARE_CAPTION}
               </a>
             </div>

@@ -28,9 +28,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // precision nobody has.
   return [
     { url: `${base}/`, lastModified, changeFrequency: "weekly", priority: 1 },
+    { url: `${base}/pricing`, lastModified, changeFrequency: "weekly", priority: 0.9 },
     { url: `${base}/integrations`, lastModified, changeFrequency: "weekly", priority: 0.8 },
     { url: `${base}/connectors/shopify`, lastModified, changeFrequency: "monthly", priority: 0.7 },
     { url: `${base}/fields/google-ads`, lastModified, changeFrequency: "monthly", priority: 0.7 },
     { url: `${base}/docs`, lastModified, changeFrequency: "monthly", priority: 0.6 },
+    // Rarely read and rarely changed, but a policy nobody can find is a policy that does not
+    // satisfy the obligation to publish one.
+    { url: `${base}/terms`, lastModified, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${base}/privacy`, lastModified, changeFrequency: "yearly", priority: 0.3 },
   ];
 }

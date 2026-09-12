@@ -7,7 +7,7 @@ import {
   combineMetric,
   isAdditive,
   weightFor,
-} from "./metrics.js";
+} from "./metrics.ts";
 
 describe("every metric declares how it combines", () => {
   it("leaves no metric without an aggregation", () => {

@@ -141,6 +141,12 @@ importers:
       '@repo/brand':
         specifier: workspace:*
         version: link:../../packages/brand
+      '@repo/connectors':
+        specifier: workspace:*
+        version: link:../../packages/connectors
+      '@repo/contract':
+        specifier: workspace:*
+        version: link:../../packages/contract
       '@repo/tokens':
         specifier: workspace:*
         version: link:../../packages/tokens

@@ -6,7 +6,7 @@ import {
   fetchWithRetry,
   parseMetaThrottle,
   parseRetryAfter,
-} from "./http.js";
+} from "./http.ts";
 
 const NOW = new Date("2026-09-08T00:00:00Z");
 

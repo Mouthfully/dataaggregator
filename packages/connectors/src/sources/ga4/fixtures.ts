@@ -16,7 +16,7 @@
  * wrong and the fixture is right.
  */
 
-import type { Ga4Report } from "./normalize.js";
+import type { Ga4Report } from "./normalize.ts";
 
 /** A typical daily report: date dimension, sessions and conversions. */
 export const DAILY_SESSIONS: Ga4Report = {

@@ -7,7 +7,7 @@ import {
   type WooWindowPage,
   fetchOrdersPages,
   fetchOrdersWindow,
-} from "./client.js";
+} from "./client.ts";
 
 const STORE = "https://shop.example.com";
 const CRED = { key: "ck_a1b2c3", secret: "cs_9z8y7x" };

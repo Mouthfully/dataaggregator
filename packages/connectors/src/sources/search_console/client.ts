@@ -38,7 +38,7 @@ import {
   type SearchConsoleDimension,
   grainFor,
   parseSearchConsoleDate,
-} from "./normalize.js";
+} from "./normalize.ts";
 
 /**
  * `POST {base}/sites/{siteUrl}/searchAnalytics/query`. Overridable so tests never resolve a real

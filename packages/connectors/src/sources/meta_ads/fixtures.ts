@@ -29,7 +29,7 @@
  * is wrong and the fixture is right.
  */
 
-import type { MetaInsightsRow } from "./normalize.js";
+import type { MetaInsightsRow } from "./normalize.ts";
 
 /** Obviously not a real ad account. */
 export const FIXTURE_ACCOUNT = "act_000000000000001";

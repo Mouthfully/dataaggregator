@@ -25,7 +25,7 @@
  * about them at all; a recorded fixture will need that read before it is committed.
  */
 
-import type { SearchAnalyticsResponse } from "./normalize.js";
+import type { SearchAnalyticsResponse } from "./normalize.ts";
 
 /** The property every fixture below belongs to. Reserved TLD: it cannot be a real customer. */
 export const FIXTURE_SITE_URL = "sc-domain:example.test";

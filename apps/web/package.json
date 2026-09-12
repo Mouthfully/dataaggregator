@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@repo/brand": "workspace:*",
+    "@repo/connectors": "workspace:*",
+    "@repo/contract": "workspace:*",
     "@repo/tokens": "workspace:*",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",

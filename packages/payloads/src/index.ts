@@ -17,7 +17,7 @@ export {
   type PutOptions,
   type R2Like,
   type RedactionRecord,
-} from "./payloads.js";
+} from "./payloads.ts";
 export {
   DECLARED_SOURCES,
   MAX_REDACTION_DEPTH,
@@ -32,4 +32,4 @@ export {
   type PolicyTable,
   type RedactionPolicy,
   type RedactionResult,
-} from "./redaction.js";
+} from "./redaction.ts";

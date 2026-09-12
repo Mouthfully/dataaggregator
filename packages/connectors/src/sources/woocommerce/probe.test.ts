@@ -1,6 +1,6 @@
 import type { FetchOptions } from "@repo/extract";
 import { describe, expect, it } from "vitest";
-import { WooClientError, probeStore, probeUrl } from "./client.js";
+import { WooClientError, probeStore, probeUrl } from "./client.ts";
 
 const STORE = "https://shop.example.com";
 const CRED = { key: "ck_a1b2c3", secret: "cs_9z8y7x" };

@@ -6,7 +6,7 @@ import {
   estimateCost,
   payloadKey,
   workspacePrefix,
-} from "./payloads.js";
+} from "./payloads.ts";
 import {
   DECLARED_SOURCES,
   MAX_REDACTION_DEPTH,
@@ -15,7 +15,7 @@ import {
   policyFor,
   redactJsonBytes,
   redactValue,
-} from "./redaction.js";
+} from "./redaction.ts";
 
 const PARTS = {
   workspaceId: "7c000000-0000-0000-0000-000000000001",

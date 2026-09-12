@@ -99,10 +99,20 @@ function moduleExports(rel) {
   return [...names];
 }
 
-/** Names the barrel re-exports from one module, following `x as y` to x. */
+/**
+ * Names the barrel re-exports from one module, following `x as y` to x.
+ *
+ * THE EXTENSION IS MATCHED LOOSELY, ON PURPOSE. This guard asks whether a module is reachable from
+ * the barrel; how the specifier spells its extension is not its business, and hard-coding one
+ * spelling made it a second copy of a convention that lives in tsconfig.base.json. That copy went
+ * wrong the moment the convention was applied: converting `./sources/x/client.js` to `.ts` --
+ * which tsconfig mandates, and which `next build` requires -- turned this guard red across all
+ * five sources while every one of them was still exported exactly as before. A guard that fails
+ * when nothing it guards has changed teaches people to distrust it.
+ */
 function barrelExportsFrom(source, half) {
   const block = barrel.match(
-    new RegExp(`export \\{([^}]*)\\} from "\\./sources/${source}/${half}\\.js";`),
+    new RegExp(`export \\{([^}]*)\\} from "\\./sources/${source}/${half}\\.(?:ts|js)";`),
   );
   if (block === null) return null;
   return block[1]

@@ -20,7 +20,7 @@ import {
   UNPARSEABLE_METRIC,
   UNSAFE_MICROS,
   ZERO_SPEND_DAY,
-} from "./fixtures.js";
+} from "./fixtures.ts";
 import {
   GOOGLE_ADS_LEVELS,
   type GoogleAdsLevel,
@@ -30,7 +30,7 @@ import {
   microsToCurrency,
   normalizeGoogleAdsSearch,
   parseGoogleAdsNumber,
-} from "./normalize.js";
+} from "./normalize.ts";
 
 const FETCHED_AT = "2026-09-08T02:00:00Z";
 const FIRST_SEEN_AT = "2026-08-14T06:00:00Z";

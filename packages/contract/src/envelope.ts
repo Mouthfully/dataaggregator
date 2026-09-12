@@ -38,9 +38,9 @@
  */
 
 import { z } from "zod";
-import { ATTRIBUTION_WINDOWS } from "./attribution.js";
-import { COMMERCE_METRICS, CONVERSION_METRICS, METRICS } from "./metrics.js";
-import { SOURCES } from "./source.js";
+import { ATTRIBUTION_WINDOWS } from "./attribution.ts";
+import { COMMERCE_METRICS, CONVERSION_METRICS, METRICS } from "./metrics.ts";
+import { SOURCES } from "./source.ts";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "must be a calendar date, YYYY-MM-DD");
 

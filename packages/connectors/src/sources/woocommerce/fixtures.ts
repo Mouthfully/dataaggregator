@@ -11,7 +11,7 @@
  * normaliser must never read), and a `_delivery_fee` meta key that is fee-shaped and is not one.
  */
 
-import type { WooOrder } from "./normalize.js";
+import type { WooOrder } from "./normalize.ts";
 
 /**
  * A fixture is WIDER than what the normaliser reads, deliberately.

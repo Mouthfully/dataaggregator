@@ -17,7 +17,7 @@ import {
   UNPARSEABLE_SPEND,
   VALUE_ONLY,
   WRONG_ACCOUNT,
-} from "./fixtures.js";
+} from "./fixtures.ts";
 import {
   META_ACTION_WINDOWS,
   type MetaActionWindow,
@@ -27,7 +27,7 @@ import {
   metaAccountId,
   normalizeMetaInsights,
   parseMetaNumber,
-} from "./normalize.js";
+} from "./normalize.ts";
 
 const TIMEZONE = "Asia/Bangkok";
 const FETCHED_AT = "2026-09-08T02:00:00Z";

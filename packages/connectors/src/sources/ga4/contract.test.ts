@@ -10,13 +10,13 @@ import {
   NO_TIMEZONE,
   SHAPE_MISMATCH,
   UNMAPPED_METRIC,
-} from "./fixtures.js";
+} from "./fixtures.ts";
 import {
   Ga4NormalizeError,
   normalizeGa4Report,
   parseGa4Date,
   parseGa4Number,
-} from "./normalize.js";
+} from "./normalize.ts";
 
 const PROPERTY = "properties/123456";
 const FETCHED_AT = "2026-09-08T02:00:00Z";

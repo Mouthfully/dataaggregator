@@ -1,4 +1,4 @@
-export { ATTRIBUTION_WINDOWS, type AttributionWindow } from "./attribution.js";
+export { ATTRIBUTION_WINDOWS, type AttributionWindow } from "./attribution.ts";
 export {
   ADDITIVE_METRICS,
   COMMERCE_METRICS,
@@ -10,18 +10,18 @@ export {
   weightFor,
   type Aggregation,
   type MetricName,
-} from "./metrics.js";
+} from "./metrics.ts";
 export {
   RESTATEMENT_CLOCKS,
   isProvisional,
   restatesUntil,
   type RestatementClock,
   type RestatementInput,
-} from "./restatement.js";
+} from "./restatement.ts";
 export {
   restatementEventSchema,
   type RestatementEvent,
-} from "./restatement-event.js";
+} from "./restatement-event.ts";
 export {
   FIELD_REGISTRY,
   droppedFields,
@@ -30,8 +30,8 @@ export {
   metricsFor,
   type Disposition,
   type SourceFields,
-} from "./registry.js";
-export { SOURCES, type Source } from "./source.js";
+} from "./registry.ts";
+export { SOURCES, type Source } from "./source.ts";
 export {
   ADVERTISING_ENTITY_TYPES,
   ENTITY_TYPES,
@@ -43,4 +43,4 @@ export {
   upsertKey,
   type Envelope,
   type EnvelopeRow,
-} from "./envelope.js";
+} from "./envelope.ts";

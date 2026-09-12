@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WORKFLOW_STEP_LIMIT, planBackfill, stepBudget } from "./backfill.js";
+import { WORKFLOW_STEP_LIMIT, planBackfill, stepBudget } from "./backfill.ts";
 
 const TODAY = "2026-09-08";
 

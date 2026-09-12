@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { planBackfill } from "./backfill.js";
-import { GOOGLE_ADS_TIERS, SURVIVAL_ACCOUNTS, accountCapacity } from "./capacity.js";
+import { planBackfill } from "./backfill.ts";
+import { GOOGLE_ADS_TIERS, SURVIVAL_ACCOUNTS, accountCapacity } from "./capacity.ts";
 
 /** Whatever the scheduler actually issues, not a guess. */
 const requestsPerAccountPerDay = planBackfill({

@@ -78,7 +78,7 @@ import {
   REDACTION_POLICY_VERSION,
   policyFor,
   redactJsonBytes,
-} from "./redaction.js";
+} from "./redaction.ts";
 
 declare const FixedLengthStream: {
   new (expectedLength: number): { readable: ReadableStream; writable: WritableStream };

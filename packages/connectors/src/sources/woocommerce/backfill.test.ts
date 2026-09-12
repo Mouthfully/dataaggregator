@@ -8,10 +8,10 @@ import {
   parseRfc3339,
   runWooBackfill,
   wooBackfillChunks,
-} from "./backfill.js";
-import type { WooWindow } from "./client.js";
-import { ORDER, PAGE } from "./fixtures.js";
-import { WooNormalizeError } from "./normalize.js";
+} from "./backfill.ts";
+import type { WooWindow } from "./client.ts";
+import { ORDER, PAGE } from "./fixtures.ts";
+import { WooNormalizeError } from "./normalize.ts";
 
 const STORE = "https://shop.example.com";
 const CRED = { key: "ck_a1b2c3", secret: "cs_9z8y7x" };

@@ -35,7 +35,7 @@
  */
 
 import { GOOGLE_ADS_TIERS, type FetchOptions, fetchWithRetry } from "@repo/extract";
-import type { GoogleAdsSearchResponse } from "./normalize.js";
+import type { GoogleAdsSearchResponse } from "./normalize.ts";
 
 /**
  * The API version, as its own constant.

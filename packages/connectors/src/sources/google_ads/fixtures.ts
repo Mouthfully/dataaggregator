@@ -28,7 +28,7 @@
  * Asia/Bangkok and reports THB, because a fixture in UTC and USD cannot exercise trap 5 or trap 6.
  */
 
-import type { GoogleAdsSearchResponse } from "./normalize.js";
+import type { GoogleAdsSearchResponse } from "./normalize.ts";
 
 /** The account fields every fixture selects, in the camelCase the response uses. */
 const CUSTOMER_MASK = "customer.id,customer.currencyCode,customer.timeZone";

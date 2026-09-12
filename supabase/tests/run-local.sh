@@ -24,6 +24,39 @@ psql() { command psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -v ON_ERROR_STOP=1 
 
 echo "==> resetting $DB"
 psql -d postgres -q -c "drop database if exists $DB;" -c "create database $DB;"
+
+# ROLES ARE CLUSTER-LEVEL, AND DROPPING THE DATABASE DOES NOT TOUCH THEM.
+#
+# This was found by a mutation that should have failed and did not: deleting
+# `grant app_ingest to authenticator` from a migration left the suite green, because the grant was
+# still there from the PREVIOUS run. Every role below, and every membership between them, outlives
+# `drop database` -- so without this the suite stops testing the migrations and starts testing the
+# accumulated state of whoever's cluster it happens to run on. CI gets a fresh container and would
+# have kept passing; a developer's machine would drift silently in the other direction.
+#
+# WHAT LEAKS IS THE MEMBERSHIPS, so those are revoked unconditionally and first. `grant app_ingest
+# to authenticator` is the one the mutation exposed, and a revoke needs no cooperation from any
+# other database: it is cluster state that this loop owns outright.
+psql -d postgres -q -t -c "
+  select format('revoke %I from %I;', r.rolname, m.rolname)
+    from pg_auth_members am
+    join pg_roles r on r.oid = am.roleid
+    join pg_roles m on m.oid = am.member
+   where r.rolname in ('app_ingest','app_scheduler','app_webhook','anon','authenticated','service_role');
+" | psql -d postgres -q -f -
+
+# Then drop the roles themselves, BEST EFFORT. This is the stronger reset -- it also catches a
+# migration that stopped creating a role at all -- but `drop role` fails if the role holds
+# privileges in ANY other database in the cluster, which this script has no way to clean and no
+# business dropping. So a failure warns and continues rather than killing the run: the membership
+# revoke above has already closed the leak that matters.
+for role in app_ingest app_scheduler app_webhook authenticator anon authenticated service_role; do
+  if ! psql -d postgres -q -c "drop role if exists $role;" 2>/dev/null; then
+    printf '    WARNING: could not drop role %s (it holds privileges in another database).\n' "$role"
+    printf '             Memberships were still revoked, so this run is sound.\n'
+  fi
+done
+
 psql -d "$DB" -q -c "create extension if not exists pgcrypto;"
 
 echo "==> shim"
@@ -61,3 +94,6 @@ psql -d "$DB" -q -f "$HERE/08_credential_lane.sql"
 
 echo "==> position suite"
 psql -d "$DB" -q -f "$HERE/09_position.sql"
+
+echo "==> ingest entry point suite"
+psql -d "$DB" -q -f "$HERE/10_ingest_entry_point.sql"

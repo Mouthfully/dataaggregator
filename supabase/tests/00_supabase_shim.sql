@@ -17,6 +17,17 @@ do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'service_role') then
     create role service_role nologin noinherit bypassrls;
   end if;
+  -- THE ROLE POSTGREST ACTUALLY CONNECTS AS, and the reason it is here rather than assumed.
+  --
+  -- PostgREST logs in as `authenticator` and serves each request by SET LOCAL ROLE to whatever the
+  -- token's `role` claim names -- which only works for a role it is a MEMBER of. A migration that
+  -- adds a new PostgREST-reachable role has to grant it, and without `authenticator` in this shim
+  -- the local suite cannot see a missing grant at all: the guarded `if exists` in
+  -- 20260912000300_ingest_entry_point.sql would simply skip, silently, and the defect would first
+  -- appear in production as a rejected token.
+  if not exists (select 1 from pg_roles where rolname = 'authenticator') then
+    create role authenticator noinherit login password 'shim-only-never-a-real-password';
+  end if;
 end $$;
 
 grant usage on schema public, extensions to anon, authenticated, service_role;

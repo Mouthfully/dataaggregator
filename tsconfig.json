@@ -1,0 +1,20 @@
+{
+  // The WORKSPACE ROOT's own TypeScript: `scripts/*.ts`.
+  //
+  // The eight `check-*.mjs` guards are deliberately NOT here. They are plain JavaScript with no
+  // workspace imports so that CI can run them with bare `node` even when install is half-broken,
+  // which is exactly when a guard is most worth having.
+  //
+  // The operator scripts are the opposite case. `seal-connection.ts` performs envelope encryption
+  // and builds a credential the Worker must be able to open; it imports @repo/vault, @repo/connections
+  // and @repo/connectors precisely so that no second copy of any of that exists. Types are what hold
+  // it to those contracts, so it must be checked -- and `pnpm -r` skips the workspace root, which is
+  // why the root `typecheck` script runs this config before recursing.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["scripts/**/*.ts"]
+}

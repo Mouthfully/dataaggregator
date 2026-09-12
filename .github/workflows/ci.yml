@@ -62,7 +62,7 @@ jobs:
       # Per-workspace tsconfigs, deliberately: apps/web needs the DOM lib and apps/api-edge needs
       # @cloudflare/workers-types, and the two collide on fetch/Request/Response/caches.
       - name: Typecheck
-        run: pnpm -r typecheck
+        run: pnpm typecheck
 
       # Every package with tests, not just the Worker. apps/api-edge runs under real workerd via
       # @cloudflare/vitest-pool-workers rather than jsdom, which needs vitest 4.x -- the pool peers

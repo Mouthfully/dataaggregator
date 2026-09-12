@@ -105,19 +105,67 @@ const CATEGORIES = [
 ] as const;
 
 /**
- * The twelve connectors, in the reference's grid order.
+ * THE CONNECTOR GRID, WITH AN AVAILABILITY STATE.
  *
- * `slug` is the file in `apps/web/public/platforms/` and `name` is what a reader sees; the pair is
- * the unit of information, so the pair is what this list holds -- a name alone cannot find a file,
- * and a slug alone cannot be read aloud. `blurb` and `cta` are the reference's own strings.
+ * The design supplies twelve tiles. Five name a connector this repository actually implements -- a
+ * client, a normaliser and an entry in `SOURCES`; the rest name a platform nobody has written a
+ * line of code for. An earlier pass rendered all twelve identically, which made the page assert
+ * that ten connectors exist when they do not. It also, oddly, omitted the two that DO: WooCommerce
+ * -- the only connector that can ingest a row today -- and Search Console.
+ *
+ * `status` fixes both directions at once, and fits the design rather than fighting it: the tile
+ * already carries a badge, so availability is a second one. A `built` tile links to its own page; a
+ * `planned` tile is honest and goes nowhere.
+ *
+ * THE FACT THIS LIST MUST AGREE WITH is the directory listing of
+ * packages/connectors/src/sources/ -- five entries today. Nothing here derives that automatically,
+ * so it is stated rather than implied: this list is hand-kept, and that directory is the truth.
  */
-const CONNECTORS = [
+/** Slugs that have a mark in /platforms. Everything else falls back to a neutral tile. */
+const MARKED = new Set([
+  "googleads",
+  "googleanalytics",
+  "googlebigquery",
+  "googlesheets",
+  "hubspot",
+  "line",
+  "looker",
+  "meta",
+  "shopee",
+  "shopify",
+  "stripe",
+  "tiktok",
+  "youtube",
+]);
+
+const PLANNED_NOTE = "Not available yet.";
+
+type ConnectorStatus = "built" | "planned";
+
+const STATUS_LABEL: Record<ConnectorStatus, string> = {
+  built: "Available",
+  planned: "Planned",
+};
+
+interface Connector {
+  readonly slug: string;
+  readonly name: string;
+  readonly category: string;
+  readonly blurb: string;
+  readonly cta: string;
+  readonly status: ConnectorStatus;
+  readonly href?: string;
+}
+
+const CONNECTORS: readonly Connector[] = [
   {
     slug: "googleads",
     name: "Google Ads",
     category: "Advertising",
     blurb: "Bring campaign spend and performance into the same report.",
     cta: "Browse data fields",
+    status: "built",
+    href: "/connectors/google-ads",
   },
   {
     slug: "meta",
@@ -125,6 +173,35 @@ const CONNECTORS = [
     category: "Advertising",
     blurb: "Bring campaign spend and performance into the same report.",
     cta: "View integration",
+    status: "built",
+    href: "/connectors/meta-ads",
+  },
+  {
+    slug: "googleanalytics",
+    name: "Google Analytics",
+    category: "Analytics",
+    blurb: "See sessions and conversions beside the spend that produced them.",
+    cta: "View integration",
+    status: "built",
+    href: "/connectors/ga4",
+  },
+  {
+    slug: "woocommerce",
+    name: "WooCommerce",
+    category: "Ecommerce",
+    blurb: "Read your store's orders on a key you issue yourself. No consent screen.",
+    cta: "Explore connector",
+    status: "built",
+    href: "/connectors/woocommerce",
+  },
+  {
+    slug: "searchconsole",
+    name: "Search Console",
+    category: "Analytics",
+    blurb: "Clicks, impressions and average position for the queries you rank on.",
+    cta: "View integration",
+    status: "built",
+    href: "/connectors/search-console",
   },
   {
     slug: "shopify",
@@ -132,6 +209,7 @@ const CONNECTORS = [
     category: "Ecommerce",
     blurb: "Connect your sales, products, and customer performance.",
     cta: "Explore connector",
+    status: "planned",
   },
   {
     slug: "tiktok",
@@ -139,6 +217,7 @@ const CONNECTORS = [
     category: "Advertising",
     blurb: "Bring campaign spend and performance into the same report.",
     cta: "View integration",
+    status: "planned",
   },
   {
     slug: "hubspot",
@@ -146,6 +225,7 @@ const CONNECTORS = [
     category: "CRM",
     blurb: "Keep your pipeline and customer data in view.",
     cta: "View integration",
+    status: "planned",
   },
   {
     slug: "stripe",
@@ -153,6 +233,7 @@ const CONNECTORS = [
     category: "Payments",
     blurb: "Make sense of transactions and recurring revenue.",
     cta: "View integration",
+    status: "planned",
   },
   {
     slug: "youtube",
@@ -160,6 +241,7 @@ const CONNECTORS = [
     category: "Social",
     blurb: "Understand your audience and content performance.",
     cta: "View integration",
+    status: "planned",
   },
   {
     slug: "googleanalytics",
@@ -167,6 +249,7 @@ const CONNECTORS = [
     category: "Analytics",
     blurb: "See how people find and use your business.",
     cta: "View integration",
+    status: "planned",
   },
   {
     slug: "line",
@@ -174,6 +257,7 @@ const CONNECTORS = [
     category: "Messaging",
     blurb: "Bring customer conversations into the bigger picture.",
     cta: "View integration",
+    status: "planned",
   },
   {
     slug: "shopee",
@@ -181,6 +265,7 @@ const CONNECTORS = [
     category: "Ecommerce",
     blurb: "Connect your sales, products, and customer performance.",
     cta: "View integration",
+    status: "planned",
   },
   {
     slug: "googlesheets",
@@ -188,6 +273,7 @@ const CONNECTORS = [
     category: "Spreadsheets",
     blurb: "Work with your business data in familiar spreadsheets.",
     cta: "View integration",
+    status: "planned",
   },
   {
     slug: "googlebigquery",
@@ -195,8 +281,9 @@ const CONNECTORS = [
     category: "Warehouse",
     blurb: "Create a central home for cross-channel analysis.",
     cta: "View integration",
+    status: "planned",
   },
-] as const;
+];
 
 /** The reference prints "12 featured integrations" above the grid. Counting the list keeps that
  *  line true when the list changes, which a typed number would not. */
@@ -264,21 +351,46 @@ export default function IntegrationsPage() {
                 {/* The mark is decorative in the accessibility sense even though it is the point
                     visually: the connector's name sits directly under it as live text, so alt text
                     here would make a screen reader announce every platform twice. */}
-                <img
-                  src={`/platforms/${connector.slug}.svg`}
-                  alt=""
-                  width={38}
-                  height={38}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-[38px] w-[38px] shrink-0 object-contain"
-                />
+                {MARKED.has(connector.slug) ? (
+                  <img
+                    src={`/platforms/${connector.slug}.svg`}
+                    alt=""
+                    width={38}
+                    height={38}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-[38px] w-[38px] shrink-0 object-contain"
+                  />
+                ) : (
+                  // No mark ships for this platform. A neutral tile carrying the initial is better
+                  // than a broken <img>, and better than borrowing another company's artwork.
+                  <span
+                    aria-hidden="true"
+                    className="bg-surface-inset text-accent flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-md text-lg font-bold"
+                  >
+                    {connector.name.charAt(0)}
+                  </span>
+                )}
 
                 {/* The badge is positioned out of the flow, as in the design, so it cannot push the
                     mark or shorten the blurb's measure. It stays clear of the 38px mark at every
                     width the grid produces. */}
-                <span className="bg-surface-inset text-ink-subtle absolute top-6 right-5 rounded-sm px-2 py-[5px] text-[11px] md:top-7">
-                  {connector.category}
+                <span className="absolute top-6 right-5 flex items-center gap-1.5 md:top-7">
+                  <span className="bg-surface-inset text-ink-subtle rounded-sm px-2 py-[5px] text-[11px]">
+                    {connector.category}
+                  </span>
+                  {/* Availability sits beside the category rather than replacing it, so a reader
+                      can still scan by kind. "Planned" is the honest word: these connectors have no
+                      code behind them, and a tile that read "Coming soon" would imply a date. */}
+                  <span
+                    className={
+                      connector.status === "built"
+                        ? "bg-surface-inset text-accent rounded-sm px-2 py-[5px] text-[11px] font-bold"
+                        : "border-line text-ink-faint rounded-sm border border-dashed px-2 py-[5px] text-[11px]"
+                    }
+                  >
+                    {STATUS_LABEL[connector.status]}
+                  </span>
                 </span>
 
                 <h3 className="font-display text-ink mt-[22px] text-[21px] leading-[1.3] font-bold tracking-[-0.01em]">
@@ -291,13 +403,19 @@ export default function IntegrationsPage() {
                   {connector.blurb}
                 </p>
 
-                <a
-                  href="/dashboard"
-                  className="text-accent mt-5 inline-flex items-center gap-3 text-sm font-bold hover:underline"
-                >
-                  {connector.cta}
-                  <span aria-hidden="true">&rarr;</span>
-                </a>
+                {connector.href === undefined ? (
+                  // Deliberately not a link. There is no page to go to, and a dead control is worse
+                  // than none -- it spends a reader's click to tell them nothing.
+                  <span className="text-ink-faint mt-5 text-sm">{PLANNED_NOTE}</span>
+                ) : (
+                  <a
+                    href={connector.href}
+                    className="text-accent mt-5 inline-flex items-center gap-3 text-sm font-bold hover:underline"
+                  >
+                    {connector.cta}
+                    <span aria-hidden="true">&rarr;</span>
+                  </a>
+                )}
               </li>
             ))}
           </ul>

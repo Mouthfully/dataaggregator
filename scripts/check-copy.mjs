@@ -128,6 +128,30 @@ function maskComments(text) {
     .replace(/(^|[^:"'`\\])(\/\/[^\n]*)/g, (_m, lead, body) => lead + body.replace(/./g, " "));
 }
 
+/**
+ * TypeScript generics blanked, offsets and newlines preserved, for the same reason comments are.
+ *
+ * The JSX model below is a delimiter walk, not a parser, and it reads `Record<ConnectorStatus,` as
+ * an unclosed start tag and the matching `>` as a tag close. Everything after a single generic
+ * annotation is then judged to be JSX children -- one `Record<K, V>` in integrations/page.tsx
+ * produced FIFTEEN false findings against an object literal at module scope.
+ *
+ * That is the failure this guard's own header calls fatal: "a guard that fires on those gets
+ * switched off, and a switched-off guard protects nothing". A `.tsx` file cannot be asked to avoid
+ * `useState<string>`.
+ *
+ * THE DISCRIMINATOR IS THE CHARACTER BEFORE `<`. A generic's `<` is glued to the identifier it
+ * parameterises -- `Record<`, `useState<`, `Set<`. A JSX tag's `<` never is: it always follows
+ * whitespace, `(`, `{`, `>` or the start of a line. So an identifier immediately followed by `<`,
+ * with no angle bracket or newline before the closing `>`, is a type and not a tag.
+ *
+ * Masking is the SAFE direction here. A construct wrongly blanked can only hide a candidate, and
+ * the walk below already documents false negatives as the direction this guard fails in.
+ */
+function maskGenerics(text) {
+  return text.replace(/\b[A-Za-z_$][\w$]*<[^<>\n]{0,200}>/g, (m) => m.replace(/[^\n]/g, " "));
+}
+
 /** `=>`, `->`, `>>` and `>=` are operators; only a bare `>` closes a tag. */
 function isTagClose(code, i) {
   const prev = code[i - 1];
@@ -203,7 +227,7 @@ function readLiteral(text, start) {
  * is one pass and not a regex.
  */
 function scan(text) {
-  const masked = maskComments(text);
+  const masked = maskGenerics(maskComments(text));
   const code = [];
   const literals = [];
   let i = 0;

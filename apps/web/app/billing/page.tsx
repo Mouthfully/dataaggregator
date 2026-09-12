@@ -99,13 +99,13 @@ export default async function BillingPage() {
           <span className="text-ink-faint block text-xs font-bold tracking-[0.14em] uppercase">
             {COPY.eyebrow}
           </span>
-          <h1 className="font-display text-ink mt-3 text-[clamp(28px,3vw,38px)] leading-[1.1] font-normal tracking-[-0.04em]">
+          <h1 className="font-display text-ink mt-3 text-[clamp(28px,3vw,38px)] leading-[1.1] font-semibold tracking-[-0.04em]">
             {COPY.heading}
           </h1>
 
           <section className="border-line bg-surface mt-8 rounded-xl border p-7">
             <p className="text-ink-subtle text-xs">{COPY.currentPlan}</p>
-            <p className="font-display text-ink mt-1 text-2xl font-normal">
+            <p className="font-display text-ink mt-1 text-2xl font-semibold">
               {PLAN_DISPLAY.find((p) => p.plan === activePlan)?.name ?? activePlan}
             </p>
 
@@ -131,12 +131,12 @@ export default async function BillingPage() {
           </section>
 
           <section className="mt-8">
-            <h2 className="font-display text-ink text-lg font-normal">Plans</h2>
+            <h2 className="font-display text-ink text-lg font-semibold">Plans</h2>
             <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {PLAN_DISPLAY.map((entry) => (
                 <li key={entry.plan} className="border-line bg-surface rounded-lg border p-5">
                   <p className="text-ink text-sm font-bold">{entry.name}</p>
-                  <p className="font-display text-ink mt-1 text-2xl font-normal tracking-[-0.03em]">
+                  <p className="font-display text-ink mt-1 text-2xl font-semibold tracking-[-0.03em]">
                     {formatAmount(entry.monthly[billingCurrency], billingCurrency)}
                   </p>
                   <p className="text-ink-subtle text-xs">{COPY.perMonth}</p>
@@ -165,7 +165,7 @@ export default async function BillingPage() {
           </section>
 
           <section className="mt-10">
-            <h2 className="font-display text-ink text-lg font-normal">{COPY.invoices}</h2>
+            <h2 className="font-display text-ink text-lg font-semibold">{COPY.invoices}</h2>
             <p className="text-ink-subtle mt-1 text-xs">{COPY.invoicesFromStripe}</p>
 
             {invoices.length === 0 ? (

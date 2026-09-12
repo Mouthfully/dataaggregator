@@ -103,10 +103,24 @@
    *      Appending var(--font-face-thai) to the display stack would fix it and would change no
    *      designed glyph -- but it is a face the design never put there, so it is a founder call.
    * --------------------------------------------------------------------------------- */
-  --mp-font-display: var(--font-face-display, "Young Serif"), Georgia, serif;
+  /* Inter Tight, per the founder's supermetrics.com reference. The fallback is the system
+   * grotesque rather than Georgia: a serif standing in for a sans is a worse failure than a
+   * different sans, and this token stopped naming a serif when the register changed. */
+  --mp-font-display: var(--font-face-display, "Inter Tight"), "Helvetica Neue", Arial, sans-serif;
   --mp-font-body:
     var(--font-face-body, "Figtree"), var(--font-face-thai, "Noto Sans Thai"), "Helvetica Neue",
     Arial, sans-serif;
+  /* ---------------------------------------------------------------------------------
+   * AN OPAQUE STOP FOR ALPHA MASKS. NOT A PALETTE COLOUR.
+   *
+   * `mask-image` reads only the ALPHA channel of its gradient -- the hue is discarded, so this
+   * value is "fully opaque" rather than "black", and using it to paint anything would be a
+   * misuse. It lives here because this file is the one place check-tokens.mjs permits a literal,
+   * and slipping the `black` keyword into a stylesheet instead would have passed that guard
+   * without satisfying it, which is the worse outcome of the two.
+   * --------------------------------------------------------------------------------- */
+  --mp-mask-opaque: #000;
+
   --mp-font-mono:
     var(--font-face-mono, "Geist Mono"), ui-monospace, SFMono-Regular, Menlo, monospace;
 

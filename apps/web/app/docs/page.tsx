@@ -342,7 +342,7 @@ export default function DocsPage() {
             <span className="text-ink-faint block text-[11px] font-bold tracking-[0.14em] uppercase">
               {EYEBROW}
             </span>
-            <h1 className="font-display text-ink mt-3 mb-5 text-[34px] leading-[1.12] font-normal tracking-[-0.035em] md:text-[42px]">
+            <h1 className="font-display text-ink mt-3 mb-5 text-[34px] leading-[1.12] font-semibold tracking-[-0.035em] md:text-[42px]">
               {HEADING}
             </h1>
             <p className="text-ink-muted max-w-[640px] text-base leading-[1.65] md:text-[17px]">
@@ -377,7 +377,7 @@ export default function DocsPage() {
                   >
                     <path d={card.path} />
                   </svg>
-                  <h2 className="font-display text-ink mb-2.5 text-base leading-[1.3] font-normal">
+                  <h2 className="font-display text-ink mb-2.5 text-base leading-[1.3] font-semibold">
                     {card.title}
                   </h2>
                   <p className="text-ink-muted mb-4 text-[13px] leading-[1.6]">{card.body}</p>
@@ -395,7 +395,7 @@ export default function DocsPage() {
             >
               <h2
                 id="quick-start-heading"
-                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-normal tracking-[-0.02em] md:text-[26px]"
+                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-semibold tracking-[-0.02em] md:text-[26px]"
               >
                 {QUICK_START_HEADING}
               </h2>
@@ -425,7 +425,7 @@ export default function DocsPage() {
             >
               <h2
                 id="concepts-heading"
-                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-normal tracking-[-0.02em] md:text-[26px]"
+                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-semibold tracking-[-0.02em] md:text-[26px]"
               >
                 {CONCEPTS_HEADING}
               </h2>
@@ -434,7 +434,7 @@ export default function DocsPage() {
               <dl>
                 {CONCEPTS.map((concept) => (
                   <div key={concept.id} className="border-line-soft border-b py-[18px]">
-                    <dt className="font-display text-ink text-base leading-[1.3] font-normal">
+                    <dt className="font-display text-ink text-base leading-[1.3] font-semibold">
                       {concept.term}
                     </dt>
                     <dd className="text-ink-muted mt-2 ml-0 text-[15px] leading-[1.65]">
@@ -452,7 +452,7 @@ export default function DocsPage() {
             >
               <h2
                 id="reporting-heading"
-                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-normal tracking-[-0.02em] md:text-[26px]"
+                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-semibold tracking-[-0.02em] md:text-[26px]"
               >
                 {REPORTING_HEADING}
               </h2>
@@ -462,7 +462,7 @@ export default function DocsPage() {
                 <span className="text-ink-faint block text-[10px] font-bold tracking-[0.14em] uppercase">
                   {RECIPE_EYEBROW}
                 </span>
-                <h3 className="font-display text-ink mt-2 mb-2 text-base leading-[1.3] font-normal">
+                <h3 className="font-display text-ink mt-2 mb-2 text-base leading-[1.3] font-semibold">
                   {RECIPE_TITLE}
                 </h3>
                 <p className="text-ink-muted text-[15px] leading-[1.9]">
@@ -489,7 +489,7 @@ export default function DocsPage() {
             >
               <h2
                 id="troubleshooting-heading"
-                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-normal tracking-[-0.02em] md:text-[26px]"
+                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-semibold tracking-[-0.02em] md:text-[26px]"
               >
                 {TROUBLESHOOTING_HEADING}
               </h2>

@@ -97,7 +97,7 @@ export default async function DashboardPage() {
             {SITE_DASHBOARD.eyebrow}
           </span>
           <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-            <h1 className="font-display text-ink text-[clamp(30px,3.4vw,44px)] leading-[1.08] font-normal tracking-[-0.04em]">
+            <h1 className="font-display text-ink text-[clamp(30px,3.4vw,44px)] leading-[1.08] font-semibold tracking-[-0.04em]">
               {SITE_DASHBOARD.heroLine1}
               <br />
               <span className="brand-gradient-text">{SITE_DASHBOARD.heroLine2}</span>
@@ -137,7 +137,7 @@ export default async function DashboardPage() {
 
             <div className="min-w-0 p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="font-display text-ink text-2xl font-normal tracking-[-0.02em]">
+                <h2 className="font-display text-ink text-2xl font-semibold tracking-[-0.02em]">
                   {SITE_DASHBOARD.title}
                 </h2>
                 <span className="border-line text-ink-muted rounded-[10px] border px-4 py-2 text-xs">
@@ -264,7 +264,7 @@ function Delta({ value }: { value: string }) {
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="border-line rounded-lg border p-5">
-      <h3 className="font-display text-ink text-base font-normal">{title}</h3>
+      <h3 className="font-display text-ink text-base font-semibold">{title}</h3>
       <div className="mt-2">{children}</div>
     </section>
   );
@@ -273,7 +273,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 function RevenueChart() {
   return (
     <section className="border-line rounded-lg border p-5">
-      <h3 className="font-display text-ink text-base font-normal">Revenue over time</h3>
+      <h3 className="font-display text-ink text-base font-semibold">Revenue over time</h3>
       <svg
         viewBox="0 0 640 220"
         className="mt-4 block w-full"
@@ -313,7 +313,7 @@ function RevenueChart() {
 function Insights() {
   return (
     <section className="border-line rounded-lg border p-5">
-      <h3 className="font-display text-ink text-base font-normal">AI insights</h3>
+      <h3 className="font-display text-ink text-base font-semibold">AI insights</h3>
       <ul className="mt-2">
         {DASHBOARD_INSIGHTS.map((insight) => (
           <li key={insight.id} className="border-line-soft border-b py-3 last:border-b-0">
@@ -331,7 +331,7 @@ function Insights() {
 function Channels() {
   return (
     <section className="border-line mt-5 rounded-lg border p-5">
-      <h3 className="font-display text-ink text-base font-normal">Channel performance</h3>
+      <h3 className="font-display text-ink text-base font-semibold">Channel performance</h3>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-left">
           <thead>

@@ -349,7 +349,7 @@ export default function ShopifyConnectorPage() {
                 </span>
               </div>
 
-              <h1 className="font-display text-ink text-[36px] leading-[1.06] font-normal tracking-[-0.04em] md:text-[42px] lg:text-[48px]">
+              <h1 className="font-display text-ink text-[36px] leading-[1.06] font-semibold tracking-[-0.04em] md:text-[42px] lg:text-[48px]">
                 {HERO_HEADING_TOP}
                 <br />
                 <span className="brand-gradient-text">{HERO_HEADING_BOTTOM}</span>
@@ -447,7 +447,7 @@ export default function ShopifyConnectorPage() {
                 {PANEL_STATS.map((stat) => (
                   <div key={stat.label} className="min-w-0">
                     <dt className="text-ink-faint text-[10px]">{stat.label}</dt>
-                    <dd className="font-display text-ink mt-1 text-lg font-normal md:text-[22px]">
+                    <dd className="font-display text-ink mt-1 text-lg font-semibold md:text-[22px]">
                       {stat.value}
                     </dd>
                   </div>
@@ -492,7 +492,7 @@ export default function ShopifyConnectorPage() {
             </span>
             <h2
               id="destinations-heading"
-              className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-normal tracking-[-0.02em] md:text-[38px]"
+              className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-semibold tracking-[-0.02em] md:text-[38px]"
             >
               {DESTINATIONS_HEADING}
             </h2>
@@ -517,7 +517,7 @@ export default function ShopifyConnectorPage() {
                   decoding="async"
                   className="h-9 w-9 shrink-0 object-contain"
                 />
-                <h3 className="font-display text-ink mt-5 mb-3 text-base leading-[1.3] font-normal tracking-[-0.01em] md:mt-6 md:text-[18px]">
+                <h3 className="font-display text-ink mt-5 mb-3 text-base leading-[1.3] font-semibold tracking-[-0.01em] md:mt-6 md:text-[18px]">
                   {destination.title}
                 </h3>
                 <p className="text-ink-muted flex-1 text-[13px] leading-[1.6] md:text-sm">
@@ -545,7 +545,7 @@ export default function ShopifyConnectorPage() {
               </span>
               <h2
                 id="use-cases-heading"
-                className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-normal tracking-[-0.02em] md:text-[38px]"
+                className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-semibold tracking-[-0.02em] md:text-[38px]"
               >
                 {USE_CASES_HEADING}
               </h2>
@@ -574,7 +574,7 @@ export default function ShopifyConnectorPage() {
                   >
                     <path d={useCase.path} />
                   </svg>
-                  <h3 className="font-display text-ink mb-3 text-xl leading-[1.3] font-normal tracking-[-0.01em]">
+                  <h3 className="font-display text-ink mb-3 text-xl leading-[1.3] font-semibold tracking-[-0.01em]">
                     {useCase.title}
                   </h3>
                   <p className="text-ink-muted text-[15px] leading-[1.7]">{useCase.body}</p>
@@ -596,7 +596,7 @@ export default function ShopifyConnectorPage() {
             </span>
             <h2
               id="fields-heading"
-              className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-normal tracking-[-0.02em] md:text-[38px]"
+              className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-semibold tracking-[-0.02em] md:text-[38px]"
             >
               {FIELDS_HEADING}
             </h2>
@@ -638,7 +638,7 @@ export default function ShopifyConnectorPage() {
             </span>
             <h2
               id="setup-heading"
-              className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-normal tracking-[-0.02em] md:text-[38px]"
+              className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-semibold tracking-[-0.02em] md:text-[38px]"
             >
               {SETUP_HEADING}
             </h2>
@@ -658,7 +658,7 @@ export default function ShopifyConnectorPage() {
                 >
                   {index + 1}
                 </span>
-                <h3 className="font-display text-ink mb-3 text-xl leading-[1.3] font-normal tracking-[-0.01em]">
+                <h3 className="font-display text-ink mb-3 text-xl leading-[1.3] font-semibold tracking-[-0.01em]">
                   {step.title}
                 </h3>
                 <p className="text-ink-muted text-[15px] leading-[1.7]">{step.body}</p>
@@ -680,7 +680,7 @@ export default function ShopifyConnectorPage() {
             </span>
             <h2
               id="faq-heading"
-              className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-normal tracking-[-0.03em] md:text-[36px]"
+              className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-semibold tracking-[-0.03em] md:text-[36px]"
             >
               {FAQ_HEADING_TOP}
               <br />
@@ -719,7 +719,7 @@ export default function ShopifyConnectorPage() {
             <div className="min-w-0">
               <h2
                 id="final-cta-heading"
-                className="font-display text-ink mb-2.5 text-[28px] leading-[1.16] font-normal tracking-[-0.02em] md:text-[30px]"
+                className="font-display text-ink mb-2.5 text-[28px] leading-[1.16] font-semibold tracking-[-0.02em] md:text-[30px]"
               >
                 {FINAL_HEADING}
               </h2>

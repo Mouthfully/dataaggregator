@@ -22,7 +22,13 @@
 /** Section copy. Inline sentences are refused by `scripts/check-copy.mjs`; uppercasing is CSS. */
 const EYEBROW = "Your favorite platforms. One connected workspace.";
 
-/** The eight marks the design shows, in the design's order. `slug` is the file in /platforms. */
+/**
+ * The marks, in the design's order, every one an artwork file that exists in /platforms.
+ *
+ * A NAME HERE IS A PROMISE THE STRIP MAKES, so this list is not the place to advertise ambition:
+ * the row sits under a hero about connecting a business's tools, and a visitor reads it as the set
+ * we read. Additions belong here when the connector exists, not before.
+ */
 const PLATFORM_MARKS = [
   { slug: "googleads", name: "Google Ads" },
   { slug: "meta", name: "Meta Ads" },
@@ -32,6 +38,11 @@ const PLATFORM_MARKS = [
   { slug: "stripe", name: "Stripe" },
   { slug: "youtube", name: "YouTube" },
   { slug: "googleanalytics", name: "Google Analytics" },
+  { slug: "googlesheets", name: "Google Sheets" },
+  { slug: "line", name: "LINE" },
+  { slug: "shopee", name: "Shopee" },
+  { slug: "looker", name: "Looker" },
+  { slug: "googlebigquery", name: "BigQuery" },
 ] as const;
 
 export function IntegrationsStrip() {
@@ -44,28 +55,53 @@ export function IntegrationsStrip() {
         {EYEBROW}
       </span>
 
-      {/* Centred and evenly gapped while the row wraps; only once the viewport can hold all eight
-          on one line does the design spread them edge to edge, which is why the switch is pinned to
-          the reference's 1000px rather than to a rounded-off breakpoint. */}
-      <ul className="mt-7 flex flex-wrap items-center justify-center gap-[22px] min-[1000px]:justify-between min-[1000px]:gap-5">
-        {PLATFORM_MARKS.map((platform) => (
-          <li
-            key={platform.slug}
-            className="text-ink flex items-center gap-[7px] text-xs font-bold whitespace-nowrap md:text-[13px]"
-          >
-            <img
-              src={`/platforms/${platform.slug}.svg`}
-              alt=""
-              width={26}
-              height={26}
-              loading="lazy"
-              decoding="async"
-              className="h-[26px] w-[26px] shrink-0 object-contain"
-            />
-            {platform.name}
-          </li>
-        ))}
-      </ul>
+      {/*
+        A CONTINUOUS MARQUEE, BUILT FROM TWO IDENTICAL TRACKS.
+        The animation translates the pair by exactly -50%, so as the first track leaves the frame the
+        second sits precisely where it began and the loop has no seam. One track cannot do this: it
+        would scroll off and leave a gap the width of the viewport before it wrapped.
+
+        THE SECOND TRACK IS `aria-hidden`. It is the same thirteen platforms again, and a screen
+        reader reading every name twice is worse than not hearing the strip at all. The list itself
+        carries the accessible name from the <section>.
+
+        MOTION IS OPT-OUT AT THE CSS LEVEL, not a preference we read in JavaScript. Continuous
+        horizontal motion is a documented trigger for vestibular disorders -- nausea, not annoyance
+        -- and `prefers-reduced-motion` turns the animation off and lets the row wrap statically, so
+        the content is never lost, only the movement.
+
+        `mask-image` fades both edges rather than hard-cutting the marks, which is what makes the
+        row read as continuing past the frame instead of being clipped by it.
+      */}
+      <div className="marquee mt-7">
+        <div className="marquee-track">
+          {[false, true].map((clone) => (
+            <ul
+              key={clone ? "clone" : "track"}
+              aria-hidden={clone || undefined}
+              className="flex shrink-0 items-center gap-[22px] pr-[22px] min-[1000px]:gap-10 min-[1000px]:pr-10"
+            >
+              {PLATFORM_MARKS.map((platform) => (
+                <li
+                  key={platform.slug}
+                  className="text-ink flex items-center gap-[7px] text-xs font-bold whitespace-nowrap md:text-[13px]"
+                >
+                  <img
+                    src={`/platforms/${platform.slug}.svg`}
+                    alt=""
+                    width={26}
+                    height={26}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-[26px] w-[26px] shrink-0 object-contain"
+                  />
+                  {platform.name}
+                </li>
+              ))}
+            </ul>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

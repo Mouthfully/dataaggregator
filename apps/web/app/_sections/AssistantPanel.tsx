@@ -105,7 +105,7 @@ export function AssistantPanel() {
           </span>
           <h2
             id="assistant-heading"
-            className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-normal tracking-[-0.03em] md:text-[36px]"
+            className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-semibold tracking-[-0.03em] md:text-[36px]"
           >
             {HEADING_TOP}
             <br />
@@ -129,7 +129,7 @@ export function AssistantPanel() {
         {/* The reference's soft card lift, geometry only -- the tint comes from the hairline token,
             which is how the feature grid keeps its shadow out of the literal ban. */}
         <div className="border-line-soft bg-surface min-w-0 rounded-lg border p-[18px] shadow-[0_10px_30px] shadow-line-soft md:order-1 md:p-6">
-          <h3 className="font-display text-ink flex items-center gap-2 text-[15px] font-normal md:text-base">
+          <h3 className="font-display text-ink flex items-center gap-2 text-[15px] font-semibold md:text-base">
             <span aria-hidden="true" className="text-accent text-2xl leading-none md:text-[28px]">
               &#10022;
             </span>

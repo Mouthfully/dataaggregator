@@ -72,3 +72,70 @@
   inset: -70px -30px -50px;
   background: var(--mp-glow-hero);
 }
+
+/* ---------------------------------------------------------------------------------------------
+ * THE INTEGRATIONS MARQUEE.
+ *
+ * Here rather than in a utility class because it needs a @keyframes and a media query, and Tailwind
+ * arbitrary values cannot express either. The component holds the structure; this holds the motion.
+ *
+ * THE -50% IS LOAD-BEARING. The track contains the platform list exactly twice, so translating by
+ * half its width lands the second copy precisely where the first started. Any other value leaves a
+ * visible jump on every loop.
+ *
+ * REDUCED MOTION STOPS THE ANIMATION AND UNPINS THE LAYOUT. Setting only `animation: none` would
+ * leave a row frozen mid-scroll with half its marks off-screen; the row has to become a wrapping
+ * static list again, which is what the flex-wrap and auto width do.
+ * --------------------------------------------------------------------------------------------- */
+.marquee {
+  overflow: hidden;
+  /* Fade both edges so the row reads as continuing past the frame rather than being clipped. */
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    var(--mp-mask-opaque) 8%,
+    var(--mp-mask-opaque) 92%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    var(--mp-mask-opaque) 8%,
+    var(--mp-mask-opaque) 92%,
+    transparent
+  );
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll 45s linear infinite;
+}
+
+/* Pausing on hover lets someone actually read a mark they recognised, and costs nothing. */
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes marquee-scroll {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .marquee-track {
+    width: auto;
+    flex-wrap: wrap;
+    justify-content: center;
+    animation: none;
+  }
+}

@@ -353,7 +353,7 @@ export default function TermsPage() {
             <span className="text-ink-faint block text-[11px] font-bold tracking-[0.14em] uppercase md:text-xs">
               {EYEBROW}
             </span>
-            <h1 className="font-display text-ink mt-2.5 text-[32px] leading-[1.1] font-normal tracking-[-0.03em] md:text-[42px]">
+            <h1 className="font-display text-ink mt-2.5 text-[32px] leading-[1.1] font-semibold tracking-[-0.03em] md:text-[42px]">
               {HEADING}
             </h1>
             <p className="text-ink-muted mt-5 text-base leading-[1.7] md:text-[17px]">{LEAD}</p>
@@ -461,7 +461,7 @@ export default function TermsPage() {
                     <span className="text-ink-faint text-[13px] font-bold tabular-nums">
                       {index + 1}
                     </span>
-                    <h3 className="font-display text-ink text-xl leading-[1.3] font-normal tracking-[-0.01em] md:text-[22px]">
+                    <h3 className="font-display text-ink text-xl leading-[1.3] font-semibold tracking-[-0.01em] md:text-[22px]">
                       {clause.title}
                     </h3>
                     {clause.open === true ? (
@@ -510,7 +510,7 @@ export default function TermsPage() {
           <div className="border-line rounded-xl border p-6 md:p-9">
             <h2
               id="open-terms-heading"
-              className="font-display text-ink text-[24px] leading-[1.2] font-normal tracking-[-0.02em] md:text-[28px]"
+              className="font-display text-ink text-[24px] leading-[1.2] font-semibold tracking-[-0.02em] md:text-[28px]"
             >
               {OPEN_TERMS_HEADING}
             </h2>

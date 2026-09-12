@@ -44,7 +44,7 @@ export default async function WelcomePage() {
           <span className="text-ink-faint block text-xs font-bold tracking-[0.14em] uppercase">
             {COPY.eyebrow}
           </span>
-          <h1 className="font-display text-ink mt-3 text-[clamp(30px,3.4vw,40px)] leading-[1.1] font-normal tracking-[-0.04em]">
+          <h1 className="font-display text-ink mt-3 text-[clamp(30px,3.4vw,40px)] leading-[1.1] font-semibold tracking-[-0.04em]">
             {COPY.heading}
           </h1>
           <p className="text-ink-muted mt-4 leading-relaxed">{COPY.lead}</p>

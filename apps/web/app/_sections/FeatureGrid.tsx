@@ -97,7 +97,7 @@ export function FeatureGrid() {
         </span>
         <h2
           id="feature-grid-heading"
-          className="font-display text-ink mt-[10px] text-[28px] leading-[1.16] font-normal tracking-[-0.03em] md:mt-[18px] md:text-[36px]"
+          className="font-display text-ink mt-[10px] text-[28px] leading-[1.16] font-semibold tracking-[-0.03em] md:mt-[18px] md:text-[36px]"
         >
           {HEADING_TOP}
           <br />
@@ -130,7 +130,7 @@ export function FeatureGrid() {
             >
               <path d={card.path} />
             </svg>
-            <h3 className="font-display text-ink mb-2 text-lg leading-[1.3] font-normal tracking-[-0.01em]">
+            <h3 className="font-display text-ink mb-2 text-lg leading-[1.3] font-semibold tracking-[-0.01em]">
               {card.title}
             </h3>
             <p className="text-ink-muted text-sm leading-[1.55]">{card.body}</p>

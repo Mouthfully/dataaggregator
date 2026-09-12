@@ -184,7 +184,7 @@ export function Pricing() {
         <span className="text-ink-faint block text-[11px] font-bold tracking-[0.14em] uppercase md:text-xs">
           {EYEBROW}
         </span>
-        <h2 className="font-display text-ink mt-2.5 text-[28px] leading-[1.16] font-normal tracking-[-0.03em] md:text-[36px]">
+        <h2 className="font-display text-ink mt-2.5 text-[28px] leading-[1.16] font-semibold tracking-[-0.03em] md:text-[36px]">
           {HEADING}
         </h2>
         <p className="text-ink-muted mx-auto mt-3 max-w-[520px] text-sm leading-[1.65]">{LEAD}</p>
@@ -230,7 +230,7 @@ export function Pricing() {
             <h3 className="text-ink text-sm font-bold">{plan.name}</h3>
 
             <p className="my-1 whitespace-nowrap">
-              <strong className="font-display text-ink text-[36px] leading-[1.1] font-normal tracking-[-0.04em]">
+              <strong className="font-display text-ink text-[36px] leading-[1.1] font-semibold tracking-[-0.04em]">
                 {plan.price}
               </strong>{" "}
               <span className="text-ink-subtle text-xs">{plan.period}</span>

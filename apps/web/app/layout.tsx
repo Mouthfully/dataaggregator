@@ -1,6 +1,6 @@
 import { brand, formatAddress, siteUrl } from "@repo/brand";
 import type { Metadata, Viewport } from "next";
-import { Figtree, Geist_Mono, Noto_Sans_Thai, Young_Serif } from "next/font/google";
+import { Figtree, Geist_Mono, Inter_Tight, Noto_Sans_Thai } from "next/font/google";
 import type { ReactNode } from "react";
 
 import { SITE } from "./_content";
@@ -45,12 +45,23 @@ import "./globals.css";
  * "Figtree" in the token file and have it resolve to the self-hosted file.
  */
 
-/* Display. Sourced from the artboards' own font link, which requests Young Serif with NO weight
- * axis -- Google serves exactly one cut. The type signature agrees: `weight` here is typed
- * `'400' | Array<'400'>` and is required, so 400 is not a choice made in this file, it is the only
- * weight the face has. See the report on apps/web's 700 display elements. */
-const displayFace = Young_Serif({
-  weight: "400",
+/* Display.
+ *
+ * INTER TIGHT, NOT THE ARTBOARD'S YOUNG SERIF, and the reason is a founder decision rather than a
+ * reading of the design: the reference the founder gave for headings is supermetrics.com, which
+ * sets them in Neue Haas Grotesk Display 65 Medium. That is a paid Monotype face and cannot be
+ * self-hosted from a free source, so this is the closest free equivalent -- a tight neo-grotesque
+ * in the same register, where Young Serif is a serif display face and the opposite register.
+ *
+ * THE WEIGHT RANGE IS WHY THIS REVERSES SOMETHING. Young Serif ships exactly one cut, 400, so every
+ * display element in this app was set to font-normal to stop the browser synthesising a fake bold.
+ * Inter Tight carries the full range, so headings carry a real 600 again -- close to the Haas 65
+ * the reference uses, which is heavier than book and lighter than a true bold.
+ *
+ * 400 is loaded alongside 600 because a handful of display elements are deliberately light.
+ */
+const displayFace = Inter_Tight({
+  weight: ["400", "600"],
   subsets: ["latin"],
   display: "swap",
   variable: "--font-face-display",

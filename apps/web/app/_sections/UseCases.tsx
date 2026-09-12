@@ -99,7 +99,7 @@ export function UseCases() {
         </span>
         <h2
           id="use-cases-heading"
-          className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-normal tracking-[-0.03em] md:text-[38px]"
+          className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-semibold tracking-[-0.03em] md:text-[38px]"
         >
           {HEADING}
         </h2>
@@ -134,7 +134,7 @@ export function UseCases() {
               <span className="text-ink-faint block text-[11px] font-bold tracking-[0.14em] uppercase">
                 {useCase.audience}
               </span>
-              <h3 className="font-display text-ink mt-[18px] mb-3.5 text-[22px] leading-[1.3] font-normal tracking-[-0.025em]">
+              <h3 className="font-display text-ink mt-[18px] mb-3.5 text-[22px] leading-[1.3] font-semibold tracking-[-0.025em]">
                 {useCase.title}
               </h3>
               <p className="text-ink-muted flex-1 text-[15px] leading-[1.65]">{useCase.body}</p>

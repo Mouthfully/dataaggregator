@@ -37,35 +37,99 @@ const MIGRATIONS_DIR = "supabase/migrations";
 const MIGRATION = `${MIGRATIONS_DIR}/20260908001100_envelope_rows.sql`;
 
 /**
- * THE SINGLE-FILE ASSUMPTION, AND THE TRIPWIRE THAT PROTECTS IT.
+ * THE SINGLE-FILE ASSUMPTION IS OVER, AND THIS IS WHAT REPLACED IT.
  *
- * Everything below compares the contract against ONE migration. That is true today because the
- * dictionary is declared in one file and no database has ever applied these migrations, so the
- * declarations are still edited in place. The day a later migration alters an enum or adds a metric
- * column, this guard keeps comparing the old file, keeps passing, and stops meaning anything --
- * silently, which is the failure mode the guard exists to prevent in the first place.
+ * This guard used to read ONE migration and carry a tripwire that failed the build the moment
+ * another migration touched the dictionary, with an error saying "teach it to fold later
+ * migrations in before merging". `20260912000200_position.sql` is that moment: it adds the
+ * `position` column, and a database has now applied these migrations, so declarations can no
+ * longer be edited in place.
  *
- * So: fail loudly the moment another migration touches the dictionary, and say what to do about it.
+ * FOLDING IS TWO RULES, and which one applies depends on the shape of the thing:
+ *
+ *   ACCUMULATE  Columns and enum members are additive. A later `alter table ... add column` or
+ *               `alter type ... add value` contributes to the set; nothing here removes.
+ *   LAST WINS   A constraint, a trigger or a function body is REDEFINED whole. Reading the first
+ *               definition of `app.record_restatement` after a later migration replaced it would
+ *               check a body that is no longer installed -- passing while the live schema drifts,
+ *               which is the exact failure the tripwire existed to prevent.
+ *
+ * Getting that backwards is silent in both directions, so the two are separated explicitly rather
+ * than handled by one clever merge.
  */
-const DICTIONARY_MUTATIONS = [
-  /alter\s+type\s+app\.(envelope_source|entity_type|attribution_window)\b/i,
-  /alter\s+table\s+(public\.)?envelope_rows\b[\s\S]{0,400}?\b(add|drop)\s+column\b/i,
-];
+function dictionaryMigrations() {
+  return readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith(".sql"))
+    .sort()
+    .map((name) => ({
+      file: `${MIGRATIONS_DIR}/${name}`,
+      body: readText(`${MIGRATIONS_DIR}/${name}`),
+    }));
+}
 
-function checkSingleFileAssumption(findings) {
-  for (const name of readdirSync(MIGRATIONS_DIR).sort()) {
-    const file = `${MIGRATIONS_DIR}/${name}`;
-    if (!name.endsWith(".sql") || file === MIGRATION) continue;
-    const body = readText(file).replace(/--[^\n]*/g, "");
-    if (DICTIONARY_MUTATIONS.some((re) => re.test(body))) {
+/** The base migration first, then every later one, in application order. */
+const MIGRATION_CHAIN = dictionaryMigrations();
+
+/** LAST WINS: the final definition of a block across the chain, or null if none defines it. */
+function lastDefinition(extract) {
+  let found = null;
+  for (const { body } of MIGRATION_CHAIN) {
+    const candidate = extract(body);
+    if (candidate !== null) found = candidate;
+  }
+  return found;
+}
+
+/** ACCUMULATE: the base set, plus anything later migrations added. */
+function accumulate(base, addFrom) {
+  const all = [...(base ?? [])];
+  for (const { body } of MIGRATION_CHAIN) {
+    for (const added of addFrom(body)) {
+      if (!all.includes(added)) all.push(added);
+    }
+  }
+  return base === null && all.length === 0 ? null : all;
+}
+
+/** `alter table envelope_rows add column <name> numeric(...)` across the chain. */
+function addedMetricColumns(body) {
+  const stripped = body.replace(/--[^\n]*/g, "");
+  return [
+    ...stripped.matchAll(
+      /alter\s+table\s+(?:public\.)?envelope_rows\s+add\s+column\s+(\w+)\s+numeric\(/gi,
+    ),
+  ].map((m) => m[1]);
+}
+
+/** `alter type app.<name> add value 'x'` across the chain. */
+function addedEnumValues(body, typeName) {
+  const stripped = body.replace(/--[^\n]*/g, "");
+  return [
+    ...stripped.matchAll(
+      new RegExp(`alter\\s+type\\s+app\\.${typeName}\\s+add\\s+value\\s+'([^']+)'`, "gi"),
+    ),
+  ].map((m) => m[1]);
+}
+
+/**
+ * A DROPPED COLUMN IS STILL A FAILURE, and folding must not quietly absorb one.
+ *
+ * Accumulation is only sound while migrations are additive. A `drop column` on a metric would be
+ * folded into "still present", so it is refused outright instead -- removing a metric is a change
+ * this guard cannot reason about, and the honest response is to say so.
+ */
+function checkNoMetricDrops(findings) {
+  for (const { file, body } of MIGRATION_CHAIN) {
+    const stripped = body.replace(/--[^\n]*/g, "");
+    if (/alter\s+table\s+(?:public\.)?envelope_rows\s+drop\s+column/i.test(stripped)) {
       findings.push({
         file,
         line: 1,
         column: 1,
         message:
-          "this migration changes the dictionary, but the guard only reads " +
-          `${MIGRATION}. Teach it to fold later migrations in before merging, or the guard passes ` +
-          "while the contract and the schema drift apart.",
+          "this migration drops a column from envelope_rows. The guard folds ADDITIONS across " +
+          "migrations and cannot reason about removals -- teach it before merging, rather than " +
+          "letting it fold the drop into 'still present'.",
       });
     }
   }
@@ -123,10 +187,33 @@ function sqlMetricColumns(source) {
 function tsMetricUnits(source) {
   const match = source.match(/METRICS\s*=\s*\{([\s\S]*?)\n\}\s*as const/);
   if (match === null) return null;
-  return [...match[1].matchAll(/^ {2}(\w+): \{ unit: "(\w+)"/gm)].map((m) => ({
-    name: m[1],
-    unit: m[2],
-  }));
+  const body = match[1];
+  const found = [];
+
+  // BRACE-MATCHED, NOT LINE-MATCHED, and the difference was a live defect.
+  //
+  // This read `^ {2}(\w+): \{ unit: "(\w+)"` -- which requires the whole entry on ONE line. The
+  // first metric that needed a comment and a multi-line body, `position`, therefore matched
+  // nothing, was absent from this list, and was checked against NONE of the four hand-written SQL
+  // lists below. The guard reported PASS. Three mutations that removed `position` from three
+  // different SQL lists were all caught by NOTHING, which is how this was found.
+  //
+  // So entries are brace-matched, key order does not matter, and -- see `unit === null` below --
+  // an entry this cannot read is REPORTED rather than skipped. A parser that silently drops what
+  // it does not understand turns a guard into decoration.
+  for (const m of body.matchAll(/^ {2}(\w+):\s*\{/gm)) {
+    const open = m.index + m[0].length;
+    let depth = 1;
+    let i = open;
+    for (; i < body.length && depth > 0; i += 1) {
+      if (body[i] === "{") depth += 1;
+      else if (body[i] === "}") depth -= 1;
+    }
+    const entry = body.slice(open, i - 1);
+    const unit = entry.match(/unit:\s*"(\w+)"/);
+    found.push({ name: m[1], unit: unit === null ? null : unit[1] });
+  }
+  return found;
 }
 
 /** The body of a named `constraint <name> check (...)`, comments stripped. */
@@ -144,60 +231,154 @@ function sqlTriggerCondition(source) {
 }
 
 /**
- * THE HOLE THIS CLOSES, named in `24-commerce-grain.md` section 1.3 before it could be closed.
+ * The body of `app.record_restatement`, whichever migration defined it last.
  *
- * The contract finds currency metrics by ASKING `METRICS` which units are currency, and finds the
- * restatement-worthy ones by asking for all of them. SQL cannot ask anything, so both lists are
- * written out by hand -- in the fx constraint, and in the trigger's `when` clause -- and comparing
- * NAMES alone would pass while either list quietly lost a metric.
- *
- * A metric missing from the fx constraint stores a converted amount with no rate to reproduce it.
- * A metric missing from the trigger restates silently forever. Neither fails any other check.
+ * Matched to the `$fn$` terminator rather than a bare `$$`, because the original uses a named
+ * dollar-quote and a `$$` search would stop at the wrong place -- returning a truncated body in
+ * which the later metrics simply are not present, and reporting drift that does not exist. (Found
+ * by writing a replacement function from memory and diffing it against the original; the memory
+ * was wrong in four places.)
  */
-function checkHandWrittenLists(findings, metrics, sql, tsFile) {
+function sqlRecordRestatementBody(source) {
+  const match = source.match(
+    /create or replace function app\.record_restatement\(\)[\s\S]*?\$fn\$([\s\S]*?)\$fn\$;/,
+  );
+  return match === null ? null : match[1].replace(/--[^\n]*/g, "");
+}
+
+/**
+ * The `on conflict ... do update set` clause of `app.upsert_envelope_row`, last definition wins.
+ *
+ * Deliberately NOT the whole function: the insert's column list mentions every metric too, so
+ * scanning the body would find a name that appears only there and report a SET clause as complete
+ * when a re-pull would never update it.
+ */
+function sqlUpsertSetClause(source) {
+  const fn = source.match(
+    /create (?:or replace )?function app\.upsert_envelope_row\([\s\S]*?\n\$\$;/,
+  );
+  if (fn === null) return null;
+  const clause = fn[0].match(/on conflict on constraint envelope_rows_pkey do update set([\s\S]*)/);
+  return clause === null ? null : clause[1].replace(/--[^\n]*/g, "");
+}
+
+/**
+ * THE FOUR HAND-WRITTEN METRIC LISTS, all of which fail silently and only two of which were checked.
+ *
+ * The contract can ASK `METRICS` which metrics are currency and which exist. SQL cannot ask
+ * anything, so the same set is written out by hand in four places -- and the migration's own
+ * comment called it "the third hand-written metric list", undercounting by one, which is a fair
+ * indication of how easy it is to lose track:
+ *
+ *   1. THE FX CONSTRAINT           a currency metric missing here stores a converted amount with
+ *                                  no rate to reproduce it.
+ *   2. THE TRIGGER `when` CLAUSE   a metric missing here never wakes the trigger, so a restatement
+ *                                  is never announced.
+ *   3. `app.record_restatement`    a metric missing HERE is worse and was unchecked: the trigger
+ *                                  fires, the function builds an empty diff, declines, and the
+ *                                  update lands with NO EVENT RECORDED. Present in one list and
+ *                                  absent from the other is the exact drift the migration warns
+ *                                  about, and nothing compared them.
+ *   4. THE UPSERT'S `set` CLAUSE   a metric missing here is never updated by a re-pull. The value
+ *                                  freezes at whatever the first fetch saw, forever, and every
+ *                                  later fetch reports success.
+ *
+ * None of the four fails any other check. All are read LAST-WINS across the migration chain,
+ * because each is a block a later migration redefines whole.
+ */
+function checkHandWrittenLists(findings, metrics, tsFile, names) {
   if (metrics === null) {
     findings.push({ file: tsFile, line: 1, column: 1, message: "could not parse metric units" });
     return;
   }
 
-  const fx = sqlConstraintBody(sql, "envelope_rows_converted_needs_rate");
-  if (fx === null) {
-    findings.push({
-      file: MIGRATION,
-      line: 1,
-      column: 1,
-      message: "could not find the envelope_rows_converted_needs_rate constraint",
-    });
-  } else {
-    for (const { name, unit } of metrics) {
-      if (unit !== "currency") continue;
-      if (!fx.includes(`${name} is null`)) {
+  // An entry whose unit could not be read is reported, never skipped. See tsMetricUnits.
+  for (const { name, unit } of metrics) {
+    if (unit === null) {
+      findings.push({
+        file: tsFile,
+        line: 1,
+        column: 1,
+        message: `metric "${name}" has no readable \`unit\`, so it cannot be checked against the SQL lists`,
+      });
+    }
+  }
+
+  // THE TWO PARSERS MUST AGREE. `tsObjectKeys` finds metric NAMES and drives the column
+  // comparison; this one finds names AND units and drives the four lists below. When they
+  // disagreed, the column check saw `position` and the list checks did not -- so the schema
+  // comparison passed, the list comparisons silently covered eleven metrics out of twelve, and
+  // the summary said everything agreed.
+  if (names !== null) {
+    for (const name of names) {
+      if (!metrics.some((m) => m.name === name)) {
         findings.push({
-          file: MIGRATION,
+          file: tsFile,
           line: 1,
           column: 1,
-          message: `metric "${name}" is currency but is absent from envelope_rows_converted_needs_rate -- a converted amount could be stored with no rate to reproduce it`,
+          message:
+            `metric "${name}" is visible to the column check but not to the hand-written-list ` +
+            "check. The two parsers disagree, so some metric is going unchecked against the fx " +
+            "constraint, the trigger, record_restatement and the upsert.",
         });
       }
     }
   }
 
-  const when = sqlTriggerCondition(sql);
-  if (when === null) {
-    findings.push({
-      file: MIGRATION,
-      line: 1,
-      column: 1,
-      message: "could not find the envelope_rows_restated trigger condition",
-    });
-  } else {
-    for (const { name } of metrics) {
-      if (!when.includes(`old.${name} is distinct from new.${name}`)) {
+  const lists = [
+    {
+      label: "envelope_rows_converted_needs_rate",
+      extract: (body) => sqlConstraintBody(body, "envelope_rows_converted_needs_rate"),
+      only: (unit) => unit === "currency",
+      contains: (body, name) => body.includes(`${name} is null`),
+      consequence: "a converted amount could be stored with no rate to reproduce it",
+    },
+    {
+      label: "the envelope_rows_restated trigger condition",
+      extract: sqlTriggerCondition,
+      only: () => true,
+      contains: (body, name) => body.includes(`old.${name} is distinct from new.${name}`),
+      consequence: "it would restate silently and no webhook would fire",
+    },
+    {
+      label: "app.record_restatement",
+      extract: sqlRecordRestatementBody,
+      only: () => true,
+      contains: (body, name) => body.includes(`jsonb_build_object('${name}'`),
+      consequence:
+        "the trigger would fire, the function would build an empty diff and decline, and the " +
+        "update would land with no restatement event recorded at all",
+    },
+    {
+      label: "the app.upsert_envelope_row conflict SET clause",
+      extract: sqlUpsertSetClause,
+      only: () => true,
+      contains: (body, name) => new RegExp(`\\b${name}\\s*=\\s*excluded\\.${name}\\b`).test(body),
+      consequence:
+        "a re-pull would never update it -- the value would freeze at whatever the first fetch " +
+        "saw, with every later fetch reporting success",
+    },
+  ];
+
+  for (const list of lists) {
+    const body = lastDefinition(list.extract);
+    if (body === null) {
+      findings.push({
+        file: MIGRATION,
+        line: 1,
+        column: 1,
+        message: `could not find ${list.label} in any migration`,
+      });
+      continue;
+    }
+    for (const { name, unit } of metrics) {
+      if (!list.only(unit)) continue;
+      if (!list.contains(body, name)) {
         findings.push({
           file: MIGRATION,
           line: 1,
           column: 1,
-          message: `metric "${name}" is absent from the envelope_rows_restated trigger condition -- it would restate silently and no webhook would fire`,
+          message: `metric "${name}" is absent from ${list.label} -- ${list.consequence}`,
         });
       }
     }
@@ -263,38 +444,45 @@ if (unknown.length > 0) {
 const sql = readText(MIGRATION);
 const findings = [];
 
-checkSingleFileAssumption(findings);
+checkNoMetricDrops(findings);
+
+const enumOf = (name) => accumulate(sqlEnum(sql, name), (body) => addedEnumValues(body, name));
 
 compare(
   findings,
   "sources",
   tsList(readText(CONTRACT.sources), "SOURCES"),
-  sqlEnum(sql, "envelope_source"),
+  enumOf("envelope_source"),
   CONTRACT.sources,
 );
 compare(
   findings,
   "entity types",
   tsList(readText(CONTRACT.entities), "ENTITY_TYPES"),
-  sqlEnum(sql, "entity_type"),
+  enumOf("entity_type"),
   CONTRACT.entities,
 );
 compare(
   findings,
   "attribution windows",
   tsList(readText(CONTRACT.attribution), "ATTRIBUTION_WINDOWS"),
-  sqlEnum(sql, "attribution_window"),
+  enumOf("attribution_window"),
   CONTRACT.attribution,
 );
 compare(
   findings,
   "metrics",
   tsObjectKeys(readText(CONTRACT.metrics), "METRICS"),
-  sqlMetricColumns(sql),
+  accumulate(sqlMetricColumns(sql), addedMetricColumns),
   CONTRACT.metrics,
 );
 
-checkHandWrittenLists(findings, tsMetricUnits(readText(CONTRACT.metrics)), sql, CONTRACT.metrics);
+checkHandWrittenLists(
+  findings,
+  tsMetricUnits(readText(CONTRACT.metrics)),
+  CONTRACT.metrics,
+  tsObjectKeys(readText(CONTRACT.metrics), "METRICS"),
+);
 
 process.exit(
   report({
@@ -302,10 +490,12 @@ process.exit(
     findings,
     notes: [
       "the canonical vocabulary lives in packages/contract AND in the schema; neither can import the other",
-      "and every metric is checked against the three hand-written SQL lists: columns, the fx constraint, the restatement trigger",
+      "declarations are FOLDED across the migration chain: columns and enum members accumulate, blocks are last-wins",
+      "every metric is checked against four hand-written SQL lists: the fx constraint, the trigger condition, app.record_restatement and the upsert SET clause",
     ],
     warn,
     summary:
-      "contract and schema agree on sources, entity types, attribution windows, metrics, the fx constraint and the restatement trigger",
+      "contract and schema agree on sources, entity types, attribution windows, metrics, and all " +
+      "four hand-written metric lists",
   }),
 );

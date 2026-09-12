@@ -50,7 +50,7 @@ export interface SearchAnalyticsRow {
   readonly impressions?: number;
   /** Read and deliberately not emitted. See SEARCH_CONSOLE_METRIC_MAP. */
   readonly ctr?: number;
-  /** Read and deliberately not emitted in this PR. See the design note. */
+  /** Average SERP rank for this row, as Search Console computed it. Not additive. */
   readonly position?: number;
 }
 
@@ -133,20 +133,27 @@ export const SEARCH_CONSOLE_NATIVE_ENTITY_TYPE: Readonly<Record<SearchConsoleGra
  * ctr, and nothing in the store says which is meant. Anyone who needs it computes it at read time
  * from columns that cannot disagree.
  *
- * `position` IS NOT EMITTED IN THIS PR, for a reason that is not about desirability -- see the
- * design note's case for it. `METRICS`'s unit union is "currency" | "count" and an average position
- * is neither, so it needs a third union member, a new `envelope_rows` column and a change to
- * `app.upsert_envelope_row`'s signature. That is a migration, and a migration belongs in its own
- * change.
+ * `position` IS NOW EMITTED. It was held back until the dictionary could describe it honestly:
+ * `METRICS`'s unit union was "currency" | "count" and an average SERP rank is neither, so it
+ * needed a third member, a new `envelope_rows` column, and a change to `app.upsert_envelope_row`.
  *
- * Both arrive on every row and are simply not read. That is different from an unmapped GA4 metric,
- * which is REFUSED: there, an unrecognised name means the dictionary has a gap; here, `ctr` and
- * `position` are recognised and excluded on purpose, and refusing them would refuse every response
- * Search Console has ever sent.
+ * The part that mattered was not the column. `position` IS NOT ADDITIVE -- positions across two
+ * days do not add to a position, and they do not plainly average either, because Search Console's
+ * own figure is weighted by impressions. Every other metric in the dictionary is additive and
+ * nothing said so, so a column alone would have been read by the first aggregator as one more
+ * thing to SUM. `METRICS` now carries an `aggregation` per metric and `combineMetric` implements
+ * it; the value emitted here is the platform's figure for this row, and combining rows is that
+ * function's job rather than any caller's.
+ *
+ * `ctr` still arrives on every row and is simply not read. That is different from an unmapped GA4
+ * metric, which is REFUSED: there, an unrecognised name means the dictionary has a gap; here `ctr`
+ * is recognised and excluded on purpose, and refusing it would refuse every response Search
+ * Console has ever sent.
  */
 export const SEARCH_CONSOLE_METRIC_MAP: Readonly<Record<string, MetricName>> = {
   clicks: "clicks",
   impressions: "impressions",
+  position: "position",
 };
 
 /**
@@ -243,6 +250,30 @@ export function parseSearchConsoleDate(value: string): string {
  * a negative click count is syntactically fine and physically impossible, and the way it arrives is
  * a positional mix-up somewhere upstream rather than a platform bug.
  */
+/**
+ * Parse `position`, which needs one refusal the count parser must not make.
+ *
+ * ZERO IS IMPOSSIBLE AND IS THE WORST AVAILABLE VALUE. A SERP position is a 1-based ordinal, so
+ * rank 0 does not exist -- and it reads as BETTER than rank 1, so a response carrying it would
+ * present as a site suddenly ranking above the top result. `parseSearchConsoleMetric` allows zero
+ * because a zero click count is an ordinary Tuesday; here it is a signal the response is not the
+ * shape this connector models.
+ *
+ * The database agrees: `envelope_rows.position` carries `check (position > 0)`, not `>= 0`.
+ */
+export function parseSearchConsolePosition(value: unknown): number {
+  const parsed = parseSearchConsoleMetric(value, "position");
+  if (parsed <= 0) {
+    throw new SearchConsoleNormalizeError(
+      `search_console: position is ${parsed}. A SERP position is a 1-based ordinal, so zero is ` +
+        "not a worse rank than one -- it is a better one, and reporting it would show a site " +
+        "ranking above the top result.",
+      "unparseable_value",
+    );
+  }
+  return parsed;
+}
+
 export function parseSearchConsoleMetric(value: unknown, metric: string): number {
   if (value === undefined || value === null) {
     throw new SearchConsoleNormalizeError(
@@ -407,6 +438,9 @@ export function normalizeSearchAnalytics(
     const metrics: Partial<Record<MetricName, number>> = {
       clicks: parseSearchConsoleMetric(row.clicks, "clicks"),
       impressions: parseSearchConsoleMetric(row.impressions, "impressions"),
+      // The platform's own figure for THIS row, already impression-weighted across whatever it
+      // aggregated to produce it. Combining rows is `combineMetric`'s job, not this one's.
+      position: parseSearchConsolePosition(row.position),
     };
 
     const restates = restatesUntil({
@@ -503,6 +537,10 @@ export function totalsByDate(
     );
   }
 
+  // POSITION IS DELIBERATELY ABSENT FROM THIS TOTAL, and must stay absent. This function SUMS
+  // rows, which is right for clicks and impressions and catastrophic for a rank: adding the
+  // positions of forty queries produces a number in the hundreds that is typed as a position.
+  // Rolling a rank up is `combineMetric("position", rows)`, which weights by impressions.
   const totals = new Map<string, SearchConsoleDateTotal>();
   for (const row of result.rows) {
     const seen = totals.get(row.dimensions.date) ?? { clicks: 0, impressions: 0 };

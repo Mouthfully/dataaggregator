@@ -96,18 +96,31 @@ describe("what a customer actually gets, per platform", () => {
     expect(value.transform).toBeUndefined();
   });
 
-  it("distinguishes a decision from a gap among Search Console's two drops", () => {
-    // They look identical in a normaliser -- read, not emitted -- and they are opposites. `ctr` is
-    // settled and will not come back; `position` is waiting on a dictionary change.
+  it("keeps ctr a decision, not a deferral", () => {
+    // `ctr` and `position` were indistinguishable in the normaliser -- one line each of "read, not
+    // emitted" -- and opposite decisions. `position` went through precedence rule 3 and is now a
+    // column; `ctr` stays out permanently, because both its inputs are stored and the quotient
+    // would be a second source of truth.
     const fields = fieldsFor("search_console");
     const ctr = fields.ctr;
-    const position = fields.position;
-    if (ctr?.kind !== "dropped" || position?.kind !== "dropped") {
-      throw new Error("expected dropped dispositions");
-    }
+    if (ctr?.kind !== "dropped") throw new Error("expected ctr to be dropped");
     expect(ctr.blockedOn).toBeUndefined();
-    expect(position.blockedOn).toBeDefined();
-    expect(position.reason).toMatch(/not\s+additive/i);
+    expect(ctr.reason).toMatch(/drift/i);
+  });
+
+  it("shows position having completed the journey rule 3 exists for", () => {
+    const position = fieldsFor("search_console").position;
+    expect(position?.kind).toBe("metric");
+    if (position?.kind !== "metric") throw new Error("expected a metric disposition");
+    expect(position.metric).toBe("position");
+    // Nothing in the registry may still be waiting on it.
+    for (const entry of FIELD_REGISTRY) {
+      for (const [field, d] of Object.entries(entry.fields)) {
+        if (d.kind === "dropped" && d.blockedOn !== undefined) {
+          expect(d.blockedOn, `${entry.source}.${field}`).not.toMatch(/aggregation semantic/i);
+        }
+      }
+    }
   });
 
   it("keeps the WooCommerce fee-line sign trap stated rather than remembered", () => {
@@ -119,7 +132,7 @@ describe("what a customer actually gets, per platform", () => {
   });
 
   it("answers 'what do I get if I connect this' without reading a normaliser", () => {
-    expect(metricsFor("search_console")).toEqual(["clicks", "impressions"]);
+    expect(metricsFor("search_console")).toEqual(["clicks", "impressions", "position"]);
     expect(metricsFor("meta_ads")).toEqual(["clicks", "impressions", "spend"]);
     expect(metricsFor("woocommerce")).toEqual(["fees", "revenue"]);
   });

@@ -1,4 +1,4 @@
-import { envelopeRowSchema, upsertKey } from "@repo/contract";
+import { combineMetric, envelopeRowSchema, upsertKey } from "@repo/contract";
 import { describe, expect, it } from "vitest";
 import {
   BY_PAGE,
@@ -23,6 +23,7 @@ import {
   normalizeSearchAnalytics,
   parseSearchConsoleDate,
   parseSearchConsoleMetric,
+  parseSearchConsolePosition,
   totalsByDate,
 } from "./normalize.js";
 
@@ -203,13 +204,60 @@ describe("the anonymity threshold, which is the whole reason this connector is c
 });
 
 describe("what is emitted, and what is deliberately not", () => {
-  it("emits clicks and impressions and nothing else", () => {
-    // ctr is clicks/impressions and storing a derived value beside its inputs is how one number
-    // becomes two that drift. position needs a third METRICS unit and a migration; see the note.
+  it("emits clicks, impressions and position -- and still not ctr", () => {
+    // `ctr` is clicks/impressions and storing a derived value beside its inputs is how one number
+    // becomes two that drift. That stays a decision. `position` was held back only until the
+    // dictionary could describe a non-additive metric; it now can, so it ships.
     const [row] = normalize(BY_QUERY, ["date", "query"]).rows;
-    expect(Object.keys(row?.metrics ?? {}).sort()).toEqual(["clicks", "impressions"]);
+    expect(Object.keys(row?.metrics ?? {}).sort()).toEqual(["clicks", "impressions", "position"]);
     expect(row?.metrics.clicks).toBe(412);
     expect(row?.metrics.impressions).toBe(9100);
+    expect(row?.metrics.position).toBe(6.2);
+    expect(Object.keys(row?.metrics ?? {})).not.toContain("ctr");
+  });
+
+  it("refuses a zero position, which reads as better than rank one", () => {
+    // A SERP position is a 1-based ordinal. Zero is not a worse rank -- it is a better one, and a
+    // row carrying it would show a site ranking above the top result.
+    expect(() => parseSearchConsolePosition(0)).toThrow(/1-based ordinal/);
+    expect(() => parseSearchConsolePosition(-3)).toThrow();
+    // A count parser must NOT make that refusal: a zero click count is an ordinary Tuesday.
+    expect(parseSearchConsoleMetric(0, "clicks")).toBe(0);
+  });
+
+  it("carries a fractional position rather than rounding it to a rank", () => {
+    // 18.4 is a mean of ordinals, not an ordinal. Rounding here would discard the difference
+    // between "just off page two" and "mid page two" for every row.
+    const [row] = normalize(DAILY_TOTALS, ["date"]).rows;
+    expect(row?.metrics.position).toBe(18.4);
+  });
+
+  it("never sums position when totalling a day, however tempting the shape", () => {
+    // `totalsByDate` SUMS, which is right for clicks and impressions and catastrophic for a rank.
+    // The type has no position field, and this asserts the absence rather than trusting it.
+    const totals = totalsByDate(normalize(DAILY_TOTALS, ["date"]));
+    for (const total of totals.values()) {
+      expect(Object.keys(total).sort()).toEqual(["clicks", "impressions"]);
+    }
+  });
+
+  it("rolls position up by weighting it, not averaging it", () => {
+    // The number the whole aggregation semantic exists for. These rows are real fixture rows at
+    // query grain; a simple mean of their positions is a different, plausible, wrong figure.
+    const rows = normalize(BY_QUERY, ["date", "query"]).rows.filter(
+      (r) => r.dimensions.date === "2026-08-14",
+    );
+    const weighted = combineMetric(
+      "position",
+      rows.map((r) => r.metrics),
+    );
+    const simpleMean = rows.reduce((t, r) => t + (r.metrics.position ?? 0), 0) / rows.length;
+    expect(weighted).not.toBeNull();
+    expect(weighted).not.toBeCloseTo(simpleMean, 4);
+    // And it lands inside the range of the rows it came from, which a sum never would.
+    const positions = rows.map((r) => r.metrics.position ?? 0);
+    expect(weighted).toBeGreaterThanOrEqual(Math.min(...positions));
+    expect(weighted).toBeLessThanOrEqual(Math.max(...positions));
   });
 
   it("labels the currency XXX, which is the ISO code for no currency involved", () => {

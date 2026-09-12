@@ -113,9 +113,14 @@ describe("capabilities that have not launched", () => {
     expect(text).not.toContain(entry?.claim.text);
   });
 
-  it("renders only the source connector that exists instead of the planned launch set", () => {
-    expect(text).toContain("Reads GA4 and WooCommerce on your own credentials.");
-    expect(text).not.toMatch(/Google Ads|Search Console|Meta|affiliate network/i);
+  it("renders only the source connectors that exist instead of the planned launch set", () => {
+    // Five now. scripts/check-capabilities.mjs is what keeps this honest as the set grows:
+    // IMPLEMENTED_SOURCE_IDS must equal the source dirs holding both client.ts and normalize.ts,
+    // so the sentence cannot drift ahead of the tree even if someone edits it by hand.
+    expect(text).toContain(
+      "Reads GA4, Google Ads, Meta Ads, Search Console and WooCommerce on your own credentials.",
+    );
+    expect(text).not.toMatch(/affiliate network|Shopify|TikTok|DataForSEO/i);
   });
 
   it("omits a whole section when every claim in it is withheld", () => {

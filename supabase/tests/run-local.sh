@@ -100,3 +100,6 @@ psql -d "$DB" -q -f "$HERE/10_ingest_entry_point.sql"
 
 echo "==> connection timezone suite"
 psql -d "$DB" -q -f "$HERE/11_connection_timezone.sql"
+
+echo "==> billing suite"
+psql -d "$DB" -q -f "$HERE/12_billing.sql"

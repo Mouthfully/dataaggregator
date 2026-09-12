@@ -1,7 +1,7 @@
 -- THE TIMEZONE IS IMMUTABLE ONCE SET.
 --
 -- A SEPARATE MIGRATION AND NOT AN EDIT TO 20260912000400, AND THE REASON IS THE POINT. That file
--- has already been applied to the live `numbadee` project. An applied migration is immutable: a
+-- has already been applied to the live project. An applied migration is immutable: a
 -- project that ran the original and a project that runs an edited copy would disagree about what
 -- version 20260912000400 means, and the disagreement is invisible -- `supabase_migrations` records
 -- the version, never the body. So the amendment is a new version, which is also the honest history:

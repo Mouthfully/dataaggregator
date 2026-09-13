@@ -43,7 +43,7 @@ import { Footer, SiteHeader } from "../_chrome";
  * WHERE THE THREE TILE LINKS GO. The reference points Google Ads at `google-ads-fields.html`,
  * Shopify at `shopify.html`, and the other ten at a `<dialog>` opened by its own script. None of
  * those exists in this app, so all twelve point at `/dashboard` -- a route that exists and shows
- * the same connected numbers a connector page would -- which is the treatment `Templates.tsx` and
+ * the same connected numbers a connector page would -- which is the treatment `Reports.tsx` and
  * `UseCases.tsx` already settled on for the reference's other dialog buttons. The LABELS stay the
  * reference's three, because they are the design's copy; only the destinations moved, and each
  * moves back independently the day its page lands.

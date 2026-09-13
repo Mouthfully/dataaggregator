@@ -157,9 +157,27 @@ describe("the arithmetic", () => {
   });
 
   it("computes the delta and its share", () => {
-    expect(figure(set, "metric.revenue.delta").text).toBe("THB 1,000.00");
+    expect(figure(set, "metric.revenue.delta").text).toBe("up THB 1,000.00");
     // 1,000 / 28,000 = 3.571...%
-    expect(figure(set, "metric.revenue.delta_share").text).toBe("3.6%");
+    expect(figure(set, "metric.revenue.delta_share").text).toBe("up 3.6%");
+  });
+
+  it("says which way a change went, because the gate compares magnitudes", () => {
+    // The verifier cannot tell "up 9%" from "down 9%" by design, so the direction has to come from
+    // the figure or the model has to guess it -- and a guessed direction is as wrong as a guessed
+    // amount.
+    const fell = build([
+      row({ source: "woocommerce", date: "2026-09-07", metrics: { revenue: 900 } }),
+      row({ source: "woocommerce", date: "2026-08-31", metrics: { revenue: 1_000 } }),
+    ]);
+    expect(figure(fell, "metric.revenue.delta").text).toBe("down THB 100.00");
+    expect(figure(fell, "metric.revenue.delta_share").text).toBe("down 10.0%");
+
+    const flat = build([
+      row({ source: "woocommerce", date: "2026-09-07", metrics: { revenue: 1_000 } }),
+      row({ source: "woocommerce", date: "2026-08-31", metrics: { revenue: 1_000 } }),
+    ]);
+    expect(figure(flat, "metric.revenue.delta").text).toBe("no change, THB 0.00");
   });
 
   it("computes the average ticket at read, rather than storing it", () => {

@@ -1,3 +1,5 @@
+import { SAMPLE_FIGURES, TOP_ACTION_IS_RANGE } from "./_sample-brief";
+
 /**
  * THE ASSISTANT PANEL -- the reference's `<section class="section container">` holding a single
  * `.assistant-panel`: a soft gradient panel with the assistant card on the wide side and the
@@ -29,64 +31,117 @@
  * no violet anywhere in the token file, so it takes the action accent, as the feature grid's first
  * mark already does. The row chips, the quoted prompt and the foot strip are three near-identical
  * pale blue-greys one step off white; `bg-surface-subtle` is that step and covers all three. The
- * "Beta" pill keeps its mint fill from the brand gradient colour.
+ * badge pill keeps its mint fill from the brand gradient colour.
  */
 
 /**
- * Section copy. Every line lives here because `scripts/check-copy.mjs` refuses a sentence typed
- * into the JSX, and each is transcribed from the reference HTML rather than reworded. The eyebrow
- * is stored in sentence case because the capitals are CSS.
+ * Section copy, and the one part of this file that changed.
+ *
+ * WHAT WAS HERE AND WHY IT COULD NOT STAY. The eyebrow read "Your AI-powered analyst", the tick
+ * list opened on "AI-powered analysis", and the card's quoted line was "Here are 3 ways to grow
+ * your business this month:" above three invented task rows. There was no generation code anywhere
+ * in `apps/` or `packages/` behind any of it, and `docs/marketplane/58-plan-reconciliation.md`
+ * section 5.1 separately flags that this block and `FeatureGrid.tsx` rendered byte-identical
+ * eyebrow, heading and lead. The grid took the four capabilities; this panel takes the engine.
+ *
+ * WHAT IT SAYS NOW. The one rule the insight engine is built on: the model writes language and
+ * never arithmetic. Deltas, shares, rankings and impact estimates are computed in TypeScript from
+ * the tenant's own `envelope_rows`, handed to the model as given facts, and the model is asked only
+ * to phrase them. A figure in the output that cannot be matched back to one of those computed
+ * values refuses the whole insight rather than being stripped, rounded to something true or
+ * regenerated with a sterner prompt -- because a repaired insight is one whose text no longer
+ * matches the reasoning that produced it.
+ *
+ * THE PANEL IS NOT REDRAWN. Same gradient panel, same card, same tick list, same three numbered
+ * rows, same `TASKS` shape, same JSX. Only the strings moved, and the rows are shaped so the real
+ * computed figures can be wired straight into them.
+ *
+ * THE BADGE SAYS "SAMPLE" AND NOT "BETA". "Beta" claims a thing exists and is early; the figures in
+ * this card are illustrations and nothing generates them yet, which is what section 5.3 requires
+ * to be labelled rather than implied.
+ *
+ * Every line lives in a constant because `scripts/check-copy.mjs` refuses a sentence typed into the
+ * JSX. The eyebrow is stored in sentence case because the capitals are CSS.
  */
-const EYEBROW = "Your AI-powered analyst";
+const EYEBROW = "How an insight is made";
 
 /** The break inside the heading is the design's, so the two lines are two values. */
-const HEADING_TOP = "From insights";
-const HEADING_BOTTOM = "to impact.";
+const HEADING_TOP = "It writes the sentence.";
+const HEADING_BOTTOM = "Never the number.";
 
 const LEAD =
-  "Get personalized recommendations, turn them into tasks, and keep your business moving forward.";
+  "Every figure is computed from your own rows before a model sees it, then handed over as a fact to phrase. An insight that cites a number your data does not contain is refused, not rewritten into one that is true.";
 
 /** The four ticks, in the reference's order. Fragments, so they carry no terminal punctuation. */
 const BENEFITS = [
-  "AI-powered analysis",
-  "Tailored to your business",
-  "Insights you can act on",
-  "More time for what matters",
+  "Every figure computed from your own rows",
+  "Ranked by what each one is worth",
+  "A range wherever a platform may still restate it",
+  "An untraceable number refuses the whole insight",
 ] as const;
 
 /** The card's own copy. */
-const CARD_TITLE = "AI Growth Assistant";
-const CARD_BADGE = "Beta";
-const CARD_PROMPT = "Here are 3 ways to grow your business this month:";
-const CARD_FOOT = "Your next opportunity starts with a clearer view.";
+const CARD_TITLE = "Insight engine";
+const CARD_BADGE = "Sample";
+const CARD_PROMPT = "Three figures behind this week's list, each traced back to a row:";
+const CARD_FOOT =
+  "Each figure carries the time it was fetched and a marker while the platform may still change it.";
 
 /** The row action, in its two states. The reference's script writes the second one at runtime. */
-const ACTION_LABEL = "Create task";
+const ACTION_LABEL = "See the source";
 // The reference ships THREE identical, enabled "Create task" affordances; `.task-row
 // button:disabled` is a runtime state produced by a click handler, never a delivered one. An
 // earlier draft rendered the third row pre-completed with the label "Task created" -- a string that
 // appears nowhere in any supplied file. It was authored, not transcribed, so it is gone.
+//
+// The label is now "See the source" rather than "Create task": every row is a FIGURE with a
+// provenance, the link goes to /dashboard, and /dashboard's envelope table is the one surface in
+// this repository that really does show a row's source and the time it was read.
 
-/** Names the list of suggestions for assistive tech, which otherwise hears three bare numbers. */
-const TASKS_LABEL = "Suggested actions";
+/** Names the list for assistive tech, which otherwise hears three bare numbers. */
+const TASKS_LABEL = "Figures behind this week's list";
 
 /**
- * The three suggestions, transcribed from the reference. All three are live and identical,
- * `.task-row button:disabled` rule exists to style -- one suggestion already acted on, which is
- * what makes the card read as a working surface rather than a menu.
+ * The third row's caption, in the two shapes the engine can return. Which one renders is the
+ * engine's answer and not an editorial choice: `buildFigureSet` gives a range only where some
+ * contributing rows may still be restated, so a caption that promised a range unconditionally
+ * would be wrong on exactly the days the distinction matters.
+ */
+const RANGE_DETAIL = "A range, because some of the rows behind it may still be restated.";
+const POINT_DETAIL = "A single figure, because every row behind it is settled.";
+
+/**
+ * THE THREE ROWS, AND THE ONE THING THAT MAKES THIS SECTION HONEST.
+ *
+ * The panel's heading says the product computes every figure before a model sees it. Typing three
+ * illustrative numbers into the card directly underneath that sentence would be the same class of
+ * thing the section argues against -- a claim about arithmetic with no arithmetic behind it. So
+ * `title` is assembled from figures `@repo/insights` computed at build time, by `buildFigureSet`,
+ * the function that will compute a real customer's. See `_sample-brief.ts`, which also explains
+ * what that does and does not prove.
+ *
+ * WHAT CHANGED AND WHY IT HAD TO. An earlier draft of this row read "Worth about THB 3,100 a
+ * month, give or take THB 500" -- a plus-or-minus band. The engine does not produce one and will
+ * not: an error bar is a constant somebody chose, and `figures.ts` has none. Its range is the
+ * settled rows at one end and every row at the other, which is the amount the platform can still
+ * restate, measured rather than assumed. The card now prints whatever shape the engine actually
+ * returned, so the copy cannot describe a behaviour the code does not have.
+ *
+ * THE SHAPE IS UNCHANGED -- `{ title, detail }`, three rows, same JSX. `detail` stays authored
+ * copy, because it says what KIND of arithmetic produced the figure rather than restating it.
  */
 const TASKS = [
   {
-    title: "Improve your ROAS on Meta Ads",
-    detail: "Review your lowest-performing campaigns.",
+    title: `${SAMPLE_FIGURES[0].label} ${SAMPLE_FIGURES[0].value}, ${SAMPLE_FIGURES[0].change} on the week before`,
+    detail: "Both totals summed from the rows; the difference computed in code, not written.",
   },
   {
-    title: "Restock popular items on Shopify",
-    detail: "Three products are running low.",
+    title: `${SAMPLE_FIGURES[1].label} ${SAMPLE_FIGURES[1].value}`,
+    detail: "A share of a total taken from the same rows, so the parts add up.",
   },
   {
-    title: "Explore your strongest sales channels",
-    detail: "See where your customers convert.",
+    title: `${SAMPLE_FIGURES[2].label} ${SAMPLE_FIGURES[2].value}`,
+    detail: TOP_ACTION_IS_RANGE ? RANGE_DETAIL : POINT_DETAIL,
   },
 ] as const;
 

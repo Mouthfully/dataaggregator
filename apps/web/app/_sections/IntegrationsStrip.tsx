@@ -19,8 +19,14 @@
  * path is a fact about this section, not copy the rest of the site draws on.
  */
 
-/** Section copy. Inline sentences are refused by `scripts/check-copy.mjs`; uppercasing is CSS. */
-const EYEBROW = "Your favorite platforms. One connected workspace.";
+/** Section copy. Inline sentences are refused by `scripts/check-copy.mjs`; uppercasing is CSS.
+ *
+ *  "Your favorite platforms. One connected workspace." sold the plumbing, which
+ *  `docs/marketplane/58-plan-reconciliation.md` section 5.1 names as the thing to stop selling:
+ *  a connected workspace is what every BI tool offers. The strip now says only what it shows --
+ *  the tools a business already has -- and the argument for what happens next is made by the
+ *  sections under it. */
+const EYEBROW = "The tools your business already runs on";
 
 /**
  * The marks, in the design's order, every one an artwork file that exists in /platforms.

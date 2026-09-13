@@ -147,6 +147,9 @@ importers:
       '@repo/contract':
         specifier: workspace:*
         version: link:../../packages/contract
+      '@repo/insights':
+        specifier: workspace:*
+        version: link:../../packages/insights
       '@repo/tokens':
         specifier: workspace:*
         version: link:../../packages/tokens

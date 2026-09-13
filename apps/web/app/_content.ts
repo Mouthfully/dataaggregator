@@ -178,12 +178,28 @@ export function connectionAllowance(plan: Plan): string {
   return `${formatAllowance(connections)} ${noun}`;
 }
 
+/* ---------------------------------------------------------------------------------------------
+ * THE POSITIONING, AND WHY EVERY UNIFICATION SENTENCE LEFT THIS OBJECT.
+ *
+ * `docs/marketplane/58-plan-reconciliation.md` section 5.1 names three strings here as copy that
+ * must stop -- "All your data. One clear view.", "Connect your tools, unify your data" and "Ready
+ * to unify your data?" -- for one reason: unification is plumbing, and every BI tool sells it. The
+ * plan sells a DECISION. So the hero no longer offers a view of the data; it offers yesterday in
+ * three lines and one thing worth doing about it, which is the product the founder's plan
+ * describes and the thing a person with no analyst actually wants at 07:00.
+ *
+ * `heroVisualLabel` IS LOAD-BEARING AND MUST STAY VISIBLE. Section 5.3 forbids a named Chiang Mai
+ * cafe presented as proof, because there are no customers and the artboard's own figures are
+ * invented. The resolution is the artboard's own: it labels "Sample figures" in three separate
+ * places. The hero panel therefore carries a sample mark inside the card, this label under it, and
+ * a third in the pill below -- no owner name, no quote, no claim that a customer exists.
+ * --------------------------------------------------------------------------------------------- */
 export const SITE = {
-  eyebrow: "Your data, made plain",
-  heroLine1: "All your data.",
-  heroLine2: "One clear view.",
+  eyebrow: "Business intelligence for small business",
+  heroLine1: "Your whole business on one page.",
+  heroLine2: "Every morning.",
   heroLead:
-    "Connect your tools, unify your data, and turn it into insights — in minutes. No code, no hassle.",
+    "Connect the tools your business already runs on. Wake up to yesterday in three lines, anything unusual, and one thing worth doing today.",
   ctaPrimary: "Start free",
   ctaSecondary: "Explore dashboard",
   ctaNav: "Explore dashboard",
@@ -191,11 +207,15 @@ export const SITE = {
   // (`packages/connectors/src/sources`), so the figure counted integrations we do not have. The
   // same string is still the eyebrow of `_sections/IntegrationsMap.tsx`, which was outside this
   // change's paths and is reported rather than edited.
-  heroChecks: ["No credit card required", "Set up in minutes"],
-  syncPill: "Everything connected. Finally.",
-  heroVisualLabel: "Illustrative dashboard",
-  platformsEyebrow: "Your favourite platforms. One connected workspace.",
-  footerTagline: "All your data. One clear view.",
+  //
+  // "Set up in minutes" became the read-access line because the second check is the one a
+  // suspicious owner reads, and section 5.1 requires read-only to be worded as what WE ask for and
+  // enforce rather than as a guarantee the platforms make.
+  heroChecks: ["No credit card required", "Read access, on your own logins"],
+  syncPill: "One thing worth doing today",
+  heroVisualLabel: "Sample figures. An illustration, not a customer.",
+  platformsEyebrow: "The tools your business already runs on",
+  footerTagline: "Yesterday in three lines. One thing to do today.",
   footerNote: "Built for businesses everywhere.",
   footerNote2: "Global platforms. Local possibilities.",
 } as const;

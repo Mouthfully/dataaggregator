@@ -438,6 +438,25 @@ function renderCount(value: number): Rendered {
   return { text, allows: canonical === null ? [] : [canonical] };
 }
 
+/**
+ * WHICH WAY A CHANGE WENT, IN A WORD.
+ *
+ * `canonicalNumber` deliberately compares magnitudes, so the verifier cannot tell "up 9%" from
+ * "down 9%". That is the right trade for the GATE -- a model asked to write "down 9%" must not be
+ * refused for omitting a minus sign -- but it means the direction has to arrive somewhere else, and
+ * the only honest somewhere is the figure itself. A prompt that printed "change against the
+ * previous period: THB 1,800.00" would be asking the model to guess which way, and a guessed
+ * direction is exactly as wrong as a guessed amount.
+ *
+ * So a delta prints its direction as a word and the model copies it, the same way it copies the
+ * digits. A surface renders the same string for the same reason.
+ */
+function directionWord(delta: number): string {
+  if (delta > 0) return "up ";
+  if (delta < 0) return "down ";
+  return "no change, ";
+}
+
 /** One decimal place, stated as such. See the note on rounding on `Figure`. */
 const PERCENT_DECIMALS = 1;
 
@@ -852,13 +871,16 @@ function metricFigures(
     });
   }
 
-  const deltaRendered = render(name, total - prior, currency);
+  // THE MAGNITUDE, because `directionWord` already carries the sign. Rendering the signed value
+  // here would print "down -THB 100.00", and the minus would be saying the same thing twice --
+  // right up until a reader took it for a double negative.
+  const deltaRendered = render(name, Math.abs(total - prior), currency);
   if (deltaRendered !== null) {
     figures.push({
       id: `metric.${name}.delta`,
       kind: "delta",
       label: `${label}, change against the previous period`,
-      text: deltaRendered.text,
+      text: `${directionWord(total - prior)}${deltaRendered.text}`,
       allows: deltaRendered.allows,
       sources,
       fetchedAt,
@@ -880,12 +902,12 @@ function metricFigures(
     return { figures, readable: true };
   }
 
-  const share = renderPercent(((total - prior) / Math.abs(prior)) * 100);
+  const share = renderPercent(Math.abs(((total - prior) / prior) * 100));
   figures.push({
     id: `metric.${name}.delta_share`,
     kind: "delta",
     label: `${label}, percentage change against the previous period`,
-    text: share.text,
+    text: `${directionWord(total - prior)}${share.text}`,
     allows: share.allows,
     sources,
     fetchedAt,

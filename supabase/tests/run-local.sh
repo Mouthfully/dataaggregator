@@ -114,3 +114,6 @@ psql -d "$DB" -q -f "$HERE/13_scheduler_entry_point.sql"
 
 echo "==> ambient suite"
 psql -d "$DB" -q -f "$HERE/14_ambient.sql"
+
+echo "==> force rls suite"
+psql -d "$DB" -q -f "$HERE/15_force_rls.sql"

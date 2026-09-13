@@ -97,7 +97,7 @@ writing**, and every PDPA gap above reappears with a different section number an
 | Article | Requirement | Evidence |
 |---|---|---|
 | Art. 5(1)(c) | Data minimisation | `woocommerce/normalize.ts` emits no buyer identifier |
-| Art. 25(1) | Data protection by design | `20260908000700_rls.sql` — **FORCE** row-level security (not merely ENABLE) on all seven tenancy tables, verified |
+| Art. 25(1) | Data protection by design | **FORCE** row-level security (not merely ENABLE) on **all fifteen** tables in `public`, asserted from the catalogue by `supabase/tests/15_force_rls.sql`. Three tables had only ENABLE until `20260913000200_force_rls.sql`; the earlier version of this row said "all seven tenancy tables" and was silent about the eight added since |
 | Art. 5(1)(a) / 12(1) | Transparency | `/privacy` and `/terms` — every statement is read out of the repository or declared absent; gaps are marked rather than filled |
 
 Everything else is partial or absent, and the gaps mirror §1: Art. 15–20 rights, Art. 30 records,
@@ -122,9 +122,9 @@ produces a well-run system and not a certificate.**
 
 | Control | Requirement | Evidence |
 |---|---|---|
-| A.5.15 | Access control enforced, not intended | `20260908000700_rls.sql` — FORCE RLS on 7 tables, explicit per-table grants, `revoke all … from anon` |
+| A.5.15 | Access control enforced, not intended | FORCE RLS on **every** table in `public` (15 of 15), explicit per-table grants, `revoke all … from anon`; `supabase/tests/15_force_rls.sql` reads the catalogue rather than a list, so a table added without it fails on the day it lands |
 | A.5.17 | Authentication information managed | `20260908000600_api_keys.sql` — only a SHA-256 `key_hash` and a non-secret prefix are stored; plaintext shown once |
-| A.8.3 | Information access restricted | as A.5.15, plus no DELETE on `organisations`/`workspaces`/`invitations`/`api_keys` and no policy granting an API-key session write access |
+| A.8.3 | Information access restricted | as A.5.15, plus no DELETE on `organisations`/`workspaces`/`invitations`/`api_keys` and no policy granting an API-key session write access. Note what this rests on: every SECURITY DEFINER writer here reaches a FORCED table through no policy admitting its owner, so the whole write path depends on the owner holding `BYPASSRLS`. Demonstrated as a mechanism in `15_force_rls.sql`; **unverified on the hosted project** |
 | A.8.33 | Test information protected | every fixture is hand-written synthetic TypeScript; no production data in any test |
 
 ### Absent and code-shaped, so these are ours to fix

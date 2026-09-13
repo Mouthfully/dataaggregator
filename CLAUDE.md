@@ -107,6 +107,14 @@ Note the inversion: every data-protection field in `brand.ts` was GDPR-shaped (`
 - **A new SQL function is `EXECUTE`-able by `PUBLIC` by default**, and `alter default privileges`
   cannot revoke it. Every migration adding one must `revoke all … from public, anon, authenticated`.
   This has already gone wrong once in this schema.
+- **A new table needs `FORCE ROW LEVEL SECURITY`, not merely `ENABLE`.** Without FORCE the table
+  owner bypasses its own policies, and migrations and every `SECURITY DEFINER` function are the
+  owner. Three tables shipped with ENABLE alone. `supabase/tests/15_force_rls.sql` now asserts both
+  settings for **every** table in `public`, read from the catalogue — do not convert it back into a
+  list of names, which is precisely how the gap survived.
+- **Do not add a permissive policy to keep a `SECURITY DEFINER` writer working.** It will apply to
+  `authenticated` too. Every definer writer here reaches a FORCED table through *no* policy, on the
+  strength of the owner holding `BYPASSRLS`; `15_force_rls.sql` demonstrates that mechanism.
 
 ### Claims: what may never be said
 

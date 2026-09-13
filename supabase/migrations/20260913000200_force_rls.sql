@@ -1,0 +1,58 @@
+-- FORCE row-level security on the three tables that had only ENABLE.
+--
+-- `20260908000700_rls.sql` states the rule in its own header, and states the reason:
+--
+--   FORCE ROW LEVEL SECURITY on every table, not merely ENABLE: without FORCE, the table owner
+--   bypasses its own policies, and migrations run as the owner.
+--
+-- It then does it for all seven tenancy tables; `20260908001100`, `20260908001200` and
+-- `20260912000900` do it for theirs. Two later migrations did not:
+--
+--   20260912000600_billing.sql   billing_customers, subscriptions
+--   20260912000700_waitlist.sql  waitlist
+--
+-- AND NOTHING CAUGHT IT, which is the half worth fixing properly. `supabase/tests/12_billing.sql`
+-- asserts `c.relrowsecurity` and never `c.relforcerowsecurity`, so it reads as a check on this rule
+-- and is not one. A test that looks like a guard and is not is worse than an absent one, because it
+-- is the reason nobody looks. `supabase/tests/15_force_rls.sql` now asserts the property for EVERY
+-- ordinary table in `public` rather than for a list, so the next table to miss it fails on the day
+-- it lands -- and asserts ENABLE the same way, because a table with neither is the worse version of
+-- this bug and a list-shaped test would miss it exactly as this one was missed.
+--
+-- ============================================================================================
+-- WHY THERE ARE NO POLICIES IN THIS FILE
+-- ============================================================================================
+--
+-- `public.waitlist` is written by `public.join_waitlist`, which is SECURITY DEFINER and therefore
+-- executes as the table owner -- the role FORCE is precisely about. The first draft of this
+-- migration added a permissive insert policy to keep that path open, and it was wrong twice.
+--
+-- Wrong on the schema: every other definer write path here already runs against a FORCED table
+-- with no policy admitting its owner -- `app.claim_connection` and `app.record_backfill` on
+-- `connections`, `app.upsert_envelope_row` on `envelope_rows`, `app.create_organisation` on
+-- `organisations` and `members`, `app.record_ambient_reading` on `ambient_readings`. All of them
+-- rest on the same property: a role with BYPASSRLS, or a superuser, bypasses row security whether
+-- or not FORCE is set, and FORCE does not reach it. `waitlist` is not a new bet. If that property
+-- does not hold on the hosted project then ingest, signup and the scheduler are already broken and
+-- the waiting list is the least of it -- which is a finding about the whole schema, not a reason to
+-- give one table a policy the other twelve do not have.
+--
+-- Wrong on the facts: `supabase/tests/14_ambient.sql` asserts that a tenant can neither insert,
+-- update nor delete a reading, and it gets that from there being NO write policy at all. A
+-- permissive `for all using (true)` would have applied to `authenticated` as much as to the owner
+-- and turned those three assertions red. The suite caught the draft, which is the suite working.
+--
+-- So the two-layer posture the ambient migration names is left exactly as it is on all three
+-- tables: no role holds a write privilege (the grant layer), and no policy admits one (the policy
+-- layer). This file adds the setting that was missing and nothing else.
+--
+-- A NOTE ON WHAT THE LOCAL SUITE CAN AND CANNOT PROVE. `supabase/tests/run-local.sh` applies these
+-- migrations as a SUPERUSER, and a superuser bypasses row-level security whether or not FORCE is
+-- set. So locally FORCE never binds, and no assertion in the suite can prove that it does. What
+-- `15_force_rls.sql` proves instead is the mechanism itself, on a throwaway table owned by a
+-- throwaway non-bypassing role -- so the sentence this file rests on is demonstrated rather than
+-- quoted from the manual.
+
+alter table public.billing_customers force row level security;
+alter table public.subscriptions     force row level security;
+alter table public.waitlist          force row level security;

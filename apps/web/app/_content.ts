@@ -29,7 +29,7 @@
  * what the thing is called.
  */
 
-import { CLAIMS, type Claim, allowedClaims, brand } from "@repo/brand";
+import { allowedClaims, brand, CLAIMS, type Claim } from "@repo/brand";
 
 import { entitlementsFor, formatAllowance } from "./_billing/entitlements";
 import type { Plan } from "./_billing/plans";
@@ -220,11 +220,20 @@ export const SITE = {
   footerNote2: "Global platforms. Local possibilities.",
 } as const;
 
-/** The primary navigation. Labels are structural, so they are not sentences. */
+/**
+ * The primary navigation. Labels are structural, so they are not sentences.
+ *
+ * `/connections` IS HERE BECAUSE A SCREEN NOBODY CAN REACH CONNECTS NOTHING. It is a signed-in
+ * route and this header is rendered on the marketing pages too -- which is already true of
+ * `/dashboard` beside it, and the middleware sends a signed-out visitor to sign in rather than
+ * showing either. The alternative was a link from the dashboard, whose file this change does not
+ * own; a customer who has just been told to connect a source should not have to guess a URL.
+ */
 export const NAV = [
   { href: "/integrations", label: "Integrations" },
   { href: "/pricing", label: "Pricing" },
   { href: "/docs", label: "Documentation" },
+  { href: "/connections", label: "Connections" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/signin", label: "Sign in" },
 ] as const;
@@ -407,3 +416,175 @@ export const DASHBOARD_ACTIVITY = [
   },
   { id: "orders", title: "Synced 8,241 orders", body: "Shopify data updated", when: "1 day ago" },
 ] as const;
+
+/* ---------------------------------------------------------------------------------------------
+ * THE CONNECT SCREEN.
+ *
+ * The screen a customer uses to attach a source itself, and the first one in this app that collects
+ * a SECRET. Every sentence it renders is here for `_content.ts`'s usual reason -- the copy guard
+ * refuses prose typed into JSX -- and for a second one that only applies to this screen: a refusal
+ * message is the entire difference between a customer who fixes their key and a customer who emails
+ * support. They are worth reading together, in one place, as a set.
+ *
+ * `errors` IS A MESSAGE PER REFUSAL CODE `POST /v1/connections` CAN RETURN, and `actions.test.ts`
+ * asserts that the set matches the endpoint's own `ConnectRefusal` union plus the four outcomes it
+ * adds outside that union (`unauthorized`, `forbidden`, `already_connected`, `upstream_unavailable`,
+ * `not_configured`). A code with no message of its own would collapse into the generic one, which
+ * is the failure this brief names: a customer who cannot tell a wrong key from a broken server.
+ *
+ * WHAT THESE MESSAGES DO NOT SAY IS AS DELIBERATE AS WHAT THEY DO. Nothing here claims the
+ * credential was checked against the platform, because nothing checks it: `/v1/connections` refuses
+ * an empty half and an expired token and seals everything else. Whether a key actually opens a store
+ * is answered by the first read, and saying otherwise here would be a confident wrong answer.
+ * --------------------------------------------------------------------------------------------- */
+
+export const CONNECTIONS = {
+  eyebrow: "Sources",
+  heading: "Connect a source.",
+  lead: "Attach the accounts this workspace reads from. A credential you paste is sealed by the service that stores it, and is never held by this site.",
+
+  listHeading: "This workspace's connections",
+  listNote:
+    "Read from your workspace. Row-level security decided which rows these are, so this table shows what your session may see and nothing else.",
+  columns: {
+    provider: "Source",
+    account: "Account",
+    lane: "Credential",
+    status: "Status",
+    lastRead: "Last read",
+  },
+  never: "Never",
+  lastReadNote:
+    "Last read is the moment a pull last finished successfully. A pull that failed leaves it where it was.",
+  listEmpty: "Nothing is connected to this workspace yet. Add the first source below.",
+  listUnavailable:
+    "Your connections could not be read just now, so none are shown. This is not a statement about your account.",
+  needsWorkspace:
+    "Your account has no workspace yet, so there is nowhere to attach a source. Create your organisation first.",
+  workspaceUnavailable:
+    "Your workspace could not be read just now, so this screen cannot say what is connected.",
+  timezoneMissing: "No time zone",
+  timezoneNote:
+    "A connection with no time zone is not read at all, because every date on every row would be computed in a zone nobody chose. Setting one is not yet something this screen can do.",
+
+  formHeading: "Add a connection",
+  formNote:
+    "What you paste is sent once, to the service that encrypts it. It is never stored by this site, never written to a cookie, and never placed in a web address.",
+  providerLabel: "Source",
+  submit: "Connect",
+  pending: "Connecting…",
+  successHeading: "That connection is stored.",
+  successBody:
+    "Nothing here tested the credential. Whether it opens the account is settled by the first read.",
+  connectAnother: "Add another connection",
+
+  oauthHeading: "Connected another way",
+  oauthNote:
+    "These sources are authorised on the provider's own consent screen rather than by pasting a credential. That flow is not built yet, so there is nothing here to press.",
+  oauthBadge: "Not yet available",
+
+  expiryLegend: "Does this token expire?",
+  expiryNever: "It does not expire",
+  expiryOn: "It expires on",
+  expiryDateLabel: "Expiry date",
+  expiryNote:
+    "Say which, rather than leaving it blank. A dated token recorded as permanent is reported as healthy on the day it stops working.",
+
+  /**
+   * PER-PROVIDER FIELD LABELS. The names are the platform's own, taken from the screen the customer
+   * copies them from -- a merchant reading "Consumer key" in WooCommerce should not have to decide
+   * whether our "API key" means the same thing.
+   */
+  fields: {
+    woocommerce: {
+      accountLabel: "Store address",
+      accountHint: "The address customers visit, with https. Anything after the domain is dropped.",
+      keyLabel: "Consumer key",
+      secretLabel: "Consumer secret",
+      credentialHint:
+        "Create a read-only key under WooCommerce, Settings, Advanced, REST API, then paste both halves here.",
+    },
+    meta_ads: {
+      accountLabel: "Ad account",
+      accountHint: "The ad account identifier, as Meta shows it in Ads Manager.",
+      tokenLabel: "System User token",
+      credentialHint:
+        "Mint the token in your own Business Manager. It stays yours, and this connection reads with it.",
+    },
+  },
+
+  /** Labels, not sentences. The value is rendered as itself when a member is not listed here. */
+  providerNames: {
+    woocommerce: "WooCommerce",
+    meta_ads: "Meta Ads",
+    ga4: "Google Analytics 4",
+    google_ads: "Google Ads",
+    search_console: "Search Console",
+    loyverse: "Loyverse",
+  } as Record<string, string>,
+
+  statusNames: {
+    active: "Active",
+    needs_reauth: "Needs reconnecting",
+    revoked: "Revoked",
+    error: "Error",
+  } as Record<string, string>,
+
+  laneNames: {
+    key_secret: "Key and secret",
+    bearer: "Token",
+    oauth: "Authorised",
+  } as Record<string, string>,
+
+  errors: {
+    /* Refused here, before anything is sent. */
+    noWorkspace:
+      "Your account has no workspace yet, so there is nowhere to put a connection. Nothing was sent.",
+    unknownProvider: "Choose one of the sources offered above. Nothing was sent.",
+    missingAccount: "Name the account this connection should read. Nothing was sent.",
+    missingKey: "Paste both halves of the key. Nothing was sent.",
+    missingToken: "Paste the token. Nothing was sent.",
+    missingExpiry:
+      "Say whether that token expires, and on what date. A blank answer would be recorded as permanent.",
+    contradictoryExpiry:
+      "That token is marked as never expiring and carries a date as well. Say which of the two is true.",
+    notConfigured:
+      "This deployment does not know where to send a credential, so nothing was sent. That is a setting on our side, not something you can fix.",
+    workspaceUnavailable:
+      "Your workspace could not be read just now, so nothing was sent. Try again in a moment.",
+
+    /* Refused by `POST /v1/connections`, one message per code it can return. */
+    unauthorized: "Your session was not accepted. Sign in again, then repeat this.",
+    forbidden:
+      "Your account may not add a connection to this workspace, so nothing was stored. An owner or admin of the organisation can add it, or grant you access.",
+    already_connected:
+      "That account is already connected in this workspace, so nothing was changed. Replacing a live credential is an edit rather than a second connection.",
+    bad_request:
+      "Those account details were refused before anything was stored. Check the account you named, and for a store paste the full address it is served on.",
+    unknown_provider: "This build cannot connect that source, so nothing was stored.",
+    unsupported_lane:
+      "That source cannot be connected by typing a credential, so nothing was stored.",
+    invalid_credential:
+      "That credential was refused as typed, so nothing was stored. Check that every field was pasted whole, with nothing missing from either end.",
+    credential_expired:
+      "That token had already expired when it was pasted, so nothing was stored. Mint a fresh one and paste that instead.",
+    bad_kek:
+      "Credentials cannot be sealed on this deployment right now, so nothing was stored. Nothing you change here will help; quote the reference below.",
+    not_configured:
+      "The service that stores credentials is not configured on this deployment, so nothing was stored.",
+    upstream_unavailable:
+      "The database would not accept this connection, and nothing partial was stored. Try again in a moment, and quote the reference below if it keeps happening.",
+
+    /* Our fault rather than the customer's, and said so rather than dressed as their mistake. */
+    clientFault:
+      "This screen sent something the service would not read, so nothing was stored. That is a fault on our side.",
+
+    /* Neither refusal nor success. */
+    unreachable:
+      "The service that stores credentials could not be reached, so this did not finish. Reload this page to see whether the connection was created before retrying.",
+    unexpected:
+      "That answer was not one this screen recognises, so it cannot say what happened. Reload this page to see whether the connection was created.",
+  },
+
+  referenceLabel: "Reference",
+} as const;

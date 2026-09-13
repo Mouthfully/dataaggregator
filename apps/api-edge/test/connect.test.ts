@@ -689,6 +689,46 @@ describe("the credential never appears in a response, an error or a log", () => 
     expect(text).not.toContain(CONSUMER_SECRET);
     expect(text).not.toContain(CONSUMER_KEY);
   });
+
+  it("is absent from THE LOG, which this block's own title claimed and nothing checked", async () => {
+    // THE TITLE SAID "a response, an error OR A LOG" AND NO TEST TOUCHED A LOG. `connect.ts` calls
+    // `console.log` on both the accepted and the refused path, so the claim was not merely
+    // unproven -- it was made about code that does the thing being claimed safe.
+    //
+    // A log line is the likeliest place a credential escapes and the least likely place anyone
+    // looks: it survives the request, it leaves the process, and it lands somewhere with different
+    // access rules from the database the credential is sealed in.
+    //
+    // Every argument of every call is stringified, including objects, because a credential nested
+    // in a structured log entry is still in the log -- and `%o`-style inspection is exactly how it
+    // would get there without appearing in any format string.
+    const logged: string[] = [];
+    const real = console.log;
+    console.log = (...args: unknown[]) => {
+      logged.push(args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" "));
+    };
+    try {
+      const h = harness();
+      await post(h.deps, wooBody(), `Bearer ${await session()}`);
+      // A refusal too: the path that logs an error is the one carrying the offending input.
+      const refused = harness();
+      await post(refused.deps, wooBody({ workspace_id: WORKSPACE_B }), `Bearer ${await session()}`);
+    } finally {
+      console.log = real;
+    }
+
+    // The endpoint must actually have logged, or this test proves nothing by silence -- the same
+    // trap as asserting an array is empty that was never assigned.
+    expect(logged.length).toBeGreaterThan(0);
+    const all = logged.join("\n");
+    expect(all).not.toContain(CONSUMER_KEY);
+    expect(all).not.toContain(CONSUMER_SECRET);
+    expect(all).not.toContain("ck_");
+    expect(all).not.toContain("cs_");
+    // And the merchant's store origin is not ours to log either: `external_account_id` identifies
+    // the customer's business, and the log line is deliberately documented as omitting it.
+    expect(all).not.toContain("shop.example.com");
+  });
 });
 
 describe("the route", () => {

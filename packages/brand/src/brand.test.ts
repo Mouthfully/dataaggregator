@@ -147,13 +147,15 @@ describe("the claims gate", () => {
     expect(IMPLEMENTED_SOURCE_IDS).toEqual([
       "ga4",
       "google_ads",
+      "loyverse",
       "meta_ads",
       "search_console",
       "woocommerce",
     ]);
     const connectors = allowedClaims().find((claim) => claim.id === "connectors");
     expect(connectors?.text).toBe(
-      "Reads GA4, Google Ads, Meta Ads, Search Console and WooCommerce on your own credentials.",
+      "Reads GA4, Google Ads, Loyverse, Meta Ads, Search Console and WooCommerce on your own " +
+        "credentials.",
     );
     expect(connectors?.text).not.toMatch(/affiliate|Shopify|TikTok|DataForSEO|Impact|Awin/i);
   });

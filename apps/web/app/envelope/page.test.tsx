@@ -126,12 +126,15 @@ describe("the page runs the connectors offline", () => {
   it("counts the rows it rendered rather than announcing a number", () => {
     // ROW_COUNT IS DEFINED AS THIS SUM, so re-deriving it here and asserting equality restated the
     // definition and could not fail. The number that can be wrong is the one the page PRINTS, and
-    // the count the fixtures actually yield -- so both are pinned to a literal. 16 is what the
-    // five normalisers produce today (2 ga4 + 2 google_ads + 7 meta_ads + 2 search_console +
-    // 3 woocommerce); a normaliser that changes its fan-out fails here and should.
-    expect(ROW_COUNT).toBe(16);
-    expect(SOURCES.reduce((total, s) => total + s.rows.length, 0)).toBe(16);
-    expect(text).toContain("16");
+    // the count the fixtures actually yield -- so both are pinned to a literal. 20 is what the
+    // six normalisers produce today (2 ga4 + 2 google_ads + 4 loyverse + 7 meta_ads +
+    // 2 search_console + 3 woocommerce); a normaliser that changes its fan-out fails here and
+    // should. Loyverse contributes ONE ROW PER RECEIPT -- a sale, a refund, a cancellation and a
+    // late-night sale -- because a receipt is the `order` grain and a refund is a second receipt
+    // rather than a mutation of the first.
+    expect(ROW_COUNT).toBe(20);
+    expect(SOURCES.reduce((total, s) => total + s.rows.length, 0)).toBe(20);
+    expect(text).toContain("20");
   });
 
   it("carries a Meta row per attribution window plus one unattributed delivery row", () => {

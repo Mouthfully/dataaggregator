@@ -31,6 +31,7 @@ type BrandField = keyof Brand;
 export const IMPLEMENTED_SOURCE_IDS = [
   "ga4",
   "google_ads",
+  "loyverse",
   "meta_ads",
   "search_console",
   "woocommerce",
@@ -41,6 +42,7 @@ export type ImplementedSourceId = (typeof IMPLEMENTED_SOURCE_IDS)[number];
 const SOURCE_LABELS: Readonly<Record<ImplementedSourceId, string>> = {
   ga4: "GA4",
   google_ads: "Google Ads",
+  loyverse: "Loyverse",
   meta_ads: "Meta Ads",
   search_console: "Search Console",
   woocommerce: "WooCommerce",

@@ -153,6 +153,84 @@ export {
 } from "./sources/google_ads/normalize.ts";
 
 // -------------------------------------------------------------------------------------------
+// Loyverse -- THE FIRST POINT OF SALE, and the first source whose read-only guarantee is enforced
+// by the TOKEN rather than by our own restraint.
+//
+// `58-plan-reconciliation.md` section 1.5 splits the sources two ways: those where read-only is a
+// property of the credential, and those where it is a promise about our code. Loyverse is in the
+// first group -- granular `*_READ` OAuth scopes -- and that is the entire reason it is the pilot
+// POS rather than the market leader.
+//
+// It also carries a REFUSAL that no other source here has: Loyverse issues a personal access
+// token that its own specification says "gives unlimited access to the targeted account", and
+// `assertReadOnlyCredential` rejects one by name. That name is exported because it is the refusal
+// itself, not a helper -- a caller wanting to check a credential before a run should be able to.
+//
+// Exported here for the same reason as every other source: `scripts/check-capabilities.mjs` treats
+// a connector the barrel does not export as one no other package can import, and the connector
+// claim in `packages/brand` counts it as implemented either way. A source claimed and unreachable
+// makes the marketing sentence true about the tree and false about the product.
+// -------------------------------------------------------------------------------------------
+export {
+  LOYVERSE_BACKFILL_CHUNK_DAYS,
+  type LoyverseBackfillBatch,
+  LoyverseBackfillError,
+  type LoyverseBackfillErrorCode,
+  type LoyverseBackfillOptions,
+  type LoyverseCheckpoint,
+  loyverseBackfillChunks,
+  parseLoyverseInstant,
+  runLoyverseBackfill,
+} from "./sources/loyverse/backfill.ts";
+export {
+  assertReadOnlyCredential,
+  assertWindow as assertLoyverseWindow,
+  EMPTY_RATE_BUDGET,
+  fetchMerchant,
+  fetchReceiptsPage,
+  fetchReceiptsPages,
+  LOYVERSE_API_BASE,
+  LOYVERSE_MAX_LIMIT,
+  LOYVERSE_MAX_PAGES,
+  LOYVERSE_MERCHANT_PATH,
+  LOYVERSE_PAGE_LIMIT,
+  LOYVERSE_RATE_FLOOR,
+  LOYVERSE_RATE_REQUESTS,
+  LOYVERSE_RATE_WINDOW_MS,
+  LOYVERSE_RECEIPTS_PATH,
+  LOYVERSE_SCOPES,
+  LoyverseClientError,
+  type LoyverseClientErrorCode,
+  type LoyverseCredential,
+  type LoyverseFetchOptions,
+  type LoyverseMerchant,
+  type LoyverseRateBudget,
+  type LoyverseReceiptsPage,
+  type LoyverseReceiptsQuery,
+  type LoyverseWalkOptions,
+  type LoyverseWindow,
+  merchantUrl,
+  rateAllowsAnother,
+  receiptsUrl,
+  spendRequest,
+} from "./sources/loyverse/client.ts";
+export {
+  assertLoyverseTimezone,
+  LOYVERSE_NATIVE_ENTITY_TYPE,
+  LOYVERSE_RECEIPT_TYPES,
+  loyverseInstantToDate,
+  LoyverseNormalizeError,
+  type LoyverseNormalizeErrorCode,
+  type LoyverseNormalizeOptions,
+  type LoyverseReceipt,
+  type LoyverseReceiptType,
+  normalizeLoyverseReceipts,
+  parseLoyverseMoney,
+  receiptRevenue,
+  receiptTypeOf,
+} from "./sources/loyverse/normalize.ts";
+
+// -------------------------------------------------------------------------------------------
 // Meta Ads
 // -------------------------------------------------------------------------------------------
 export {

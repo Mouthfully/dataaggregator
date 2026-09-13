@@ -1,0 +1,43 @@
+-- Loyverse: the pilot point-of-sale connector.
+--
+-- TWO ENUMS MOVE TOGETHER IN ONE MIGRATION, AND THAT IS THE POINT OF THE FILE. `loyverse` is both
+-- a SOURCE (the envelope carries rows from it) and a PROVIDER (a merchant authorises a connection
+-- to it). Those are different enums, declared in different migrations, watched by different
+-- guards -- and `20260908000500_connections.sql` already left the warning about exactly this:
+--
+--     "NOTE FOR WHOEVER ADDS THE NEXT ONE: no guard relates this enum to its TypeScript twin.
+--      Adding a member here and forgetting the other side fails at runtime, not at build time."
+--
+-- A source with no provider is a connector nobody can connect; a provider with no source is a
+-- connection whose rows the envelope refuses. Splitting them across two migrations would let one
+-- ship without the other, so they are one file.
+--
+-- `alter type ... add value` RATHER THAN AN IN-PLACE EDIT, and that is now the only option
+-- available. `20260908001100_envelope_rows.sql` records that its own `woocommerce` member was
+-- appended by editing the declaration, because the guard of the day failed the build the moment a
+-- second migration touched a dictionary enum -- and it says, in that same comment, that the guard
+-- "must learn to fold later migrations in FIRST". `check-dictionary.mjs` has since learned it.
+-- `check-providers.mjs` learns it in this change, for the same reason and in the same shape.
+--
+-- APPEND-ONLY, NEVER INSERTED. PostgreSQL orders an enum by definition order, and `add value` with
+-- no `before`/`after` appends -- which is what both guards compare against the tail of the
+-- TypeScript list. Adding `before`/`after` here would silently rewrite every `order by` on either
+-- column.
+--
+-- NO `if not exists`. It would make a re-run silent, and a re-run that finds the member already
+-- present means this migration has been applied twice -- a fact worth failing on rather than
+-- absorbing.
+
+-- The source: `packages/contract/src/source.ts` SOURCES, last member.
+alter type app.envelope_source add value 'loyverse';
+
+-- The provider: `packages/connections/src/connections.ts` PROVIDER_LANES, last key.
+--
+-- ITS LANE IS `oauth` AND ONLY `oauth`, which `app.credential_lane` already carries -- so no lane
+-- is added here, and none is needed. Loyverse also issues a personal access token, which would
+-- land in the existing `bearer` lane and is deliberately never offered: the platform's own
+-- specification says that token "gives unlimited access to the targeted account". The refusal is
+-- enforced in TypeScript by `PROVIDER_LANES.loyverse` omitting `bearer`, and in the connector by
+-- `assertReadOnlyCredential`. It is NOT enforced by this column, and it could not be: a column
+-- cannot tell which lane a row SHOULD have used.
+alter type app.connection_provider add value 'loyverse';

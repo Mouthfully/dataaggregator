@@ -74,6 +74,22 @@ export const PROVIDER_LANES = {
   // User lane puts nobody in front of anybody, because the customer minted the token itself.
   meta_ads: ["oauth", "bearer"],
   woocommerce: ["key_secret"],
+
+  // OAUTH ONLY, AND THE SINGLE-ELEMENT ARRAY IS A REFUSAL RATHER THAN AN OMISSION.
+  //
+  // Loyverse DOES issue a pasteable long-lived credential -- a personal access token the merchant
+  // mints in its own back office, exactly the shape `connectWithToken` exists for. It is not
+  // listed, so `offersLane("loyverse", "bearer")` is false and `connectWithToken` refuses the
+  // provider before anything is sealed.
+  //
+  // The reason is the platform's own sentence about that token: it "gives unlimited access to the
+  // targeted account" -- no scopes, and on this API unlimited includes RECEIPTS_WRITE,
+  // ITEMS_WRITE, INVENTORY_WRITE and TAXES_WRITE. `meta_ads` above carries two lanes because both
+  // of Meta's are scope-bounded and the difference is only who gets reviewed; here the two lanes
+  // differ in what the credential can DO, so offering both would mean the same connector
+  // sometimes satisfies the read-only pillar and sometimes only promises to. See
+  // `PROVIDERS.loyverse` in @repo/oauth for the full argument.
+  loyverse: ["oauth"],
 } as const satisfies Record<string, readonly CredentialLane[]>;
 
 /** Every provider a connection can be to. `app.connection_provider` must carry the same members. */

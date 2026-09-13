@@ -209,6 +209,114 @@ export const REDACTION_POLICIES: Readonly<Record<Source, RedactionPolicy>> = {
       "an unbounded bag any plugin may write to. Ids, money, quantities, dates and product labels " +
       "survive; identity does not.",
   },
+
+  // THE SECOND `redact` SOURCE, for the same reason as the first rather than a new one: a Loyverse
+  // receipt is a record of one person buying something at a till. 11A.12 settled that `raw` cannot
+  // be stored as returned for ANY commerce source, and a point of sale is one.
+  //
+  // WHAT IS DROPPED BY NOT BEING NAMED:
+  //
+  //   `customer_id`       the same call as WooCommerce's, and the same answer. A pseudonym is
+  //                       still personal data and an archive of receipt-to-customer mappings is a
+  //                       re-identification table with no consumer. Loyverse makes the stakes
+  //                       plainer than WooCommerce does: its own specification notes that some
+  //                       resources "(like customers) don't use soft deletion due to personal data
+  //                       restrictions" -- the platform itself saying this identifier points at
+  //                       regulated data.
+  //   `points_earned`,    a loyalty POINTS BALANCE is a running total attached to one identified
+  //   `points_deducted`,  shopper. `points_balance` in particular would let two receipts be joined
+  //   `points_balance`    to the same customer WITHOUT the customer_id just dropped -- the
+  //                       allow-list defeating itself one field along.
+  //   `note`,             free text a cashier typed, at receipt and at line level, exactly like
+  //   `line_note`         WooCommerce's `customer_note` and refund `reason`. "Call Khun Nok on
+  //                       081..." is a sentence somebody actually writes on a cafe ticket.
+  //   `employee_id`,      who served it and on which till. Employee monitoring is not what this
+  //   `pos_device_id`     archive is for, and no number here is computed from either. `store_id`
+  //                       IS kept: it identifies premises, not a person, and it is the only way to
+  //                       tell a two-branch owner which branch a receipt came from.
+  //   `payment_details`   `card_number`, `card_company`, `entry_method`, `authorization_code`,
+  //                       `reference_id`. Loyverse masks the PAN to the last four -- but a masked
+  //                       PAN plus a timestamp is still a card-holder identifier, and an
+  //                       authorization code is a payment-network credential. Nothing in this
+  //                       product reads any of it. THIS IS THE ONE A REVIEWER SHOULD CHECK FIRST:
+  //                       it is the only field family here that would put card data in an archive.
+  //
+  // `dining_option` IS KEPT AND IS NOT A COVER COUNT. It is free-form text ("Dine in", "To go") set
+  // by the merchant, and `58-plan-reconciliation.md` section 1.6 records that a grep of this whole
+  // specification found no guest, cover, table or pax field anywhere. It is kept because it is a
+  // property of the SALE rather than of a buyer, and because the day somebody asks "is takeaway up"
+  // the archive should be able to answer. It must never be counted as people.
+  loyverse: {
+    disposition: "redact",
+    keep: new Set([
+      // Identity of the receipt itself.
+      "receipt_number",
+      "receipt_type",
+      "refund_for",
+      "order",
+      "source",
+      "store_id",
+      "dining_option",
+      // The clocks. All three, because they answer three different questions: the normaliser reads
+      // `receipt_date` while the PULL filters on `updated_at`, and an archive that kept only one
+      // could not show why a row was re-read. `cancelled_at` is how a counted sale is voided.
+      "created_at",
+      "receipt_date",
+      "updated_at",
+      "cancelled_at",
+      // The money, at receipt and at line level.
+      "total_money",
+      "total_tax",
+      "total_discount",
+      "tip",
+      "surcharge",
+      "money_amount",
+      "gross_total_money",
+      "price",
+      "quantity",
+      "rate",
+      "percentage",
+      "value",
+      // COST AND COST_TOTAL ARE KEPT DELIBERATELY THOUGH NOTHING READS THEM YET. They are the
+      // merchant's own purchase cost -- not personal data by any reading -- and they are the input
+      // `cost_of_goods` needs on the day the dictionary gains a currency metric for it
+      // (`58-plan-reconciliation.md` build order 4.3). An archive that dropped them would make that
+      // step require a re-pull of history Loyverse may no longer serve.
+      "cost",
+      "cost_total",
+      // The line collections. Naming the collection is not enough -- the keys INSIDE each element
+      // must be named too, or the array survives as the right number of empty objects.
+      "line_items",
+      "payments",
+      "line_taxes",
+      "total_taxes",
+      "line_discounts",
+      "total_discounts",
+      "line_modifiers",
+      // Line-level labels: a product, a modifier, a tax, a discount or a payment type. `name` is
+      // the same value-level limit WooCommerce's policy already states -- a merchant who names an
+      // item after its buyer has put personal data somewhere no keep-list can reach.
+      "id",
+      "item_id",
+      "variant_id",
+      "item_name",
+      "variant_name",
+      "sku",
+      "name",
+      "type",
+      "option",
+      "modifier_option_id",
+      "payment_type_id",
+      "tax_id",
+      "paid_at",
+    ]),
+    reason:
+      "a receipt is a record of one person buying something at a till: customer_id and the loyalty " +
+      "points balance identify a shopper, note and line_note are free text a cashier typed, " +
+      "payment_details carries a masked card number and an authorization code, and employee_id " +
+      "with pos_device_id say who served it. Ids, money, quantities, dates, costs and product " +
+      "labels survive; identity does not.",
+  },
 };
 
 export class PayloadPolicyError extends Error {

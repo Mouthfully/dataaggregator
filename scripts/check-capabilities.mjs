@@ -19,6 +19,19 @@
  * So a source must also be EXPORTED from the barrel. A connector nothing can import is not a
  * capability, and a guard that reads the tree without reading the barrel will keep saying it is.
  *
+ * AND ONE CLASS OF SOURCE IS CLAIMABLE-EXEMPT, ENUMERATED BELOW WITH A REASON. The claim this
+ * guard generates is "Reads <sources> ON YOUR OWN CREDENTIALS", and `air4thai` has no credential:
+ * it is the Thai Pollution Control Department's public air quality feed, read by an unauthenticated
+ * GET, landing in a SHARED table that carries no workspace_id. Adding it to IMPLEMENTED_SOURCE_IDS
+ * would put a false sentence on the site -- and put a public dataset in a list section 11.9 scopes
+ * to four platform connectors plus bought SERP.
+ *
+ * The exemption is NARROW and it is one-way. An ambient source is excused from the MARKETING mirror
+ * and from nothing else: every name its client and normaliser export must still be re-exported from
+ * the barrel, because a connector nothing can import is not a capability whoever is claiming it.
+ * And the list is checked in both directions, like DB_ONLY_PROVIDERS in check-providers.mjs -- an
+ * entry naming a directory that does not exist fails, so the excuse cannot outlive its subject.
+ *
  * AND THE THIRD FILE IS CHECKED TOO, WHICH IT WAS NOT. Specification 13.3 makes a connector unit
  * `{client, normalize, backfill, fixtures, contract.test}`, and this guard read two of the three
  * code files. `backfill.ts` is THE DRIVER -- it is what a scheduled pull or an ingest run actually
@@ -36,6 +49,19 @@ import { readdirSync, statSync } from "node:fs";
 import { parseArgs, readText, repoRoot, report } from "./lib/scan.mjs";
 
 const CLAIMS_FILE = "packages/brand/src/claims.ts";
+
+/**
+ * Sources that are implemented and deliberately NOT part of the connector claim, each with the
+ * reason. See the note above: excused from the marketing mirror, bound by the barrel rule exactly
+ * like every other source.
+ */
+const AMBIENT_SOURCES = {
+  air4thai:
+    "public air quality data from the Thai Pollution Control Department; no credential, no " +
+    "connections row, and readings land in a shared table with no workspace_id, so the claim " +
+    '"on your own credentials" would be false of it',
+};
+
 const SOURCES_DIR = "packages/connectors/src/sources";
 const BARREL = "packages/connectors/src/index.ts";
 
@@ -173,11 +199,34 @@ if (declared === null) {
   });
 } else {
   for (const source of implemented.filter((id) => !declared.includes(id))) {
+    if (source in AMBIENT_SOURCES) continue;
     findings.push({
       file: CLAIMS_FILE,
       line: 1,
       column: 1,
       message: `implemented source "${source}" is absent from the connector-claim source list`,
+    });
+  }
+  // A CLAIMED AMBIENT SOURCE IS ALSO A FAILURE, in the other direction: the exemption says the
+  // marketing sentence must NOT name it, so finding it there is the false claim arriving anyway.
+  for (const source of declared.filter((id) => id in AMBIENT_SOURCES)) {
+    findings.push({
+      file: CLAIMS_FILE,
+      line: 1,
+      column: 1,
+      message:
+        `"${source}" is an ambient source and must not appear in the connector claim: ` +
+        `${AMBIENT_SOURCES[source]}.`,
+    });
+  }
+  // And an excuse that outlives its subject is a comment claiming something untrue.
+  for (const source of Object.keys(AMBIENT_SOURCES)) {
+    if (implemented.includes(source)) continue;
+    findings.push({
+      file: "scripts/check-capabilities.mjs",
+      line: 1,
+      column: 1,
+      message: `AMBIENT_SOURCES excuses "${source}", which is no longer an implemented source.`,
     });
   }
   for (const source of declared.filter((id) => !implemented.includes(id))) {
@@ -207,6 +256,7 @@ process.exit(
       "a claimable source has both client.ts and normalize.ts under packages/connectors/src/sources",
       "and EVERY name they export must be re-exported -- a presence check missed five page walkers",
       "a backfill.ts is optional, and where one exists every name it exports must be re-exported too",
+      "an AMBIENT source is excused from the marketing mirror only -- the barrel rule still binds",
     ],
     warn,
     summary:

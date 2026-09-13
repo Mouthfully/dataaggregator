@@ -111,3 +111,6 @@ psql -d "$DB" -q -f "$HERE/12_billing.sql"
 # rather than left for whoever notices next.
 echo "==> scheduler entry point suite"
 psql -d "$DB" -q -f "$HERE/13_scheduler_entry_point.sql"
+
+echo "==> ambient suite"
+psql -d "$DB" -q -f "$HERE/14_ambient.sql"

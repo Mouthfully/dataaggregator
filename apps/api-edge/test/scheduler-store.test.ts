@@ -245,7 +245,9 @@ describe("taking and closing a lease", () => {
     });
 
     const taken = fake([{ raw: "false" }]);
-    expect(await createSchedulerStore(config(taken.impl)).claim(CONNECTION, "worker-2")).toBe(false);
+    expect(await createSchedulerStore(config(taken.impl)).claim(CONNECTION, "worker-2")).toBe(
+      false,
+    );
   });
 
   it("REFUSES to read anything but a boolean as a lease taken", async () => {
@@ -253,9 +255,9 @@ describe("taking and closing a lease", () => {
     // which `10-credential-model.md` prices as halving the accounts one developer token supports.
     // Anything truthy-but-unknown read as `true` is exactly that.
     const f = fake([{ raw: '"t"' }]);
-    await expect(createSchedulerStore(config(f.impl)).claim(CONNECTION, "worker-1")).rejects.toThrow(
-      /rather than a boolean/,
-    );
+    await expect(
+      createSchedulerStore(config(f.impl)).claim(CONNECTION, "worker-1"),
+    ).rejects.toThrow(/rather than a boolean/);
   });
 
   it("refuses an anonymous lease, so a stuck connection can be attributed", async () => {

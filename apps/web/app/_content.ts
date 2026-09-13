@@ -29,7 +29,7 @@
  * what the thing is called.
  */
 
-import { CLAIMS, type Claim, allowedClaims, brand } from "@repo/brand";
+import { allowedClaims, brand, CLAIMS, type Claim } from "@repo/brand";
 
 import { entitlementsFor, formatAllowance } from "./_billing/entitlements";
 import type { Plan } from "./_billing/plans";
@@ -178,12 +178,28 @@ export function connectionAllowance(plan: Plan): string {
   return `${formatAllowance(connections)} ${noun}`;
 }
 
+/* ---------------------------------------------------------------------------------------------
+ * THE POSITIONING, AND WHY EVERY UNIFICATION SENTENCE LEFT THIS OBJECT.
+ *
+ * `docs/marketplane/58-plan-reconciliation.md` section 5.1 names three strings here as copy that
+ * must stop -- "All your data. One clear view.", "Connect your tools, unify your data" and "Ready
+ * to unify your data?" -- for one reason: unification is plumbing, and every BI tool sells it. The
+ * plan sells a DECISION. So the hero no longer offers a view of the data; it offers yesterday in
+ * three lines and one thing worth doing about it, which is the product the founder's plan
+ * describes and the thing a person with no analyst actually wants at 07:00.
+ *
+ * `heroVisualLabel` IS LOAD-BEARING AND MUST STAY VISIBLE. Section 5.3 forbids a named Chiang Mai
+ * cafe presented as proof, because there are no customers and the artboard's own figures are
+ * invented. The resolution is the artboard's own: it labels "Sample figures" in three separate
+ * places. The hero panel therefore carries a sample mark inside the card, this label under it, and
+ * a third in the pill below -- no owner name, no quote, no claim that a customer exists.
+ * --------------------------------------------------------------------------------------------- */
 export const SITE = {
-  eyebrow: "Your data, made plain",
-  heroLine1: "All your data.",
-  heroLine2: "One clear view.",
+  eyebrow: "Business intelligence for small business",
+  heroLine1: "Your whole business on one page.",
+  heroLine2: "Every morning.",
   heroLead:
-    "Connect your tools, unify your data, and turn it into insights — in minutes. No code, no hassle.",
+    "Connect the tools your business already runs on. Wake up to yesterday in three lines, anything unusual, and one thing worth doing today.",
   ctaPrimary: "Start free",
   ctaSecondary: "Explore dashboard",
   ctaNav: "Explore dashboard",
@@ -191,20 +207,33 @@ export const SITE = {
   // (`packages/connectors/src/sources`), so the figure counted integrations we do not have. The
   // same string is still the eyebrow of `_sections/IntegrationsMap.tsx`, which was outside this
   // change's paths and is reported rather than edited.
-  heroChecks: ["No credit card required", "Set up in minutes"],
-  syncPill: "Everything connected. Finally.",
-  heroVisualLabel: "Illustrative dashboard",
-  platformsEyebrow: "Your favourite platforms. One connected workspace.",
-  footerTagline: "All your data. One clear view.",
+  //
+  // "Set up in minutes" became the read-access line because the second check is the one a
+  // suspicious owner reads, and section 5.1 requires read-only to be worded as what WE ask for and
+  // enforce rather than as a guarantee the platforms make.
+  heroChecks: ["No credit card required", "Read access, on your own logins"],
+  syncPill: "One thing worth doing today",
+  heroVisualLabel: "Sample figures. An illustration, not a customer.",
+  platformsEyebrow: "The tools your business already runs on",
+  footerTagline: "Yesterday in three lines. One thing to do today.",
   footerNote: "Built for businesses everywhere.",
   footerNote2: "Global platforms. Local possibilities.",
 } as const;
 
-/** The primary navigation. Labels are structural, so they are not sentences. */
+/**
+ * The primary navigation. Labels are structural, so they are not sentences.
+ *
+ * `/connections` IS HERE BECAUSE A SCREEN NOBODY CAN REACH CONNECTS NOTHING. It is a signed-in
+ * route and this header is rendered on the marketing pages too -- which is already true of
+ * `/dashboard` beside it, and the middleware sends a signed-out visitor to sign in rather than
+ * showing either. The alternative was a link from the dashboard, whose file this change does not
+ * own; a customer who has just been told to connect a source should not have to guess a URL.
+ */
 export const NAV = [
   { href: "/integrations", label: "Integrations" },
   { href: "/pricing", label: "Pricing" },
   { href: "/docs", label: "Documentation" },
+  { href: "/connections", label: "Connections" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/signin", label: "Sign in" },
 ] as const;
@@ -220,6 +249,67 @@ export const NAV = [
  * and they are deleted in one piece. A figure typed into the JSX would have to be hunted. The screen
  * itself is labelled as a concept, in the UI, by `SITE_DASHBOARD.notice`.
  * --------------------------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------------------------
+ * THE LIVE TABLE'S VOCABULARY -- the half of the dashboard that is NOT illustrative.
+ *
+ * Nothing here is a figure. Every number on the live table is read out of `envelope_rows` at
+ * request time; these are the words around them, and they are constants because
+ * `scripts/check-copy.mjs` requires prose to come from a named constant and because the three
+ * marks below are a glossary that the legend and the cells must not be able to disagree about.
+ *
+ * THE MARKS ARE THE POINT OF THE TABLE.
+ *
+ *   provisionalMark  the platform may still restate this figure. A provisional number printed
+ *                    like a settled one is precisely the failure `is_provisional` exists to
+ *                    prevent, so it is marked ON THE FIGURE and not only in a status column --
+ *                    a figure read off a screen, or copied into a message, takes its mark with it.
+ *   absentMark       the platform reported nothing. NOT ZERO, and never rendered as zero.
+ *   unreadableMark   something was stored that the page could not read as a number. Shown rather
+ *                    than swallowed, because a defect hidden behind the absent mark is a defect
+ *                    nobody goes looking for.
+ * --------------------------------------------------------------------------------------------- */
+
+export const DASHBOARD_LIVE = {
+  heading: "Your envelope rows",
+  note: "Read from your workspace for the period above. Row-level security decided which rows these are, so this table shows what your session may see and nothing else.",
+  columns: {
+    source: "Source",
+    entity: "Entity",
+    date: "Date",
+    window: "Attribution window",
+    status: "Status",
+    fetched: "Read at",
+  },
+  provisional: "Provisional",
+  final: "Final",
+  unattributed: "Unattributed",
+  provisionalMark: "†",
+  absentMark: "—",
+  unreadableMark: "?",
+  provisionalTitle: "Still provisional",
+  absentTitle: "Not reported",
+  unreadableTitle: "Could not be read",
+  noMetrics:
+    "These rows carry no metric values at all, so there is nothing to total. Only the row metadata is shown.",
+  legend: [
+    {
+      id: "provisional",
+      mark: "†",
+      body: "The platform may still restate this figure, so it is not final yet.",
+    },
+    {
+      id: "absent",
+      mark: "—",
+      body: "The platform reported nothing for this metric on this row. That is not the same as zero.",
+    },
+    {
+      id: "unreadable",
+      mark: "?",
+      body: "A value was stored that this page could not read as a number, so no figure is shown.",
+    },
+  ],
+} as const;
 
 export const SITE_DASHBOARD = {
   eyebrow: "Client workspace",
@@ -326,3 +416,175 @@ export const DASHBOARD_ACTIVITY = [
   },
   { id: "orders", title: "Synced 8,241 orders", body: "Shopify data updated", when: "1 day ago" },
 ] as const;
+
+/* ---------------------------------------------------------------------------------------------
+ * THE CONNECT SCREEN.
+ *
+ * The screen a customer uses to attach a source itself, and the first one in this app that collects
+ * a SECRET. Every sentence it renders is here for `_content.ts`'s usual reason -- the copy guard
+ * refuses prose typed into JSX -- and for a second one that only applies to this screen: a refusal
+ * message is the entire difference between a customer who fixes their key and a customer who emails
+ * support. They are worth reading together, in one place, as a set.
+ *
+ * `errors` IS A MESSAGE PER REFUSAL CODE `POST /v1/connections` CAN RETURN, and `actions.test.ts`
+ * asserts that the set matches the endpoint's own `ConnectRefusal` union plus the four outcomes it
+ * adds outside that union (`unauthorized`, `forbidden`, `already_connected`, `upstream_unavailable`,
+ * `not_configured`). A code with no message of its own would collapse into the generic one, which
+ * is the failure this brief names: a customer who cannot tell a wrong key from a broken server.
+ *
+ * WHAT THESE MESSAGES DO NOT SAY IS AS DELIBERATE AS WHAT THEY DO. Nothing here claims the
+ * credential was checked against the platform, because nothing checks it: `/v1/connections` refuses
+ * an empty half and an expired token and seals everything else. Whether a key actually opens a store
+ * is answered by the first read, and saying otherwise here would be a confident wrong answer.
+ * --------------------------------------------------------------------------------------------- */
+
+export const CONNECTIONS = {
+  eyebrow: "Sources",
+  heading: "Connect a source.",
+  lead: "Attach the accounts this workspace reads from. A credential you paste is sealed by the service that stores it, and is never held by this site.",
+
+  listHeading: "This workspace's connections",
+  listNote:
+    "Read from your workspace. Row-level security decided which rows these are, so this table shows what your session may see and nothing else.",
+  columns: {
+    provider: "Source",
+    account: "Account",
+    lane: "Credential",
+    status: "Status",
+    lastRead: "Last read",
+  },
+  never: "Never",
+  lastReadNote:
+    "Last read is the moment a pull last finished successfully. A pull that failed leaves it where it was.",
+  listEmpty: "Nothing is connected to this workspace yet. Add the first source below.",
+  listUnavailable:
+    "Your connections could not be read just now, so none are shown. This is not a statement about your account.",
+  needsWorkspace:
+    "Your account has no workspace yet, so there is nowhere to attach a source. Create your organisation first.",
+  workspaceUnavailable:
+    "Your workspace could not be read just now, so this screen cannot say what is connected.",
+  timezoneMissing: "No time zone",
+  timezoneNote:
+    "A connection with no time zone is not read at all, because every date on every row would be computed in a zone nobody chose. Setting one is not yet something this screen can do.",
+
+  formHeading: "Add a connection",
+  formNote:
+    "What you paste is sent once, to the service that encrypts it. It is never stored by this site, never written to a cookie, and never placed in a web address.",
+  providerLabel: "Source",
+  submit: "Connect",
+  pending: "Connecting…",
+  successHeading: "That connection is stored.",
+  successBody:
+    "Nothing here tested the credential. Whether it opens the account is settled by the first read.",
+  connectAnother: "Add another connection",
+
+  oauthHeading: "Connected another way",
+  oauthNote:
+    "These sources are authorised on the provider's own consent screen rather than by pasting a credential. That flow is not built yet, so there is nothing here to press.",
+  oauthBadge: "Not yet available",
+
+  expiryLegend: "Does this token expire?",
+  expiryNever: "It does not expire",
+  expiryOn: "It expires on",
+  expiryDateLabel: "Expiry date",
+  expiryNote:
+    "Say which, rather than leaving it blank. A dated token recorded as permanent is reported as healthy on the day it stops working.",
+
+  /**
+   * PER-PROVIDER FIELD LABELS. The names are the platform's own, taken from the screen the customer
+   * copies them from -- a merchant reading "Consumer key" in WooCommerce should not have to decide
+   * whether our "API key" means the same thing.
+   */
+  fields: {
+    woocommerce: {
+      accountLabel: "Store address",
+      accountHint: "The address customers visit, with https. Anything after the domain is dropped.",
+      keyLabel: "Consumer key",
+      secretLabel: "Consumer secret",
+      credentialHint:
+        "Create a read-only key under WooCommerce, Settings, Advanced, REST API, then paste both halves here.",
+    },
+    meta_ads: {
+      accountLabel: "Ad account",
+      accountHint: "The ad account identifier, as Meta shows it in Ads Manager.",
+      tokenLabel: "System User token",
+      credentialHint:
+        "Mint the token in your own Business Manager. It stays yours, and this connection reads with it.",
+    },
+  },
+
+  /** Labels, not sentences. The value is rendered as itself when a member is not listed here. */
+  providerNames: {
+    woocommerce: "WooCommerce",
+    meta_ads: "Meta Ads",
+    ga4: "Google Analytics 4",
+    google_ads: "Google Ads",
+    search_console: "Search Console",
+    loyverse: "Loyverse",
+  } as Record<string, string>,
+
+  statusNames: {
+    active: "Active",
+    needs_reauth: "Needs reconnecting",
+    revoked: "Revoked",
+    error: "Error",
+  } as Record<string, string>,
+
+  laneNames: {
+    key_secret: "Key and secret",
+    bearer: "Token",
+    oauth: "Authorised",
+  } as Record<string, string>,
+
+  errors: {
+    /* Refused here, before anything is sent. */
+    noWorkspace:
+      "Your account has no workspace yet, so there is nowhere to put a connection. Nothing was sent.",
+    unknownProvider: "Choose one of the sources offered above. Nothing was sent.",
+    missingAccount: "Name the account this connection should read. Nothing was sent.",
+    missingKey: "Paste both halves of the key. Nothing was sent.",
+    missingToken: "Paste the token. Nothing was sent.",
+    missingExpiry:
+      "Say whether that token expires, and on what date. A blank answer would be recorded as permanent.",
+    contradictoryExpiry:
+      "That token is marked as never expiring and carries a date as well. Say which of the two is true.",
+    notConfigured:
+      "This deployment does not know where to send a credential, so nothing was sent. That is a setting on our side, not something you can fix.",
+    workspaceUnavailable:
+      "Your workspace could not be read just now, so nothing was sent. Try again in a moment.",
+
+    /* Refused by `POST /v1/connections`, one message per code it can return. */
+    unauthorized: "Your session was not accepted. Sign in again, then repeat this.",
+    forbidden:
+      "Your account may not add a connection to this workspace, so nothing was stored. An owner or admin of the organisation can add it, or grant you access.",
+    already_connected:
+      "That account is already connected in this workspace, so nothing was changed. Replacing a live credential is an edit rather than a second connection.",
+    bad_request:
+      "Those account details were refused before anything was stored. Check the account you named, and for a store paste the full address it is served on.",
+    unknown_provider: "This build cannot connect that source, so nothing was stored.",
+    unsupported_lane:
+      "That source cannot be connected by typing a credential, so nothing was stored.",
+    invalid_credential:
+      "That credential was refused as typed, so nothing was stored. Check that every field was pasted whole, with nothing missing from either end.",
+    credential_expired:
+      "That token had already expired when it was pasted, so nothing was stored. Mint a fresh one and paste that instead.",
+    bad_kek:
+      "Credentials cannot be sealed on this deployment right now, so nothing was stored. Nothing you change here will help; quote the reference below.",
+    not_configured:
+      "The service that stores credentials is not configured on this deployment, so nothing was stored.",
+    upstream_unavailable:
+      "The database would not accept this connection, and nothing partial was stored. Try again in a moment, and quote the reference below if it keeps happening.",
+
+    /* Our fault rather than the customer's, and said so rather than dressed as their mistake. */
+    clientFault:
+      "This screen sent something the service would not read, so nothing was stored. That is a fault on our side.",
+
+    /* Neither refusal nor success. */
+    unreachable:
+      "The service that stores credentials could not be reached, so this did not finish. Reload this page to see whether the connection was created before retrying.",
+    unexpected:
+      "That answer was not one this screen recognises, so it cannot say what happened. Reload this page to see whether the connection was created.",
+  },
+
+  referenceLabel: "Reference",
+} as const;

@@ -107,11 +107,33 @@ const HEADLINE_NOTE =
 /* The controller panel. Every value is read from the brand package; none is typed here. */
 const CONTROLLER_LABEL = "Responsible for this data";
 
+/**
+ * THE GOVERNING LAW AND THE AUTHORITY WERE MISSING, AND THAT WAS THE GAP ON THIS PAGE.
+ *
+ * Seven hundred lines describing who holds what, and the notice named no law and no supervisory
+ * authority. For a Thai juristic person processing personal data that is not a stylistic omission:
+ * the PDPA is what these obligations come FROM, and a reader with a complaint had no route out of
+ * this page. Naming the authority is the practical half of the rights the statute grants -- rights
+ * with no address are rights on paper.
+ *
+ * BOTH VALUES COME FROM THE BRAND PACKAGE, like every other row here. `brand.governingPrivacyLaw`
+ * is a plain string and not a nullable one, because unlike `euRepresentative` there is nothing to
+ * arrange: the law applies to this entity whether or not anyone writes it down.
+ *
+ * THE GDPR IS DELIBERATELY NOT NAMED HERE. `brand.euRepresentative` is null, and whether the GDPR
+ * reaches this entity at all turns on Article 3(2) -- on whether the business offers services to
+ * data subjects in the Union -- which is a decision nobody has taken. Naming a second law in the
+ * controller panel would assert that it applies. The `dpa` and `gdpr` claims stay withheld in
+ * `packages/brand/src/claims.ts`, and the clause below on international arrangements is where that
+ * gap is stated rather than papered over.
+ */
 const CONTROLLER_ROWS = [
   { key: "Controller", value: brand.legalEntity },
   { key: "Registered address", value: formatAddress() },
   { key: "Company registration", value: brand.companyRegistration },
   { key: "Country of registration", value: brand.postalAddress.country },
+  { key: "Governing law", value: brand.governingPrivacyLaw },
+  { key: "Supervisory authority", value: brand.supervisoryAuthority },
 ] as const;
 
 const CONTACT_ROW_LABEL = "Contact";
@@ -295,6 +317,19 @@ const CLAUSES: readonly Clause[] = [
     body: [HOSTING_LINE],
   },
   {
+    // THE PDPA APPOINTS A DPO IN DEFINED CIRCUMSTANCES, and whether this entity meets the trigger
+    // is a question for counsel rather than for a source file. So the clause says the appointment
+    // has not been made and names the route that exists in the meantime, rather than printing a
+    // contact nobody staffs. `brand.dataProtectionOfficer` is null for the same reason.
+    id: "data-protection-officer",
+    title: "Data protection officer",
+    open: true,
+    body: [
+      "No data protection officer has been appointed. The Personal Data Protection Act requires one in defined circumstances, and whether this company meets them has not been determined.",
+      "Until it is, questions and requests about personal data go to the contact address above, and are answered by the people responsible for the service rather than by a named officer. A contact printed here that nobody staffs would be worse than none, because it is the address a person would write to and wait at.",
+    ],
+  },
+  {
     id: "sub-processors",
     title: "Sub-processors",
     open: true,
@@ -441,7 +476,7 @@ export default function PrivacyPage() {
             <span className="text-ink-faint block text-[11px] font-bold tracking-[0.14em] uppercase md:text-xs">
               {EYEBROW}
             </span>
-            <h1 className="font-display text-ink mt-2.5 text-[32px] leading-[1.1] font-bold tracking-[-0.03em] md:text-[42px]">
+            <h1 className="font-display text-ink mt-2.5 text-[32px] leading-[1.1] font-semibold tracking-[-0.03em] md:text-[42px]">
               {HEADING}
             </h1>
             <p className="text-ink-muted mt-5 text-base leading-[1.7] md:text-[17px]">{LEAD}</p>
@@ -520,7 +555,7 @@ export default function PrivacyPage() {
         >
           <h2
             id="roles-heading"
-            className="font-display text-ink text-[24px] leading-[1.2] font-bold tracking-[-0.02em] md:text-[28px]"
+            className="font-display text-ink text-[24px] leading-[1.2] font-semibold tracking-[-0.02em] md:text-[28px]"
           >
             {ROLES_HEADING}
           </h2>
@@ -531,7 +566,7 @@ export default function PrivacyPage() {
                 key={role.id}
                 className="border-line bg-surface flex flex-col rounded-lg border p-6 md:p-7"
               >
-                <h3 className="font-display text-ink text-xl leading-[1.3] font-bold tracking-[-0.01em]">
+                <h3 className="font-display text-ink text-xl leading-[1.3] font-semibold tracking-[-0.01em]">
                   {role.title}
                 </h3>
                 <span className="text-ink-subtle mt-2 text-[11px] font-bold tracking-[0.1em] uppercase">
@@ -553,7 +588,7 @@ export default function PrivacyPage() {
             <div className="max-w-[760px]">
               <h2
                 id="inventory-heading"
-                className="font-display text-ink text-[24px] leading-[1.2] font-bold tracking-[-0.02em] md:text-[28px]"
+                className="font-display text-ink text-[24px] leading-[1.2] font-semibold tracking-[-0.02em] md:text-[28px]"
               >
                 {INVENTORY_HEADING}
               </h2>
@@ -640,7 +675,7 @@ export default function PrivacyPage() {
                     <span className="text-ink-faint text-[13px] font-bold tabular-nums">
                       {index + 1}
                     </span>
-                    <h3 className="font-display text-ink text-xl leading-[1.3] font-bold tracking-[-0.01em] md:text-[22px]">
+                    <h3 className="font-display text-ink text-xl leading-[1.3] font-semibold tracking-[-0.01em] md:text-[22px]">
                       {clause.title}
                     </h3>
                     {clause.open === true ? (
@@ -689,7 +724,7 @@ export default function PrivacyPage() {
           <div className="border-line rounded-xl border p-6 md:p-9">
             <h2
               id="open-items-heading"
-              className="font-display text-ink text-[24px] leading-[1.2] font-bold tracking-[-0.02em] md:text-[28px]"
+              className="font-display text-ink text-[24px] leading-[1.2] font-semibold tracking-[-0.02em] md:text-[28px]"
             >
               {OPEN_ITEMS_HEADING}
             </h2>

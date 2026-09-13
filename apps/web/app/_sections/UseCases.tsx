@@ -12,12 +12,9 @@
  * example") is one the link can actually keep. When a templates surface lands, these become links
  * to it and nothing else in this file moves.
  *
- * THE CONNECTOR ROW is the one addition to the reference's per-card content, and it is content the
- * section already implies rather than a new claim: three of the real connector marks from
- * `apps/web/public/platforms/`, naming the sources that feed that team's view. Every slug shown is
- * one the integrations sections already list, so nothing here promises a connector the page does
- * not promise elsewhere. Plain <img> for the same reason the integration sections use one -- these
- * are fixed-size brand marks, so `next/image` would add a layout wrapper and buy nothing.
+ * THE PER-TRADE LINE occupies the slot the reference filled with a row of connector marks. See the
+ * second block below for why the marks went; the slot, its 24px top margin and the CTA baseline it
+ * holds are unchanged.
  *
  * COLOUR. The reference tints the card icons a bright blue and gives the cards a near-white ground
  * one step off the page. Neither literal is in the token file; both sit a couple of percent from a
@@ -29,61 +26,89 @@
  * The grid is three columns at 768px and one below it, per the reference's own 760px collapse.
  */
 
-/** Section copy. `scripts/check-copy.mjs` refuses a sentence typed into the JSX, so every line
- *  arrives from here. Eyebrows are stored in sentence case because the capitals are CSS. */
-const EYEBROW = "Made for the way you work";
-const HEADING = "A clearer view, for every team.";
-const LEAD = "One shared source of insight. A different perspective for every role.";
+/**
+ * WHERE THE AUDIENCE GETS NAMED, AND WHO IS NOT ON THE LIST.
+ *
+ * The site named nobody. The founder's plan names five trades -- cafes, bars and restaurants;
+ * hotels and guesthouses; online sellers; clinics and salons; accountants -- all of them
+ * owner-operated, in Thailand, with no analyst and no IT department. Those five are these five.
+ *
+ * "AGENCIES & CONSULTANTS" WAS THE THIRD CARD AND IS DELIBERATELY GONE.
+ * `docs/marketplane/58-plan-reconciliation.md` section 5.1 lists it as copy that must stop,
+ * because specification 11A.1 demotes agencies from the primary customer to a secondary channel.
+ * Accountants stay: they are on the plan's own list, and they arrive as a customer rather than as
+ * a reseller.
+ *
+ * THE CONNECTOR ROW WAS REMOVED, WHICH IS A REDUCTION IN CLAIMS RATHER THAN A LOSS OF DESIGN.
+ * Each card used to carry three platform marks naming "that team's sources". Five cards would have
+ * meant fifteen such marks, and for four of the five trades the source that matters is a Thai POS
+ * or a delivery platform that section 5.1 says may not appear on this site at all until one is
+ * both built and reachable. A logo is a promise with no sentence to qualify it. In its place each
+ * card carries the line the plan itself uses for per-trade emphasis -- "A cafe gets hourly revenue
+ * and delivery share; a guesthouse gets occupancy and commission cost" -- which is content, sits in
+ * the same slot, and promises a layout rather than a connector.
+ *
+ * Section copy. `scripts/check-copy.mjs` refuses a sentence typed into the JSX, so every line
+ * arrives from here. Eyebrows are stored in sentence case because the capitals are CSS.
+ */
+const EYEBROW = "Who it is for";
+const HEADING = "Built for owner-run businesses.";
+const LEAD =
+  "The same brief every morning, laid out for the trade you are in. A café is not a guesthouse, and neither of them is a clinic.";
 
-/** The card CTA. One label for all three, as in the reference. */
-const CTA_LABEL = "See a report example";
-
-/** Names the connector row for assistive tech, which otherwise hears three logos and no context. */
-const SOURCES_LABEL = "Connected sources";
+/** The card CTA. One label for all five, as the reference uses one for all three. */
+const CTA_LABEL = "See a sample dashboard";
 
 /**
- * The three audience cards, in the reference's order. Eyebrow, heading and body are transcribed
- * from the reference HTML and not adjusted.
+ * The five trades, in the plan's own order.
  *
- * `path` is the reference's own 24-box outline mark for that card, copied verbatim so the icon set
- * stays the designer's. `sources` are slugs of files that ship in `apps/web/public/platforms/`.
+ * `title` ends in a decision rather than in a view, which is the rule the whole page was rewritten
+ * against. `leadsWith` is the per-trade emphasis the plan promises; it describes a layout, not a
+ * source, and names no platform.
+ *
+ * `path` is the reference's own 24-box outline mark where the trade matches one of its three, and
+ * the same icon family for the two it did not have.
  */
 const CASES = [
   {
-    id: "marketing",
-    audience: "Marketing teams",
-    title: "Know which campaigns deserve your next dollar.",
-    body: "Compare spend, conversions, and revenue across channels.",
+    id: "food",
+    audience: "Cafés, bars and restaurants",
+    title: "Know which hours pay, before you open.",
+    body: "Yesterday's takings by hour, what delivery really came to, and the one change worth making this week.",
+    leadsWith: "Leads with hourly revenue and delivery share",
     path: "M4 13h3v8H4zM10 8h3v13h-3zM16 3h3v18h-3z",
-    sources: [
-      { slug: "googleads", name: "Google Ads" },
-      { slug: "meta", name: "Meta Ads" },
-      { slug: "tiktok", name: "TikTok Ads" },
-    ],
   },
   {
-    id: "ecommerce",
-    audience: "Ecommerce businesses",
-    title: "See the full story behind every sale.",
-    body: "Bring orders, products, and acquisition data into one view.",
+    id: "stay",
+    audience: "Hotels and guesthouses",
+    title: "See which nights to hold and which to fill.",
+    body: "Occupancy against the same week last year, and what each booking channel costs you to fill a room.",
+    leadsWith: "Leads with occupancy and channel cost",
+    path: "M3 21V8l9-5 9 5v13M9 21v-6h6v6",
+  },
+  {
+    id: "sellers",
+    audience: "Online sellers",
+    title: "Find the listing that costs you on every order.",
+    body: "Orders, fees and ad spend on one line per listing, so a product that sells well and earns nothing shows up.",
+    leadsWith: "Leads with margin by listing and by channel",
     path: "m3 7 9-5 9 5v10l-9 5-9-5V7Zm0 0 9 5 9-5m-9 5v10",
-    sources: [
-      { slug: "shopify", name: "Shopify" },
-      { slug: "stripe", name: "Stripe" },
-      { slug: "shopee", name: "Shopee" },
-    ],
   },
   {
-    id: "agencies",
-    audience: "Agencies & consultants",
-    title: "Less reporting. More time for your clients.",
-    body: "Create consistent reports and share the numbers that matter.",
-    path: "M16 21v-3a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v3m20 0v-3a4 4 0 0 0-3-3.9M9 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-8a4 4 0 0 1 0 8",
-    sources: [
-      { slug: "googleanalytics", name: "Google Analytics" },
-      { slug: "looker", name: "Looker" },
-      { slug: "googlesheets", name: "Google Sheets" },
-    ],
+    id: "clinics",
+    audience: "Clinics and salons",
+    title: "Fill the hours that sit empty.",
+    body: "Which hours book out, which treatments bring people back, and where an hour of staff time earns least.",
+    leadsWith: "Leads with utilisation by hour and by treatment",
+    path: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v5l3.5 2",
+  },
+  {
+    id: "accountants",
+    audience: "Accountants",
+    title: "Close every client's month from one export.",
+    body: "The same set of numbers for each client, on the first, with every figure linking back to where it came from.",
+    leadsWith: "Leads with one export per client, on the first",
+    path: "M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm7 0v5h5M9 13h6m-6 4h4",
   },
 ] as const;
 
@@ -99,7 +124,7 @@ export function UseCases() {
         </span>
         <h2
           id="use-cases-heading"
-          className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-bold tracking-[-0.03em] md:text-[38px]"
+          className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-semibold tracking-[-0.03em] md:text-[38px]"
         >
           {HEADING}
         </h2>
@@ -134,25 +159,16 @@ export function UseCases() {
               <span className="text-ink-faint block text-[11px] font-bold tracking-[0.14em] uppercase">
                 {useCase.audience}
               </span>
-              <h3 className="font-display text-ink mt-[18px] mb-3.5 text-[22px] leading-[1.3] font-bold tracking-[-0.025em]">
+              <h3 className="font-display text-ink mt-[18px] mb-3.5 text-[22px] leading-[1.3] font-semibold tracking-[-0.025em]">
                 {useCase.title}
               </h3>
               <p className="text-ink-muted flex-1 text-[15px] leading-[1.65]">{useCase.body}</p>
 
-              <ul aria-label={SOURCES_LABEL} className="mt-6 flex items-center gap-3">
-                {useCase.sources.map((source) => (
-                  <li key={source.slug} className="flex">
-                    <img
-                      src={`/platforms/${source.slug}.svg`}
-                      alt={source.name}
-                      width={22}
-                      height={22}
-                      loading="lazy"
-                      className="block h-[22px] w-[22px]"
-                    />
-                  </li>
-                ))}
-              </ul>
+              {/* No aria-label: the line reads as its own label ("Leads with ...") and a generic
+                  <p> does not reliably expose one anyway. */}
+              <p className="bg-surface text-ink-subtle mt-6 rounded-sm px-3 py-2 text-xs leading-[1.5]">
+                {useCase.leadsWith}
+              </p>
 
               <a
                 href="/dashboard"

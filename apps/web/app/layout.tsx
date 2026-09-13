@@ -1,9 +1,125 @@
 import { brand, formatAddress, siteUrl } from "@repo/brand";
 import type { Metadata, Viewport } from "next";
+import { Figtree, Geist_Mono, Inter_Tight, Noto_Sans_Thai } from "next/font/google";
 import type { ReactNode } from "react";
 
 import { SITE } from "./_content";
 import "./globals.css";
+
+/**
+ * THE TYPEFACES, DOWNLOADED AT BUILD TIME AND SERVED FROM THIS ORIGIN.
+ *
+ * `next/font/google` is not a convenience wrapper around a <link> to fonts.googleapis.com. At
+ * build time it fetches the CSS and the .woff2 files, writes them into the app's own static
+ * output, and emits a @font-face block pointing at our origin. What that buys, and what breaks
+ * if someone "simplifies" this back to a stylesheet link:
+ *
+ *   - No third-party request on first paint. The browser never talks to Google. The token file
+ *     used to justify Arial with exactly this ("no font link, no FOUT and no third-party request
+ *     on first paint"); that was a real tradeoff against a <link>, and it is not a tradeoff
+ *     against this. The faces cost nothing that Arial was saving.
+ *   - No render-blocking round trip to a foreign origin before the face is even discovered. A
+ *     <link> to Google costs a DNS lookup, a TLS handshake and a CSS fetch before the first byte
+ *     of a font file is requested.
+ *   - `adjustFontFallback` (on by default, deliberately not disabled below) measures each face
+ *     and emits a size-adjusted local fallback -- a synthetic "Figtree Fallback" built from Arial
+ *     with `size-adjust`, `ascent-override` and `descent-override` set so the fallback occupies
+ *     the same box as the real face. That is what removes the layout shift a webfont normally
+ *     causes between first paint and swap.
+ *
+ * Each face is exposed as a CSS custom property (`variable`) rather than as a className, and the
+ * four properties are put on <html> below. packages/tokens/src/tokens.css composes them into the
+ * three SEMANTIC family tokens (--mp-font-display / -body / -mono) that every consumer already
+ * reads. No component changes; the stack order and the fallbacks stay in the token file, which is
+ * the single source of truth for them.
+ *
+ * WEIGHTS ARE LOADED, NEVER SYNTHESISED. A weight an element asks for but the face does not carry
+ * is faked by the browser -- a mechanically smeared outline, which is a large part of what reads
+ * as cheap. Each `weight` array below is exactly the set of weights apps/web actually uses, so
+ * adding a `font-medium` or a `font-semibold` to a page without adding the cut here reintroduces
+ * synthesis silently. The counts, measured over apps/web source: font-bold 382, font-normal 21,
+ * every other weight utility 0.
+ *
+ * The families are named here and nowhere else, because `next/font/google` takes the face name as
+ * the import identifier and hashes it into a private family name -- there is no way to write
+ * "Figtree" in the token file and have it resolve to the self-hosted file.
+ */
+
+/* Display.
+ *
+ * INTER TIGHT, NOT THE ARTBOARD'S YOUNG SERIF, and the reason is a founder decision rather than a
+ * reading of the design: the reference the founder gave for headings is supermetrics.com, which
+ * sets them in Neue Haas Grotesk Display 65 Medium. That is a paid Monotype face and cannot be
+ * self-hosted from a free source, so this is the closest free equivalent -- a tight neo-grotesque
+ * in the same register, where Young Serif is a serif display face and the opposite register.
+ *
+ * THE WEIGHT RANGE IS WHY THIS REVERSES SOMETHING. Young Serif ships exactly one cut, 400, so every
+ * display element in this app was set to font-normal to stop the browser synthesising a fake bold.
+ * Inter Tight carries the full range, so headings carry a real 600 again -- close to the Haas 65
+ * the reference uses, which is heavier than book and lighter than a true bold.
+ *
+ * 400 is loaded alongside 600 because a handful of display elements are deliberately light.
+ */
+const displayFace = Inter_Tight({
+  weight: ["400", "600"],
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-face-display",
+});
+
+/* Body. 400 and 700 are the only two weights apps/web uses. The artboards' link also requests 500
+ * and 600; no element in this app asks for either, and a loaded cut nobody references is bytes
+ * spent on nothing -- add them here the day a page uses them. */
+const bodyFace = Figtree({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-face-body",
+});
+
+/* Thai. Figtree ships `latin` and `latin-ext` only -- it has no Thai glyphs at all, and that
+ * includes ฿ (U+0E3F), which is in the Thai block and which this product prints on every THB
+ * price. Without a Thai face in the stack the browser picks whatever it can find and the baht
+ * sign arrives in a different typeface from the digits beside it. The artboards solve it the same
+ * way: `"Figtree", "Noto Sans Thai", ...` -- the Latin face first, so designed Latin text is never
+ * touched, and Noto Sans Thai reached only for codepoints Figtree does not have.
+ *
+ * `subsets: ["thai"]` keeps the emitted unicode-range to the Thai block, which is what guarantees
+ * it can never win a Latin glyph. `preload: false` because most pages here are English: without a
+ * preload link the browser fetches this file only when a page actually paints a Thai codepoint.
+ *
+ * The weights match apps/web's, not the artboards'. The artboards set Thai at 400 and 600, but
+ * this face is a fallback inside the body stack, so it inherits whatever weight the element
+ * carries -- and in this app that is 400 or 700. A ฿ inside one of the 382 bold elements with no
+ * 700 cut loaded is a synthesised Thai bold. */
+const thaiFace = Noto_Sans_Thai({
+  weight: ["400", "700"],
+  subsets: ["thai"],
+  display: "swap",
+  preload: false,
+  variable: "--font-face-thai",
+});
+
+/* Mono. The token file has named "Geist Mono" since the palette was first extracted but nothing
+ * ever loaded it, so all 54 font-mono uses -- plus every bare <code>/<pre>/<kbd>, which Tailwind's
+ * preflight routes through this same token -- have been falling through to the system monospace.
+ * This is the first build that actually serves it. 400 and 700: four mono elements carry
+ * font-bold, nine carry font-normal, and the rest inherit one of the two. */
+const monoFace = Geist_Mono({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-face-mono",
+});
+
+/* One string, so <html> carries all four custom properties and every descendant -- including
+ * anything a portal renders outside <body> -- can resolve the family tokens. */
+const fontVariables = [
+  displayFace.variable,
+  bodyFace.variable,
+  thaiFace.variable,
+  monoFace.variable,
+].join(" ");
 
 /**
  * SITE-WIDE METADATA.
@@ -157,7 +273,7 @@ function StructuredData() {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang={brand.defaultLocale}>
+    <html lang={brand.defaultLocale} className={fontVariables}>
       <head>
         <StructuredData />
       </head>

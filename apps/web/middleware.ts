@@ -19,7 +19,10 @@ import { GATE_COOKIE, gateToken, isGated, tokensMatch } from "./app/_gate/token"
  * including the marketing pages, and a missing environment variable must not take the public site
  * down -- the signed-in routes refuse on their own, which is the correct place for that failure.
  */
-const PROTECTED = ["/dashboard", "/billing", "/welcome"];
+// `/connections` IS ON THIS LIST BECAUSE IT WAS NOT COVERED BY ANY PREFIX ALREADY HERE, checked
+// rather than assumed. It is the screen that attaches a source, so an unauthenticated request must
+// land on sign-in rather than on a credential form that then fails at the server action.
+const PROTECTED = ["/connections", "/dashboard", "/billing", "/welcome"];
 
 /**
  * Reachable WITHOUT the pre-launch password.

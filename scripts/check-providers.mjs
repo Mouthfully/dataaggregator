@@ -38,10 +38,13 @@
  * Usage: node scripts/check-providers.mjs [--warn]
  */
 
+import { readdirSync } from "node:fs";
+
 import { parseArgs, readText, report } from "./lib/scan.mjs";
 
-const CONNECTIONS_SQL = "supabase/migrations/20260908000500_connections.sql";
-const LANE_SQL = "supabase/migrations/20260912000100_credential_lane.sql";
+const MIGRATIONS_DIR = "supabase/migrations";
+const CONNECTIONS_SQL = `${MIGRATIONS_DIR}/20260908000500_connections.sql`;
+const LANE_SQL = `${MIGRATIONS_DIR}/20260912000100_credential_lane.sql`;
 const CONNECTIONS_TS = "packages/connections/src/connections.ts";
 const LANE_TEST = "supabase/tests/08_credential_lane.sql";
 
@@ -55,6 +58,86 @@ const DB_ONLY_PROVIDERS = {
   cj: "affiliate network; enum written ahead of the connector, no module yet",
   partnerstack: "affiliate network; enum written ahead of the connector, no module yet",
 };
+
+/**
+ * THE SINGLE-FILE ASSUMPTION IS OVER HERE TOO, AND `check-dictionary.mjs` GOT THERE FIRST.
+ *
+ * This guard read ONE migration per enum and compared its `create type` body against TypeScript.
+ * That held only while a declaration could still be edited in place -- and it cannot: a database
+ * has applied these migrations, so a new member arrives as `alter type ... add value` in a LATER
+ * file. `20260913000300_loyverse_provider.sql` is the first one, and against the unfolded guard it
+ * read as the most alarming failure this script can report -- "PROVIDER_LANES names loyverse,
+ * which app.connection_provider cannot store" -- about a column that stores it perfectly well.
+ *
+ * A guard that goes red when the thing it guards is CORRECT is worse than no guard: it teaches
+ * people that red means "add it to the excuse list". So the fold is the one `check-dictionary.mjs`
+ * already performs, deliberately in the same shape, so the two cannot come to disagree about what
+ * folding means:
+ *
+ *   ACCUMULATE  enum members are additive. A later `alter type ... add value` contributes.
+ *
+ * There is no LAST WINS case here, because this guard reads no function bodies or constraints --
+ * only enum declarations and one `update` statement, which is compared verbatim and not folded.
+ *
+ * A `DROP` OR `RENAME` ON AN ENUM IS REFUSED RATHER THAN FOLDED, for `checkNoMetricDrops`'s
+ * reason: accumulation is sound only while migrations are additive, and a removal folded into
+ * "still present" is exactly the silent pass both guards exist to prevent. PostgreSQL has no
+ * `alter type ... drop value` at all, so the only reachable form is `rename value`.
+ */
+const MIGRATION_CHAIN = readdirSync(MIGRATIONS_DIR)
+  .filter((name) => name.endsWith(".sql"))
+  .sort()
+  .map((name) => ({
+    file: `${MIGRATIONS_DIR}/${name}`,
+    body: readText(`${MIGRATIONS_DIR}/${name}`),
+  }));
+
+/** `alter type app.<name> add value 'x'` across the chain, in application order. */
+function addedEnumValues(typeName) {
+  const short = typeName.replace(/^app\./, "");
+  const added = [];
+  for (const { body } of MIGRATION_CHAIN) {
+    const stripped = body.replace(/--[^\n]*/g, "");
+    for (const m of stripped.matchAll(
+      new RegExp(`alter\\s+type\\s+app\\.${short}\\s+add\\s+value\\s+'([^']+)'`, "gi"),
+    )) {
+      if (!added.includes(m[1])) added.push(m[1]);
+    }
+  }
+  return added;
+}
+
+/** Refuse what the fold cannot reason about, rather than absorbing it. */
+function checkNoEnumRemovals(typeName, findings) {
+  const short = typeName.replace(/^app\./, "");
+  for (const { file, body } of MIGRATION_CHAIN) {
+    const stripped = body.replace(/--[^\n]*/g, "");
+    if (
+      new RegExp(`alter\\s+type\\s+app\\.${short}\\s+(?:drop|rename)\\s+value`, "i").test(stripped)
+    ) {
+      findings.push({
+        file,
+        line: 1,
+        column: 1,
+        message:
+          `this migration removes or renames a member of app.${short}. The guard folds ADDITIONS ` +
+          "across migrations and cannot reason about removals -- teach it before merging, rather " +
+          "than letting it fold the change into 'still present'.",
+      });
+    }
+  }
+}
+
+/** The base declaration plus every member later migrations added. Null only if there is no base. */
+function foldedEnum(sql, typeName) {
+  const base = enumMembers(sql, typeName);
+  if (base === null) return null;
+  const all = [...base];
+  for (const added of addedEnumValues(typeName)) {
+    if (!all.includes(added)) all.push(added);
+  }
+  return all;
+}
 
 /** Members of `create type <name> as enum (...)`, comments and all stripped. */
 function enumMembers(sql, typeName) {
@@ -101,7 +184,8 @@ const connectionsTs = readText(CONNECTIONS_TS);
 const findings = [];
 const at = (file, message) => findings.push({ file, line: 1, column: 1, message });
 
-const dbProviders = enumMembers(connectionsSql, "app.connection_provider");
+const dbProviders = foldedEnum(connectionsSql, "app.connection_provider");
+checkNoEnumRemovals("app.connection_provider", findings);
 const tsProviders = providerLaneKeys(connectionsTs);
 
 if (dbProviders === null) at(CONNECTIONS_SQL, "could not parse app.connection_provider");
@@ -136,7 +220,8 @@ if (dbProviders !== null && tsProviders !== null) {
   }
 }
 
-const dbLanes = enumMembers(laneSql, "app.credential_lane");
+const dbLanes = foldedEnum(laneSql, "app.credential_lane");
+checkNoEnumRemovals("app.credential_lane", findings);
 const tsLanes = credentialLanes(connectionsTs);
 
 if (dbLanes === null) at(LANE_SQL, "could not parse app.credential_lane");
@@ -194,6 +279,7 @@ process.exit(
       "database -> TypeScript may be surplus, but every surplus member is declared with a reason",
       "credential lanes must match exactly in both directions",
       "the lane backfill exists twice -- in the migration and in the test that re-runs it",
+      "later `alter type ... add value` migrations are folded into the base declaration",
     ],
     warn,
     summary:

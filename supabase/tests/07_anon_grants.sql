@@ -162,6 +162,15 @@ declare
   -- below the loop check that directly. An entry for it would mean the internet could write
   -- envelope rows.
   --
+  -- `public.due_connections(integer)`, `public.claim_connection(uuid, text)` and
+  -- `public.record_backfill(uuid, boolean)` were added by 20260912000800_scheduler_entry_point.sql
+  -- and are deliberately NOT here, so THIS LIST DOES NOT CHANGE for that migration. Three new
+  -- functions landed in `public` and the anon-executable count stayed at three, which is the whole
+  -- claim the migration makes: they are executable only by `app_scheduler`, asserted directly below
+  -- the loop. Entries for them would mean the internet could enumerate every connection in every
+  -- workspace on the platform, and could hold a lease on each -- stopping every backfill fifteen
+  -- minutes at a time, indefinitely.
+  --
   -- `public.join_waitlist(text, text)` IS here, from 20260912000700_waitlist.sql. It is the one
   -- function in this schema that is MEANT to be called by a stranger: the product is pre-launch and
   -- the people signing up are by definition not authenticated. It is safe to expose because of what
@@ -271,12 +280,68 @@ select app_test.check('authenticator does not INHERIT app_ingest, so a tenant re
   'an inheriting authenticator holds app_ingest EXECUTE on every request, before SET ROLE narrows it');
 
 -- ---------------------------------------------------------------------------------------------
+-- THE SCHEDULER ENTRY POINT, asserted from both directions, exactly as the ingest one is.
+--
+-- 20260912000800_scheduler_entry_point.sql put three forwarders in `public` over the scheduler's
+-- three `app.` functions. The enumeration above proves anon cannot reach them; these prove the rest
+-- of the shape. The stakes on this side are cross-tenant ENUMERATION rather than forged numbers: a
+-- caller who can execute `due_connections` learns which connections exist in every workspace on the
+-- platform and when each was last pulled -- the question row-level security exists to make
+-- unaskable -- and a caller who can execute `claim_connection` can hold a lease on every one of
+-- them and stop every backfill, fifteen minutes at a time, indefinitely.
+--
+-- The positive assertions matter as much as the refusals: a revoke that took `app_scheduler` with
+-- it presents as "the cron runs and nothing is ever pulled", which is silent and looks like there
+-- being no work to do. supabase/tests/13_scheduler_entry_point.sql calls all three as anon and as a
+-- tenant and asserts the refusals are ENFORCED, which is a different claim from these ACLs.
+-- ---------------------------------------------------------------------------------------------
+do $$
+declare
+  r record;
+begin
+  for r in
+    select unnest(array[
+      'public.due_connections(integer)',
+      'public.claim_connection(uuid, text)',
+      'public.record_backfill(uuid, boolean, text, timestamptz)'
+    ]) as sig
+  loop
+    perform app_test.check(
+      format('app_scheduler may execute %s', r.sig),
+      has_function_privilege('app_scheduler', r.sig, 'EXECUTE'),
+      format('%s is granted to no role, so the scheduler half of the system is still inert', r.sig));
+
+    perform app_test.check(
+      format('anon may NOT execute %s', r.sig),
+      not has_function_privilege('anon', r.sig, 'EXECUTE'),
+      'the anon key is public and ships in browsers; these three are the cross-tenant vocabulary');
+
+    perform app_test.check(
+      format('authenticated may NOT execute %s', r.sig),
+      not has_function_privilege('authenticated', r.sig, 'EXECUTE'),
+      'a tenant able to call these could enumerate every other tenant''s connections');
+  end loop;
+end $$;
+
+-- Same membership, same reason, and the same 'MEMBER'-not-'USAGE' distinction as above: without it
+-- PostgREST's SET ROLE fails and the error surfaces as a rejected token, sending whoever hits it to
+-- look at the signing secret rather than at role membership.
+select app_test.check('authenticator may assume app_scheduler, which is how PostgREST reaches it',
+  pg_has_role('authenticator', 'app_scheduler', 'MEMBER'));
+
+-- ---------------------------------------------------------------------------------------------
 -- Summary
 --
 -- The floor is asserted for the reason given in 06_jwt_claims.sql: a suite that stops running
 -- looks exactly like a suite that passes. Ten tables times seven privileges is the bulk of it;
 -- the anon-executable loop above contributes one assertion per function it finds, which is why
 -- the floor sits a little under the current total rather than on it.
+--
+-- RAISED FROM 93 TO 103 by 20260912000800_scheduler_entry_point.sql, which added ten: three
+-- functions times "app_scheduler may", "anon may not" and "authenticated may not", plus the
+-- `authenticator` membership without which PostgREST cannot assume the role at all. The floor is
+-- raised with the assertions rather than left where it was, because the whole value of a floor is
+-- that it notices a block that stopped running.
 -- ---------------------------------------------------------------------------------------------
 \o
 
@@ -291,7 +356,7 @@ declare v_failed integer; v_total integer;
 begin
   select count(*) filter (where not passed), count(*) into v_failed, v_total from app_test.results;
   if v_failed > 0 then raise exception 'anon grants: % assertion(s) failed', v_failed; end if;
-  if v_total < 93 then
-    raise exception 'anon grants: only % assertion(s) ran; expected at least 93', v_total;
+  if v_total < 103 then
+    raise exception 'anon grants: only % assertion(s) ran; expected at least 103', v_total;
   end if;
 end $$;

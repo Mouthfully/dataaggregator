@@ -54,10 +54,19 @@ begin
       );
     end loop;
 
+    -- ENABLED **AND FORCED**, and the second half is here because its absence is how
+    -- `20260913000200_force_rls.sql` came to be needed. This assertion read `and c.relrowsecurity`
+    -- alone, while its own name claimed to be the check that "the absent policies mean" something
+    -- -- and absent policies mean nothing to the table owner unless the table is FORCED. It was a
+    -- guard in the shape of a guard. `15_force_rls.sql` now asserts the property for every table in
+    -- `public`; this one stays because the two tables here are the ones with money on them.
     select count(*) into v_count
-      from pg_class c where c.relname = v_tbl and c.relrowsecurity;
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relname = v_tbl
+       and c.relrowsecurity and c.relforcerowsecurity;
     perform app_test.check(
-      format('public.%s has row-level security ENABLED -- without it the absent policies mean nothing', v_tbl),
+      format('public.%s has row-level security ENABLED and FORCED -- without FORCE the absent policies mean nothing to the owner', v_tbl),
       v_count = 1
     );
   end loop;
@@ -174,3 +183,20 @@ select count(*) filter (where passed) as passed,
        count(*) filter (where not passed) as failed,
        count(*) as total
   from app_test.results;
+
+-- THIS FILE COULD NOT FAIL THE RUN. Every other suite in this directory ends by raising when an
+-- assertion failed; this one printed `FAIL` and exited 0, so `run-local.sh` went green over it and
+-- so did the gate. That is the same defect as the assertion above, one layer out: it looked like a
+-- check on billing and was a report about billing. Both halves are why a missing FORCE survived.
+--
+-- The floor is the other half, for the reason 06_jwt_claims.sql gives: a suite that stops running
+-- looks exactly like a suite that passes. Twenty-three assertions today.
+do $$
+declare v_failed integer; v_total integer;
+begin
+  select count(*) filter (where not passed), count(*) into v_failed, v_total from app_test.results;
+  if v_failed > 0 then raise exception 'billing: % assertion(s) failed', v_failed; end if;
+  if v_total < 23 then
+    raise exception 'billing: only % assertion(s) ran; expected at least 23', v_total;
+  end if;
+end $$;

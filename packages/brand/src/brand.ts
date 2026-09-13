@@ -86,6 +86,63 @@ export interface Brand {
   readonly euRepresentative: string | null;
   /** Whether a DPA with Article 28 terms and a transfer mechanism actually exists to send. */
   readonly dpaAvailable: boolean;
+
+  /* --- Certifications. NONE OF THESE CAN BE CONFERRED BY THIS REPOSITORY. ------------------- */
+
+  /**
+   * Whether a SOC 2 **Type II** report exists, from a named CPA firm, covering a stated
+   * observation window.
+   *
+   * A BOOLEAN THAT ONLY AN AUDITOR CAN FLIP. Type I is design at a point in time; Type II is
+   * operating effectiveness over a window, commonly three to twelve months. Nothing written in
+   * this repository shortens that window -- evidence has to accumulate while the controls actually
+   * run -- so this field is false until a report is in hand, and `claims.ts` withholds the claim
+   * while it is.
+   */
+  readonly soc2TypeIIReport: boolean;
+
+  /**
+   * Whether an ISO/IEC 27001 certificate exists, issued by an accredited certification body.
+   *
+   * The certifiable object is the **ISMS** in clauses 4-10 -- context, leadership, risk
+   * assessment, internal audit, management review -- most of which is management-system work no
+   * codebase provides. Annex A is a reference control set justified in a Statement of
+   * Applicability. Implementing every technical control in Annex A and flipping this would be a
+   * lie about a certificate, not a shortcut to one.
+   */
+  readonly iso27001Certificate: boolean;
+
+  /**
+   * Thailand's Personal Data Protection Act, B.E. 2562 (2019).
+   *
+   * NOT A CERTIFICATION AND NOT OPTIONAL. There is nothing to hold and nothing to flip: the PDPA is
+   * the law this entity operates under, and it applies whether or not anyone writes it down. It is
+   * here as a FACT ABOUT THE ENTITY so that code and copy can reference the governing law rather
+   * than each inventing one -- the same reason `legalEntity` is here.
+   *
+   * `null` would be wrong. A Thai juristic person processing personal data is in scope, and the
+   * only honest value is the statute.
+   */
+  readonly governingPrivacyLaw: string;
+
+  /**
+   * The supervisory authority a data subject complains to, and the one a breach is notified to.
+   *
+   * A privacy notice that names no authority leaves a data subject with no route, which is the
+   * practical half of the rights the statute grants. Named here so one string serves the notice,
+   * the breach runbook and any future in-product disclosure.
+   */
+  readonly supervisoryAuthority: string;
+
+  /**
+   * The Data Protection Officer, where one is appointed.
+   *
+   * NULL, AND THE NULL IS LOAD-BEARING. The PDPA requires a DPO in defined circumstances, and
+   * whether this entity meets the trigger is a question for counsel rather than for this file. A
+   * plausible-looking name here would be the exact failure this repository is organised against:
+   * a data subject would write to it and nobody would answer.
+   */
+  readonly dataProtectionOfficer: string | null;
 }
 
 export const brand: Brand = {
@@ -158,6 +215,18 @@ export const brand: Brand = {
   dataRegion: "ap-southeast-1",
   euRepresentative: null,
   dpaAvailable: false,
+
+  // Neither is held. Both are flipped by a third party handing over a document, never by an edit
+  // here -- and `packages/brand/src/brand.test.ts` fails the moment one is flipped while the
+  // matching FORBIDDEN_CLAIMS pattern still bans the wording, so turning one on is a deliberate,
+  // reviewed change rather than a one-character one.
+  soc2TypeIIReport: false,
+  iso27001Certificate: false,
+
+  // The law that applies without anyone deciding anything. The entity is a Thai juristic person.
+  governingPrivacyLaw: "Personal Data Protection Act B.E. 2562 (2019)",
+  supervisoryAuthority: "Personal Data Protection Committee (PDPC), Thailand",
+  dataProtectionOfficer: null,
 };
 
 /** Formatted for an imprint, an invoice footer or an email signature. */

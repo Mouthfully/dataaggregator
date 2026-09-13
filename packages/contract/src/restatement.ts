@@ -114,6 +114,46 @@ export const RESTATEMENT_CLOCKS: Record<Source, RestatementClock> = {
       "pipeline, so an order can be refunded or edited at any remove and every row stays provisional. " +
       "Restatements are caught by a `modified_after` pull, not by a ladder.",
   },
+
+  // THE SAME NULL AS WOOCOMMERCE, AND IT WAS ESTABLISHED RATHER THAN ASSUMED. The prior belief was
+  // that a receipt is FINAL WHEN IT IS RUNG, which would have made this a zero like
+  // `dataforseo_serp`. That belief is wrong, so it is written down here against the evidence that
+  // overturned it rather than left as an intuition somebody re-derives.
+  //
+  // FOUR FACTS, each read directly in Loyverse's own OpenAPI document
+  // (`https://developer.loyverse.com/docs/API-Reference__v1.0.yaml`):
+  //
+  //   * A `Receipt` carries `updated_at`, "The date and time when the receipt was updated" -- a
+  //     field with nothing to describe if a receipt were immutable.
+  //   * It carries `cancelled_at`, "The time when this receipt was cancelled". A sale already
+  //     counted can be voided afterwards.
+  //   * `/receipts` exposes `updated_at_min`/`updated_at_max` filters, and the `receipts.update`
+  //     webhook is documented as firing "when a receipt is created or updated". A platform does
+  //     not ship an updated-since filter and an update webhook for records that never update.
+  //   * Refunds do not even touch the original row: `POST /receipts/{receipt_number}/refund`
+  //     returns a SECOND receipt with `receipt_type: REFUND` and `refund_for` naming the sale. So
+  //     a day's takings move through a new receipt rather than through a mutation -- which the
+  //     `updated_at` walk catches for the same reason WooCommerce's `modified_after` walk does.
+  //
+  // AND NOTHING IN THE SPECIFICATION BOUNDS HOW LATE ANY OF IT MAY HAPPEN. There is no cut-off, no
+  // closing period and no finalisation statement anywhere in the document; a search for one
+  // returns only the pagination sentence about "the final set of results".
+  //
+  // SO THIS IS WOOCOMMERCE'S NULL AND NOT `search_console`'s, and the distinction above is exactly
+  // the one being drawn. Not "a number exists and nobody has measured it" -- the account is the
+  // merchant's own till, and no window closes. Every Loyverse row is therefore permanently
+  // provisional, which the brief must say in words rather than leave as a flag nobody explains
+  // (`58-plan-reconciliation.md` section 2.2).
+  loyverse: {
+    windowDays: null,
+    perAccount: false,
+    note:
+      "No window closes. The account is the merchant's own till rather than a platform reporting " +
+      "pipeline: a receipt carries `updated_at` and `cancelled_at`, the `receipts.update` webhook " +
+      "fires on update as well as creation, and a refund arrives as a second receipt whose " +
+      "`refund_for` names the sale -- all read in Loyverse's own OpenAPI specification, which " +
+      "bounds none of it. Restatements are caught by an `updated_at_min` pull, not by a ladder.",
+  },
 };
 
 const DAY_MS = 86_400_000;

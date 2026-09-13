@@ -394,7 +394,7 @@ const PRIMARY_BUTTON =
 const TEXT_LINK = "text-accent inline-flex items-center gap-3 text-sm font-bold hover:underline";
 const EYEBROW = "text-ink-faint block text-[11px] font-bold tracking-[0.14em] uppercase md:text-xs";
 const SECTION_HEADING =
-  "font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-bold tracking-[-0.02em] md:text-[38px]";
+  "font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-semibold tracking-[-0.02em] md:text-[38px]";
 const TABLE_HEAD = "text-ink-subtle border-line border-b px-4 py-3 text-left font-bold";
 const TABLE_CELL = "border-line-soft text-ink-muted border-b px-4 py-3 align-top";
 
@@ -445,7 +445,7 @@ export default function GoogleAdsConnectorPage() {
                 </span>
               </div>
 
-              <h1 className="font-display text-ink text-[36px] leading-[1.06] font-bold tracking-[-0.04em] md:text-[42px] lg:text-[48px]">
+              <h1 className="font-display text-ink text-[36px] leading-[1.06] font-semibold tracking-[-0.04em] md:text-[42px] lg:text-[48px]">
                 {HERO_HEADING_TOP}
                 <br />
                 <span className="brand-gradient-text">{HERO_HEADING_BOTTOM}</span>
@@ -545,7 +545,7 @@ export default function GoogleAdsConnectorPage() {
                 {PANEL_STATS.map((stat) => (
                   <div key={stat.label} className="min-w-0">
                     <dt className="text-ink-faint font-mono text-[10px]">{stat.label}</dt>
-                    <dd className="font-display text-ink mt-1 text-lg font-bold md:text-[22px]">
+                    <dd className="font-display text-ink mt-1 text-lg font-semibold md:text-[22px]">
                       {stat.value}
                     </dd>
                   </div>
@@ -613,7 +613,7 @@ export default function GoogleAdsConnectorPage() {
                 >
                   <path d={destination.path} />
                 </svg>
-                <h3 className="font-display text-ink mt-5 mb-3 text-base leading-[1.3] font-bold tracking-[-0.01em] md:mt-6 md:text-[18px]">
+                <h3 className="font-display text-ink mt-5 mb-3 text-base leading-[1.3] font-semibold tracking-[-0.01em] md:mt-6 md:text-[18px]">
                   {destination.title}
                 </h3>
                 <p className="text-ink-muted flex-1 text-[13px] leading-[1.6] md:text-sm">
@@ -665,7 +665,7 @@ export default function GoogleAdsConnectorPage() {
                   >
                     <path d={item.path} />
                   </svg>
-                  <h3 className="font-display text-ink mb-3 text-xl leading-[1.3] font-bold tracking-[-0.01em]">
+                  <h3 className="font-display text-ink mb-3 text-xl leading-[1.3] font-semibold tracking-[-0.01em]">
                     {item.title}
                   </h3>
                   <p className="text-ink-muted text-[15px] leading-[1.7]">{item.body}</p>
@@ -809,7 +809,7 @@ export default function GoogleAdsConnectorPage() {
                 >
                   {index + 1}
                 </span>
-                <h3 className="font-display text-ink mb-3 text-xl leading-[1.3] font-bold tracking-[-0.01em]">
+                <h3 className="font-display text-ink mb-3 text-xl leading-[1.3] font-semibold tracking-[-0.01em]">
                   {step.title}
                 </h3>
                 <p className="text-ink-muted text-[15px] leading-[1.7]">{step.body}</p>
@@ -834,7 +834,7 @@ export default function GoogleAdsConnectorPage() {
             <span className={EYEBROW}>{FAQ_EYEBROW}</span>
             <h2
               id="faq-heading"
-              className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-bold tracking-[-0.03em] md:text-[36px]"
+              className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-semibold tracking-[-0.03em] md:text-[36px]"
             >
               {FAQ_HEADING_TOP}
               <br />
@@ -873,7 +873,7 @@ export default function GoogleAdsConnectorPage() {
             <div className="min-w-0">
               <h2
                 id="final-cta-heading"
-                className="font-display text-ink mb-2.5 text-[28px] leading-[1.16] font-bold tracking-[-0.02em] md:text-[30px]"
+                className="font-display text-ink mb-2.5 text-[28px] leading-[1.16] font-semibold tracking-[-0.02em] md:text-[30px]"
               >
                 {FINAL_HEADING}
               </h2>

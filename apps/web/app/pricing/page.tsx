@@ -538,7 +538,7 @@ export default async function PricingPage({
             <span className="text-ink-faint block text-[11px] font-bold tracking-[0.14em] uppercase md:text-xs">
               {HERO_EYEBROW}
             </span>
-            <h1 className="font-display text-ink mt-2.5 text-[36px] leading-[1.06] font-bold tracking-[-0.04em] md:text-[42px] lg:text-[48px]">
+            <h1 className="font-display text-ink mt-2.5 text-[36px] leading-[1.06] font-semibold tracking-[-0.04em] md:text-[42px] lg:text-[48px]">
               {HERO_HEADING_TOP}
               <br />
               <span className="brand-gradient-text">{HERO_HEADING_BOTTOM}</span>
@@ -632,7 +632,7 @@ export default async function PricingPage({
                 <h3 className="text-ink text-sm font-bold">{tier.name}</h3>
 
                 <p className="my-1 whitespace-nowrap">
-                  <strong className="font-display text-ink text-[36px] leading-[1.1] font-bold tracking-[-0.04em]">
+                  <strong className="font-display text-ink text-[36px] leading-[1.1] font-semibold tracking-[-0.04em]">
                     {tier.monthly}
                   </strong>{" "}
                   <span className="text-ink-subtle text-xs">{PER_MONTH}</span>
@@ -694,11 +694,11 @@ export default async function PricingPage({
                 </span>
                 <h3
                   id="enterprise-heading"
-                  className="font-display text-ink mt-2.5 text-[28px] leading-[1.16] font-bold tracking-[-0.03em] md:text-[32px]"
+                  className="font-display text-ink mt-2.5 text-[28px] leading-[1.16] font-semibold tracking-[-0.03em] md:text-[32px]"
                 >
                   {ENTERPRISE_NAME}
                 </h3>
-                <p className="font-display text-ink mt-2 text-[28px] leading-[1.1] font-bold tracking-[-0.03em]">
+                <p className="font-display text-ink mt-2 text-[28px] leading-[1.1] font-semibold tracking-[-0.03em]">
                   {ENTERPRISE_PRICE}
                 </p>
                 <p className="text-ink-muted mt-4 text-[15px] leading-[1.7]">{ENTERPRISE_LEAD}</p>
@@ -749,7 +749,7 @@ export default async function PricingPage({
               </span>
               <h2
                 id="compare-heading"
-                className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-bold tracking-[-0.02em] md:text-[38px]"
+                className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-semibold tracking-[-0.02em] md:text-[38px]"
               >
                 {COMPARE_HEADING}
               </h2>
@@ -844,7 +844,7 @@ export default async function PricingPage({
             </span>
             <h2
               id="every-plan-heading"
-              className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-bold tracking-[-0.02em] md:text-[38px]"
+              className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-semibold tracking-[-0.02em] md:text-[38px]"
             >
               {EVERY_PLAN_HEADING}
             </h2>
@@ -859,7 +859,7 @@ export default async function PricingPage({
                 key={card.title}
                 className="border-line bg-surface flex flex-col rounded-lg border p-6"
               >
-                <h3 className="font-display text-ink mb-3 text-lg leading-[1.3] font-bold tracking-[-0.01em]">
+                <h3 className="font-display text-ink mb-3 text-lg leading-[1.3] font-semibold tracking-[-0.01em]">
                   {card.title}
                 </h3>
                 <p className="text-ink-muted flex-1 text-[14px] leading-[1.7]">{card.body}</p>
@@ -886,7 +886,7 @@ export default async function PricingPage({
               </span>
               <h2
                 id="billing-faq-heading"
-                className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-bold tracking-[-0.03em] md:text-[36px]"
+                className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-semibold tracking-[-0.03em] md:text-[36px]"
               >
                 {FAQ_HEADING_TOP}
                 <br />
@@ -932,7 +932,7 @@ export default async function PricingPage({
             </span>
             <h2
               id="open-terms-heading"
-              className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-bold tracking-[-0.02em] md:text-[38px]"
+              className="font-display text-ink mt-2.5 text-[30px] leading-[1.16] font-semibold tracking-[-0.02em] md:text-[38px]"
             >
               {OPEN_HEADING}
             </h2>
@@ -963,7 +963,7 @@ export default async function PricingPage({
           <div className="border-line bg-surface rounded-lg border p-6 md:p-8">
             <h2
               id="imprint-heading"
-              className="font-display text-ink text-xl leading-[1.3] font-bold tracking-[-0.01em]"
+              className="font-display text-ink text-xl leading-[1.3] font-semibold tracking-[-0.01em]"
             >
               {IMPRINT_HEADING}
             </h2>
@@ -1012,7 +1012,7 @@ export default async function PricingPage({
             <div className="min-w-0">
               <h2
                 id="final-cta-heading"
-                className="font-display text-ink-on-inverse mb-2.5 text-[28px] leading-[1.16] font-bold tracking-[-0.02em] md:text-[30px]"
+                className="font-display text-ink-on-inverse mb-2.5 text-[28px] leading-[1.16] font-semibold tracking-[-0.02em] md:text-[30px]"
               >
                 {FINAL_HEADING}
               </h2>

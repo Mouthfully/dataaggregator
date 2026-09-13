@@ -1,0 +1,22 @@
+{
+  "name": "@repo/insights",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@repo/brand": "workspace:*",
+    "@repo/contract": "workspace:*"
+  },
+  "devDependencies": {
+    "@repo/connectors": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

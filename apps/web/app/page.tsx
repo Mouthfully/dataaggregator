@@ -1,6 +1,7 @@
 import { brand } from "@repo/brand";
 import { SITE } from "./_content";
 import { Footer, SiteHeader } from "./_chrome";
+import { ActionSheet } from "./_sections/ActionSheet";
 import { AssistantPanel } from "./_sections/AssistantPanel";
 import { DashboardFeature } from "./_sections/DashboardFeature";
 import { Faq, FinalCta } from "./_sections/FaqCta";
@@ -8,8 +9,8 @@ import { FeatureGrid } from "./_sections/FeatureGrid";
 import { IntegrationsMap } from "./_sections/IntegrationsMap";
 import { IntegrationsStrip } from "./_sections/IntegrationsStrip";
 import { Pricing } from "./_sections/Pricing";
+import { Reports } from "./_sections/Reports";
 import { SimplerWay } from "./_sections/SimplerWay";
-import { Templates } from "./_sections/Templates";
 import { UseCases } from "./_sections/UseCases";
 
 /**
@@ -28,27 +29,80 @@ import { UseCases } from "./_sections/UseCases";
  * design needs are composite values with no utility to map onto, so they arrive as the two classes
  * globals.css declares, each of which reads a `var()`.
  */
+/**
+ * THE HERO'S SAMPLE BUSINESS, AND THE THREE THINGS THAT DECIDED IT.
+ *
+ * 1. IT IS A CAFE IN CHIANG MAI, IN BAHT. `docs/marketplane/58-plan-reconciliation.md` section 5.1
+ *    bans the figures this panel used to show -- "$186.2K, 5.42x ROAS" -- for a baht-billed Thai
+ *    owner-operator. The plan's own emphasis for a cafe is hourly revenue and delivery share ("A
+ *    cafe gets hourly revenue and delivery share; a guesthouse gets occupancy and commission
+ *    cost"), so those are the numbers, and the axis is a trading day rather than a calendar month.
+ *
+ * 2. IT IS TAKINGS, NOT TAKINGS AFTER FEES. Section 5.1 stops the after-fees figure as the
+ *    headline number on a public page: it cannot be fetched from the delivery platforms at all
+ *    (Grab's commission field is documented as absent from ListOrder) and section 2.2 concludes
+ *    that "the honest v1 brief says 'takings,' not 'after fees'". No commission line is drawn here.
+ *
+ * 3. NOBODY IS NAMED. Section 5.3 forbids a named Chiang Mai cafe as proof at any price -- there
+ *    are no customers, the artboard's own owner quotes are unapproved drafts and its figures are
+ *    invented. So the panel carries a trade and a city, three sample marks, and no business name,
+ *    no owner, no quote and no suggestion that this is anyone's real week.
+ *
+ * NO SOURCE IS NAMED EITHER. Delivery share is a channel split a POS can carry; naming the
+ * platform it came from would put a source on the page that section 5.1 says must not appear
+ * until it is both built and reachable.
+ */
 const HERO = {
-  search: "Search metrics, reports, or ask AI\u2026",
-  range: "Last 30 days\u2304",
-  micro: "Your business, at a glance.",
-  period: "This month",
-  synced: "All sources synced. You\u2019re up to date.",
+  search: "Ask about your shop\u2026",
+  range: "Yesterday\u2304",
+  micro: "Sample caf\u00e9 \u00b7 Chiang Mai",
+  sample: "Sample",
+  chart: "Revenue by hour",
+  period: "Yesterday",
+  // WHAT THIS USED TO SAY, AND WHY IT COULD NOT STAY: "Read at 06:40. Still provisional."
+  //
+  // The second sentence is backed -- `RESTATEMENT_CLOCKS.woocommerce.windowDays` is null, so a
+  // shop's own till never finalises and the marker never comes off. The first was not, and it was
+  // the wrong-number-that-looks-right in its purest form: `app.due_connections` offers a connection
+  // when `last_backfill_at < date_trunc('day', now())`, which truncates in a session TimeZone
+  // NOTHING IN THIS REPOSITORY SETS -- and which is not `connections.timezone`, a column that
+  // exists and that this predicate does not read. There is no configuration of this system that
+  // produces a 06:40 local read, and 06:40 is a DELIVERY time besides, with nothing delivering.
+  //
+  // Being inside a panel the page labels as a sample does not license a false MECHANISM: a sample
+  // figure is an illustration of a number, and a sample clock time is an illustration of a
+  // capability. The provisional half stays, because it is true every morning.
+  synced: "Still provisional, as a shop\u2019s own till always is.",
 } as const;
 
-const HERO_NAV = ["Home", "Insights", "Reports", "Sources", "Tasks", "Settings"] as const;
+const HERO_NAV = ["Today", "Do", "Ask", "Reports", "Sources", "Settings"] as const;
 
 const HERO_METRICS = [
-  { label: "Revenue", value: "$186.2K", delta: "\u2191 23.8%" },
-  { label: "Orders", value: "8,241", delta: "\u2191 10.3%" },
-  { label: "ROAS", value: "5.42\u00d7", delta: "\u2191 12.6%" },
+  { label: "Takings", value: "\u0e3f15,420", delta: "\u2191 8.2%" },
+  { label: "Orders", value: "198", delta: "\u2191 4.1%" },
+  { label: "Delivery share", value: "29%", delta: "\u2191 3 pts" },
 ] as const;
 
-const HERO_AXIS = ["Jun 1", "Jun 8", "Jun 15", "Jun 22", "Jun 30"] as const;
+const HERO_AXIS = ["08:00", "11:00", "14:00", "17:00", "21:00"] as const;
 
-/** The trend line, taken verbatim from the reference so the shape is the designer's, not mine. */
+/**
+ * The trading day, hour by hour. The reference's own path was a month-long climb, which cannot
+ * describe a day that opens quiet, peaks at lunch, sags through the afternoon and peaks again in
+ * the evening -- and the shape is the only part of this panel that says "this is a cafe" without
+ * words. Same 440x155 box, same all-line segments and same closing fill as the reference, so the
+ * geometry the designer drew is untouched; only the data points moved.
+ */
 const HERO_TREND =
-  "M0 130L25 118L45 120L70 99L95 103L120 84L145 90L170 62L195 55L220 65L245 48L270 53L295 31L320 38L345 26L370 30L395 12L420 18L440 5";
+  "M0 128L34 112L68 104L102 86L136 42L170 30L204 58L238 86L272 92L306 74L340 52L374 46L408 78L440 116";
+
+/**
+ * The chart's accessible name and title. Both are read aloud, so `scripts/check-copy.mjs` counts
+ * `aria-label` as prose; neither carries terminal punctuation, and both say "sample" in the first
+ * word rather than describing a trend a reader might take for someone's real day.
+ */
+const CHART_TITLE = "Sample revenue by hour";
+const CHART_DESCRIPTION =
+  "Sample revenue by hour for an illustrative caf\u00e9 day, peaking at lunch and again in the evening";
 
 export default function Page() {
   return (
@@ -62,7 +116,7 @@ export default function Page() {
             <span className="text-ink-faint block text-xs font-bold tracking-[0.14em] uppercase">
               {SITE.eyebrow}
             </span>
-            <h1 className="font-display text-ink mt-4 text-[clamp(38px,4.4vw,58px)] leading-[1.06] font-bold tracking-[-0.045em]">
+            <h1 className="font-display text-ink mt-4 text-[clamp(38px,4.4vw,58px)] leading-[1.06] font-semibold tracking-[-0.045em]">
               {SITE.heroLine1}
               <br />
               <span className="brand-gradient-text">{SITE.heroLine2}</span>
@@ -107,11 +161,15 @@ export default function Page() {
             _sections/ with its copy colocated -- see that directory for why. */}
         <IntegrationsStrip />
         <SimplerWay />
+        {/* The action sheet sits third, ahead of the capability grid that enumerates it, because
+            it is the whole repositioning: the page's argument is that an insight ends in a to-do
+            rather than in a chart, and an argument made below the fold is not made. */}
+        <ActionSheet />
         <FeatureGrid />
         <AssistantPanel />
         <IntegrationsMap />
         <DashboardFeature />
-        <Templates />
+        <Reports />
         <Pricing />
         <UseCases />
         <Faq />
@@ -159,8 +217,12 @@ function HeroDashboard() {
         <div className="min-w-0 flex-1 p-5">
           <div className="bg-surface-subtle text-ink-faint mb-5 flex items-center justify-between rounded-md px-2 py-1.5 text-[10px]">
             {HERO.search}
+            {/* The reference's user avatar ("JD") is the first of the three sample marks this
+                panel carries. An initialled avatar asserts a person; a sample chip asserts the
+                opposite, which is what section 5.3 of the reconciliation requires of a figure set
+                nobody's business produced. */}
             <b className="bg-ink-faint text-ink-on-accent rounded-full px-1.5 py-0.5 text-[9px]">
-              JD
+              {HERO.sample}
             </b>
           </div>
 
@@ -181,7 +243,7 @@ function HeroDashboard() {
           </div>
 
           <div className="mt-5 flex justify-between text-[11px] font-bold">
-            Revenue over time
+            {HERO.chart}
             <span className="text-ink-faint font-normal text-[9px]">{HERO.period}</span>
           </div>
 
@@ -189,9 +251,9 @@ function HeroDashboard() {
             viewBox="0 0 440 155"
             className="text-brand-mint mt-2.5 block w-full"
             role="img"
-            aria-label="Illustrative revenue trend increasing over time"
+            aria-label={CHART_DESCRIPTION}
           >
-            <title>Illustrative revenue trend</title>
+            <title>{CHART_TITLE}</title>
             <defs>
               <linearGradient id="hero-area" x1="0" y1="0" x2="0" y2="1">
                 <stop stopColor="currentColor" stopOpacity="0.25" />

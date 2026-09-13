@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // `client.ts` uses WHATWG globals that both target runtimes provide -- fetch, Response,
+    // RequestInit, AbortController -- which `lib: ["ES2022"]` alone does not declare. "DOM" is the
+    // smallest lib that does, and the same caveat as packages/connectors/tsconfig.json applies:
+    // internal packages ship raw TypeScript and compile under the CONSUMER's tsconfig, so nothing
+    // leaks. `crypto.subtle` comes from the same lib and exists in Node 22 and in workerd.
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}

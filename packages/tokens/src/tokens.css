@@ -38,36 +38,91 @@
   /* ---------------------------------------------------------------------------------
    * TYPEFACES -- the one block to edit if the brand register is ever reversed.
    *
-   * These three faces are the artboard as shipped, CONFIRMED BY THE FOUNDER: Young Serif
-   * for display (weight 400, on 21 elements -- every h1 and h2, the wordmark, the pricing
-   * numerals), Figtree for body, Geist Mono for code and metadata.
-   *
-   * Specification section 14 proposed something else and is now overruled: it claimed
-   * "the serif display moment from the first draft was dropped in favour of one
-   * consistent bold voice" and specified extra-bold Geist (800) for display, Geist for
-   * body, with Inter Tight and JetBrains Mono as fallbacks. The artboard falsifies that
-   * claim -- the serif is the entire display voice -- and section 14's 800 weight is not
-   * even loadable from the artboard's own font link, which tops out at 700.
-   *
-   * The names are SEMANTIC (display / body / mono), never the face name, so reversing the
-   * register is a change to these three lines plus the Google Fonts <link>, and no
-   * consumer file changes. The required link is:
+   * Young Serif for display, Figtree for body, Geist Mono for code and metadata. This is the
+   * artboard as shipped and founder-confirmed: the three faces, their weights and their fallback
+   * order are all read straight off the artboards' own font links and body rules --
+   *   design/marketplane/Main.dc.html:11, design/app/App.dc.html:13, design/app-simple/*.dc.html:10
    *   https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap
+   * Young Serif is requested there with NO weight axis, so Google serves exactly one cut, 400.
+   * That is not an omission to be corrected; it is the whole weight range the face has.
+   *
+   * Specification section 14 proposed something else and is overruled: it claimed "the serif
+   * display moment from the first draft was dropped in favour of one consistent bold voice" and
+   * specified extra-bold Geist (800) for display, Geist for body, with Inter Tight and JetBrains
+   * Mono as fallbacks. The artboard falsifies that claim -- the serif is the entire display voice
+   * -- and section 14's 800 weight is not loadable from any font link in the design, all of which
+   * top out at 700.
+   *
+   * HOW THE FACES ARE LOADED, AND WHY THE ARIAL THAT SAT HERE IS GONE.
+   *
+   * These three lines briefly carried `Arial, Helvetica, "Helvetica Neue", sans-serif` for display
+   * and body, attributed to BRAND.md v1.0. Two things about that, both worth keeping written down:
+   *
+   *   1. THE DOCUMENT IS NOT IN THIS TREE. No BRAND.md exists anywhere in the repository, so the
+   *      Arial stack, the "Helvetica Neue" third step and the "400 body, 700 headings" rule could
+   *      not be checked against anything. The artboards can be, line by line. Where the only
+   *      readable founder-supplied source is the artboard, the artboard is what gets implemented.
+   *   2. THE REASON GIVEN FOR ARIAL NO LONGER HOLDS. It was "no font link, no FOUT and no
+   *      third-party request on first paint" -- a real argument against a <link> to
+   *      fonts.googleapis.com, and no argument at all against what apps/web/app/layout.tsx now
+   *      does. `next/font/google` downloads the .woff2 files AT BUILD TIME and serves them from
+   *      our own origin: no font link, no third-party request on first paint, and a size-adjusted
+   *      local fallback that holds the same metrics so there is no layout shift on swap. The faces
+   *      cost none of the three things Arial was bought to save.
+   *
+   * If BRAND.md does arrive and does say Arial, this block is where that is settled -- these three
+   * lines and the four `next/font` calls in apps/web/app/layout.tsx, and no consumer file.
+   *
+   * THE var() INDIRECTION. `next/font` hashes each family into a private name, so the real family
+   * cannot be written here. layout.tsx exposes each face as a custom property on <html>
+   * (--font-face-display / -body / -thai / -mono) and this file composes the stacks around them.
+   * Every var() carries the plain face name as its fallback, so these three values stay readable
+   * and stay valid where those properties do not exist -- which is the whole point for the Workers
+   * and Deno surfaces: ../scripts/build-tokens.mjs copies these strings verbatim into
+   * dist/tokens.generated.ts, and a rendered email or PDF has no <html> class and no next/font.
+   * There it degrades to the named family, then to the real fallbacks. (An email client with no
+   * custom-property support at all -- Outlook's Word engine -- drops the declaration and uses its
+   * own default. Nothing renders email today; whoever writes that renderer should read this.)
+   *
+   * The NAMES are SEMANTIC (display / body / mono), never the face name. That is what makes a
+   * whole-register swap a re-valuing of three lines instead of an edit to every consumer.
+   *
+   * TWO THINGS THIS BLOCK DOES NOT DECIDE, both reported rather than quietly resolved:
+   *
+   *   a. apps/web sets `font-bold` on all 127 of its `font-display` elements. Young Serif has no
+   *      700, so every one of them is a browser-synthesised bold today. The artboard sets display
+   *      type at 400 (see WEIGHTS below); the missing BRAND.md is quoted as saying 700 headings.
+   *      Two founder sources, one of them unreadable -- so the weights on those elements were left
+   *      exactly as they were. Resolving it is a one-line change either way and belongs to whoever
+   *      can read the guide.
+   *   b. --mp-font-display has no Thai face, exactly as the artboards' display stacks have none.
+   *      ฿ (U+0E3F) is a Thai-block codepoint, and apps/web/app/billing/page.tsx:139 prints a THB
+   *      amount inside a font-display element, so on a THB account the baht sign falls out of
+   *      Young Serif into whatever the system serif is, next to Young Serif digits. The artboards
+   *      have the same defect (design/app/App.dc.html:40, design/app-simple/Main.dc.html:28).
+   *      Appending var(--font-face-thai) to the display stack would fix it and would change no
+   *      designed glyph -- but it is a face the design never put there, so it is a founder call.
    * --------------------------------------------------------------------------------- */
-  /* BRAND.md "Typography": Arial for website and product type, with Helvetica and a generic
-   * sans fallback. One family across display and body -- the guide sets the register with WEIGHT
-   * (400 body, 700 headings) rather than with a second face, so display and body resolve to the
-   * same stack. They stay two tokens because the distinction is semantic and a future brand may
-   * split them again; collapsing them to one would be a change to every consumer.
+  /* Inter Tight, per the founder's supermetrics.com reference. The fallback is the system
+   * grotesque rather than Georgia: a serif standing in for a sans is a worse failure than a
+   * different sans, and this token stopped naming a serif when the register changed. */
+  --mp-font-display: var(--font-face-display, "Inter Tight"), "Helvetica Neue", Arial, sans-serif;
+  --mp-font-body:
+    var(--font-face-body, "Figtree"), var(--font-face-thai, "Noto Sans Thai"), "Helvetica Neue",
+    Arial, sans-serif;
+  /* ---------------------------------------------------------------------------------
+   * AN OPAQUE STOP FOR ALPHA MASKS. NOT A PALETTE COLOUR.
    *
-   * No web font is loaded. Arial and Helvetica are installed everywhere this renders, so there is
-   * no font link, no FOUT and no third-party request on first paint. The guide's wordmark is
-   * outlined paths in the SVG and needs no font at all.
-   *
-   * Mono is unchanged and is NOT from the guide, which is silent on it. It is the artboard's. */
-  --mp-font-display: Arial, Helvetica, "Helvetica Neue", sans-serif;
-  --mp-font-body: Arial, Helvetica, "Helvetica Neue", sans-serif;
-  --mp-font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+   * `mask-image` reads only the ALPHA channel of its gradient -- the hue is discarded, so this
+   * value is "fully opaque" rather than "black", and using it to paint anything would be a
+   * misuse. It lives here because this file is the one place check-tokens.mjs permits a literal,
+   * and slipping the `black` keyword into a stylesheet instead would have passed that guard
+   * without satisfying it, which is the worse outcome of the two.
+   * --------------------------------------------------------------------------------- */
+  --mp-mask-opaque: #000;
+
+  --mp-font-mono:
+    var(--font-face-mono, "Geist Mono"), ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* ---------------------------------------------------------------------------------
    * GROUND AND SURFACES

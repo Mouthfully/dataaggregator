@@ -37,6 +37,7 @@
 
 import {
   normalizeGa4Report,
+  normalizeLoyverseReceipts,
   normalizeGoogleAdsSearch,
   normalizeMetaInsights,
   normalizeSearchAnalytics,
@@ -46,6 +47,7 @@ import { CONVERSION_METRICS, type EnvelopeRow, envelopeRowSchema } from "@repo/c
 
 import * as ga4Fixtures from "../../../../packages/connectors/src/sources/ga4/fixtures.ts";
 import * as googleAdsFixtures from "../../../../packages/connectors/src/sources/google_ads/fixtures.ts";
+import * as loyverseFixtures from "../../../../packages/connectors/src/sources/loyverse/fixtures.ts";
 import * as metaFixtures from "../../../../packages/connectors/src/sources/meta_ads/fixtures.ts";
 import * as searchConsoleFixtures from "../../../../packages/connectors/src/sources/search_console/fixtures.ts";
 import * as wooFixtures from "../../../../packages/connectors/src/sources/woocommerce/fixtures.ts";
@@ -120,7 +122,11 @@ function source(
 }
 
 // ---------------------------------------------------------------------------------------------
-// The five runs. Every option below is the one that source's own contract.test.ts passes.
+// The runs. Every option below is the one that source's own contract.test.ts passes.
+//
+// THE COUNT IS NOT WRITTEN DOWN ANY MORE, and that is deliberate: `page.test.tsx` derives the
+// expected set from the source tree intersected with `SOURCES` in @repo/contract, so a hard-coded
+// "five" here was a second copy of a fact that moves. Loyverse made it move.
 // ---------------------------------------------------------------------------------------------
 
 const GA4_INPUT = {
@@ -156,6 +162,22 @@ const SEARCH_CONSOLE_INPUT = {
   fetchedAt: "2026-09-11T02:00:00Z",
   firstSeenAt: "2026-08-14T06:00:00Z",
 } as const;
+
+/**
+ * Loyverse. A POS, and the first source on this page whose rows can be NEGATIVE.
+ *
+ * `PAGE` holds a sale, a refund, a cancellation and a late-night sale -- so the panel shows a
+ * negative `revenue`, two zeroes that are measurements rather than absences, and a row filed on the
+ * NEXT calendar day because 18:45 UTC is 01:45 in Bangkok. All four are things a reader should be
+ * able to see happening rather than take on trust.
+ */
+const LOYVERSE_INPUT = {
+  merchantId: loyverseFixtures.MERCHANT.id,
+  currency: "THB",
+  timezone: "Asia/Bangkok",
+  fetchedAt: "2026-09-10T02:00:00.000Z",
+  firstSeenAt: "2026-09-10T02:00:00.000Z",
+};
 
 const WOO_INPUT = {
   storeUrl: "https://shop.example.com",
@@ -202,6 +224,14 @@ const SEARCH_CONSOLE = source(
   }).rows,
 );
 
+const LOYVERSE = source(
+  normalizeLoyverseReceipts,
+  loyverseFixtures,
+  loyverseFixtures.PAGE,
+  LOYVERSE_INPUT,
+  normalizeLoyverseReceipts({ receipts: loyverseFixtures.PAGE, ...LOYVERSE_INPUT }),
+);
+
 const WOOCOMMERCE = source(
   normalizeWooOrders,
   wooFixtures,
@@ -213,6 +243,7 @@ const WOOCOMMERCE = source(
 export const SOURCES: readonly OfflineSource[] = [
   GA4,
   GOOGLE_ADS,
+  LOYVERSE,
   META_ADS,
   SEARCH_CONSOLE,
   WOOCOMMERCE,

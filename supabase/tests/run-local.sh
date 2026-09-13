@@ -103,3 +103,17 @@ psql -d "$DB" -q -f "$HERE/11_connection_timezone.sql"
 
 echo "==> billing suite"
 psql -d "$DB" -q -f "$HERE/12_billing.sql"
+
+# 13 WAS WRITTEN AND NEVER WIRED IN. `20260912000800_scheduler_entry_point.sql` shipped with
+# `13_scheduler_entry_point.sql` beside it and this runner was not amended, so the file has been
+# sitting in the directory proving nothing -- the same failure the repository keeps finding, one
+# layer up: a test nothing runs is indistinguishable from a test that passes. Wired in here
+# rather than left for whoever notices next.
+echo "==> scheduler entry point suite"
+psql -d "$DB" -q -f "$HERE/13_scheduler_entry_point.sql"
+
+echo "==> ambient suite"
+psql -d "$DB" -q -f "$HERE/14_ambient.sql"
+
+echo "==> force rls suite"
+psql -d "$DB" -q -f "$HERE/15_force_rls.sql"

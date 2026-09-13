@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { amountFor, lookupKey } from "../../../../scripts/create-stripe-prices";
+import { amountFor, isLiveKey, lookupKey } from "../../../../scripts/create-stripe-prices";
 import { CURRENCIES, INTERVALS, PLAN_DISPLAY } from "./plans";
 
 /**
@@ -67,5 +67,31 @@ describe("lookup keys", () => {
 
   it("names the plan and interval, so a dashboard row is readable without a lookup", () => {
     expect(lookupKey("growth", "year")).toBe("plan_growth_year");
+  });
+});
+
+/**
+ * WHICH KEYS COUNT AS LIVE.
+ *
+ * This exists because the guard was wrong in the one case that mattered. It tested
+ * `startsWith("sk_live_")`, so a RESTRICTED live key -- `rk_live_...`, the key type Stripe
+ * recommends for a script scoped to Products and Prices -- was classified as a test key. It would
+ * have created live prices without the `--live` flag, while the progress output said "TEST mode".
+ *
+ * The case was found the only way it could be: by someone handing over an `rk_live_` key.
+ */
+describe("which keys write to the live account", () => {
+  it.each(["sk_live_abc123", "rk_live_abc123", "pk_live_abc123"])("treats %s as live", (key) => {
+    expect(isLiveKey(key)).toBe(true);
+  });
+
+  it.each(["sk_test_abc123", "rk_test_abc123", "pk_test_abc123"])("treats %s as test", (key) => {
+    expect(isLiveKey(key)).toBe(false);
+  });
+
+  it("does not match a key that merely contains the word live", () => {
+    // `_live_` has to be the segment after the key type, not any substring: a test key whose random
+    // tail happened to contain "live" must not be refused as live, or the guard cries wolf.
+    expect(isLiveKey("sk_test_aliveandwell")).toBe(false);
   });
 });

@@ -16,27 +16,43 @@ import Image from "next/image";
  * themselves. Everything else on the page is SVG, where next/image would add a wrapper for nothing.
  */
 
-const EYEBROW = "Your business, at a glance";
-const HEADING_LEAD = "One workspace.";
-const HEADING_REST = "Your whole business.";
+/**
+ * THE COPY, RE-AIMED, AND THE ONE THING IT CANNOT FIX.
+ *
+ * The heading used to promise a workspace and the lead a dashboard "your team will actually use".
+ * That sells the picture; `docs/marketplane/58-plan-reconciliation.md` section 5.1 says the product
+ * sells the decision. So the page now says what the page is FOR -- the one screen you open once a
+ * day, already laid out for your trade -- and the three benefit lines end in a to-do.
+ *
+ * WHAT COULD NOT BE FIXED HERE. The artefact below is a supplied PNG showing a dollar-denominated
+ * dashboard, and section 5.1 bans USD hero figures for a baht-billed Thai owner-operator. A raster
+ * cannot be re-rendered from this file, so the honest move is the one available: the caption says
+ * in words that the figures are a sample and not a customer's, and this stays on the design note's
+ * list until the image is redrawn in baht. Labelling an unfixable illustration is the artboard's
+ * own remedy; leaving it unlabelled would let an illustration read as a customer.
+ */
+const EYEBROW = "One page, every morning";
+const HEADING_LEAD = "The page you open";
+const HEADING_REST = "once a day.";
 const LEAD =
-  "Revenue, campaign performance, and your next best action — together in a dashboard your team will actually use.";
+  "Yesterday's takings, anything unusual, and the one thing worth doing — laid out for the trade you are in, not for an analyst who is not coming.";
 const IMAGE_ALT =
-  "Client dashboard concept showing revenue, orders, ad spend, channel performance, and AI insights";
+  "Dashboard concept showing revenue, orders, spend, channel performance and a list of suggested actions";
+const SAMPLE_LABEL = "Product concept. Sample figures, not a customer.";
 const OPEN_LABEL = "Explore the client dashboard";
 
 const BENEFITS = [
   {
-    id: "growth",
-    label: "See what is driving growth",
+    id: "changed",
+    label: "Know what changed overnight",
     d: "M4 13h3v8H4zM10 8h3v13h-3zM16 3h3v18h-3z",
   },
   {
-    id: "aligned",
-    label: "Keep your team aligned",
+    id: "trade",
+    label: "Laid out for your trade",
     d: "M16 21v-3a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v3m20 0v-3a4 4 0 0 0-3-3.9M9 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-8a4 4 0 0 1 0 8",
   },
-  { id: "action", label: "Turn insights into action", d: "m6 11 4 4L21 4M20 12v8H3V3h12" },
+  { id: "todo", label: "Ends in one thing to do", d: "m6 11 4 4L21 4M20 12v8H3V3h12" },
 ] as const;
 
 export function DashboardFeature() {
@@ -46,7 +62,7 @@ export function DashboardFeature() {
         <span className="text-ink-faint block text-xs font-bold tracking-[0.14em] uppercase">
           {EYEBROW}
         </span>
-        <h2 className="font-display text-ink mt-3 text-[28px] leading-[1.16] font-bold tracking-[-0.03em] md:text-4xl">
+        <h2 className="font-display text-ink mt-3 text-[28px] leading-[1.16] font-semibold tracking-[-0.03em] md:text-4xl">
           {HEADING_LEAD} <span className="brand-gradient-text">{HEADING_REST}</span>
         </h2>
         <p className="text-ink-muted mt-4 text-base leading-[1.65]">{LEAD}</p>
@@ -64,9 +80,14 @@ export function DashboardFeature() {
           sizes="(max-width: 1200px) 100vw, 1200px"
           className="block h-auto w-full"
         />
-        <span className="text-accent flex items-center justify-end gap-2 px-6 py-4 text-sm font-bold">
-          {OPEN_LABEL}
-          <span aria-hidden="true">&#8599;</span>
+        {/* The caption strip now carries the sample label on the left and the open affordance on
+            the right. Same strip, same height, one more thing said out loud. */}
+        <span className="flex flex-wrap items-center justify-between gap-2 px-6 py-4">
+          <span className="text-ink-faint text-xs">{SAMPLE_LABEL}</span>
+          <span className="text-accent flex items-center gap-2 text-sm font-bold">
+            {OPEN_LABEL}
+            <span aria-hidden="true">&#8599;</span>
+          </span>
         </span>
       </a>
 

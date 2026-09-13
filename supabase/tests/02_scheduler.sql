@@ -42,6 +42,19 @@ $$;
 -- savepoint, that is aborted on purpose; the verdicts survive in PL/pgSQL variables, which are
 -- memory rather than database state, and are inserted afterwards. Reasoned out in full at the head
 -- of 01_rls_isolation.sql.
+create or replace function app_test.check_rejected(p_name text, p_sql text)
+returns void language plpgsql as $$
+begin
+  execute p_sql;
+  perform app_test.check(p_name, false, 'ACCEPTED: the database allowed a call it must refuse');
+exception
+  when raise_exception or check_violation or invalid_parameter_value then
+    perform app_test.check(p_name, true, 'refused: ' || sqlerrm);
+  when others then
+    perform app_test.check(p_name, false, 'wrong error: ' || sqlerrm);
+end;
+$$;
+
 create or replace function app_test.check_undone(
   p_setup     text,
   p_undone    text,
@@ -223,17 +236,70 @@ commit;
 begin;
   set local role app_scheduler;
 
-  select app.record_backfill('9e000000-0000-0000-0000-000000000001'::uuid, true, '2026-09-08T03:30:00Z'::timestamptz);
+  -- THE LEASE IS worker-c's: the abandoned-claim takeover above is the last thing to claim this
+  -- row. Closing it as anyone else must fail, which is the assertion below this one.
+  select app_test.check('a lease cannot be closed by an instance that does not hold it',
+    (select not app.record_backfill('9e000000-0000-0000-0000-000000000001'::uuid, true,
+       '2026-09-08T03:30:00Z'::timestamptz, 'worker-b', null)),
+    'an instance whose lease expired mid-run must not close the lease another instance now holds');
+
+  select app_test.check('the losing close changed nothing',
+    (select count(*) = 1 from app.due_connections('2026-09-08T04:00:00Z'::timestamptz)
+      where connection_id = '9e000000-0000-0000-0000-000000000001'));
+
+  select app_test.check('the holder closes its own lease',
+    (select app.record_backfill('9e000000-0000-0000-0000-000000000001'::uuid, true,
+       '2026-09-08T03:30:00Z'::timestamptz, 'worker-c', '2026-09-08T03:29:00Z'::timestamptz)));
+
   select app_test.check('a successful run stops the connection being due today',
     (select count(*) = 0 from app.due_connections('2026-09-08T04:00:00Z'::timestamptz)
       where connection_id = '9e000000-0000-0000-0000-000000000001'));
 
   -- A failed run must be retried on the next sweep, not silently skipped for a day.
   select app.claim_connection('9e000000-0000-0000-0000-000000000003'::uuid, 'worker-d', '2026-09-08T04:00:00Z'::timestamptz);
-  select app.record_backfill('9e000000-0000-0000-0000-000000000003'::uuid, false, '2026-09-08T04:05:00Z'::timestamptz);
+  select app.record_backfill('9e000000-0000-0000-0000-000000000003'::uuid, false,
+    '2026-09-08T04:05:00Z'::timestamptz, 'worker-d', '2026-09-08T04:04:00Z'::timestamptz);
   select app_test.check('a failed run is offered again rather than skipped for the day',
     (select count(*) = 1 from app.due_connections('2026-09-08T04:10:00Z'::timestamptz)
       where connection_id = '9e000000-0000-0000-0000-000000000003'));
+
+  select app_test.check('the watermark never moves BACKWARDS',
+    (select app.record_backfill('9e000000-0000-0000-0000-000000000003'::uuid, false,
+       '2026-09-08T04:06:00Z'::timestamptz, 'worker-d', '2020-01-01T00:00:00Z'::timestamptz)
+     is not null),
+    'a run that failed before completing a chunk reports the since it started from; assigning that '
+    'would re-walk rows already written');
+
+  select app_test.check_rejected('a checkpoint in the future is refused',
+    'select app.record_backfill(''9e000000-0000-0000-0000-000000000003''::uuid, true, '
+    '''2026-09-08T04:05:00Z''::timestamptz, ''worker-d'', ''2030-01-01T00:00:00Z''::timestamptz)');
+
+  select app_test.check_rejected('an anonymous lease close is refused',
+    'select app.record_backfill(''9e000000-0000-0000-0000-000000000003''::uuid, true, '
+    '''2026-09-08T04:05:00Z''::timestamptz, ''  '', null)');
+
+  select app_test.check('the old three-argument record_backfill is gone, not merely unused',
+    to_regprocedure('app.record_backfill(uuid, boolean, timestamptz)') is null,
+    'leaving it granted beside the new arity keeps the anonymous-lease, no-checkpoint path '
+    'reachable -- a guard with a door beside it');
+commit;
+
+-- The watermark itself, read OUTSIDE the scheduler's transaction. `app_scheduler` holds no grant on
+-- `public.connections` at all -- 02's own assertions above prove it -- so the role that writes the
+-- checkpoint through a security definer cannot read it back, and an assertion that tried would be
+-- testing the grant rather than the watermark.
+begin;
+  select app_test.check('a successful run advances the watermark to the window it closed',
+    (select ingest_checkpoint = '2026-09-08T03:29:00Z'::timestamptz
+       from public.connections where id = '9e000000-0000-0000-0000-000000000001'),
+    'last_backfill_at is stamped at the END of a run, so resuming from it skips every row modified '
+    'while the run was in flight');
+
+  select app_test.check('a FAILED run DOES advance the watermark, because its checkpoint is safe',
+    (select ingest_checkpoint = '2026-09-08T04:04:00Z'::timestamptz
+       from public.connections where id = '9e000000-0000-0000-0000-000000000003'),
+    'runIngest writes each page before pulling the next, so every page behind a reported checkpoint '
+    'is already stored. Withholding it would restart a long walk from the same since every night');
 commit;
 
 -- ---------------------------------------------------------------------------------------------

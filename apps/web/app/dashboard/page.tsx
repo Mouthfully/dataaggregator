@@ -14,6 +14,7 @@ import {
   DASHBOARD_PRODUCTS,
   SITE_DASHBOARD,
 } from "../_content";
+import { LiveRows } from "./_rows";
 
 /**
  * ALWAYS RENDERED PER REQUEST.
@@ -62,6 +63,12 @@ const DASH_STATE = {
     "Your data could not be read just now. The screen below is the illustrative concept.",
   noRows:
     "Your workspace has no rows for this period yet. Connect a source and run a backfill to fill it.",
+  // A FAILED READ IS NOT AN EMPTY PERIOD, and until the live table landed the two shared a
+  // sentence: `performanceRows` returns no rows on error, so a customer whose query failed was
+  // told their period was empty. That is a statement about their business made from a database
+  // fault, which is the same class of mistake as printing zero for a null.
+  rowsUnavailable:
+    "Your rows could not be read just now, so no figures are shown. This is not a statement about the period.",
 } as const;
 
 export default async function DashboardPage() {
@@ -73,6 +80,10 @@ export default async function DashboardPage() {
   const live = state?.kind === "ready" ? state.workspace : null;
   const performance = live ? await performanceRows(SPAN.from, SPAN.to) : null;
 
+  // Rendered only when the read SUCCEEDED and returned something. An errored read has no rows to
+  // show and, more importantly, nothing true to say about the period -- `DASH_STATE` says so.
+  const liveRows = performance !== null && performance.error === null ? performance.rows : [];
+
   // Zero rows is the TRUE state of this project today -- envelope_rows is empty -- so it is said
   // rather than papered over. The designed screen still renders beneath, labelled as a concept,
   // because a signed-in person with an empty database should still see what the product looks like.
@@ -83,9 +94,11 @@ export default async function DashboardPage() {
         ? DASH_STATE.noWorkspace
         : state.kind === "unavailable"
           ? DASH_STATE.unavailable
-          : performance && performance.rows.length === 0
-            ? DASH_STATE.noRows
-            : null;
+          : performance && performance.error !== null
+            ? DASH_STATE.rowsUnavailable
+            : performance && performance.rows.length === 0
+              ? DASH_STATE.noRows
+              : null;
 
   return (
     <>
@@ -97,7 +110,7 @@ export default async function DashboardPage() {
             {SITE_DASHBOARD.eyebrow}
           </span>
           <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-            <h1 className="font-display text-ink text-[clamp(30px,3.4vw,44px)] leading-[1.08] font-bold tracking-[-0.04em]">
+            <h1 className="font-display text-ink text-[clamp(30px,3.4vw,44px)] leading-[1.08] font-semibold tracking-[-0.04em]">
               {SITE_DASHBOARD.heroLine1}
               <br />
               <span className="brand-gradient-text">{SITE_DASHBOARD.heroLine2}</span>
@@ -131,13 +144,23 @@ export default async function DashboardPage() {
           </div>
         )}
 
+        {/* THE LIVE TABLE GOES ABOVE THE CONCEPT, and the order is the decision. These are the
+            reader's own figures; everything below is the illustrative screen, which keeps its
+            `SITE_DASHBOARD.notice` label. If the two are ever confused for each other, the safe
+            direction is a real number mistaken for a concept -- never the reverse. */}
+        {liveRows.length === 0 ? null : (
+          <div className="mx-auto max-w-[1200px] px-8 pt-4 pb-2">
+            <LiveRows rows={liveRows} />
+          </div>
+        )}
+
         <div className="mx-auto max-w-[1200px] px-8 pb-20">
           <div className="border-line bg-surface grid overflow-hidden rounded-xl border md:grid-cols-[232px_1fr]">
             <Sidebar workspaceName={live?.name ?? SITE_DASHBOARD.workspace} />
 
             <div className="min-w-0 p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="font-display text-ink text-2xl font-bold tracking-[-0.02em]">
+                <h2 className="font-display text-ink text-2xl font-semibold tracking-[-0.02em]">
                   {SITE_DASHBOARD.title}
                 </h2>
                 <span className="border-line text-ink-muted rounded-[10px] border px-4 py-2 text-xs">
@@ -264,7 +287,7 @@ function Delta({ value }: { value: string }) {
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="border-line rounded-lg border p-5">
-      <h3 className="font-display text-ink text-base font-bold">{title}</h3>
+      <h3 className="font-display text-ink text-base font-semibold">{title}</h3>
       <div className="mt-2">{children}</div>
     </section>
   );
@@ -273,7 +296,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 function RevenueChart() {
   return (
     <section className="border-line rounded-lg border p-5">
-      <h3 className="font-display text-ink text-base font-bold">Revenue over time</h3>
+      <h3 className="font-display text-ink text-base font-semibold">Revenue over time</h3>
       <svg
         viewBox="0 0 640 220"
         className="mt-4 block w-full"
@@ -313,7 +336,7 @@ function RevenueChart() {
 function Insights() {
   return (
     <section className="border-line rounded-lg border p-5">
-      <h3 className="font-display text-ink text-base font-bold">AI insights</h3>
+      <h3 className="font-display text-ink text-base font-semibold">AI insights</h3>
       <ul className="mt-2">
         {DASHBOARD_INSIGHTS.map((insight) => (
           <li key={insight.id} className="border-line-soft border-b py-3 last:border-b-0">
@@ -331,7 +354,7 @@ function Insights() {
 function Channels() {
   return (
     <section className="border-line mt-5 rounded-lg border p-5">
-      <h3 className="font-display text-ink text-base font-bold">Channel performance</h3>
+      <h3 className="font-display text-ink text-base font-semibold">Channel performance</h3>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-left">
           <thead>

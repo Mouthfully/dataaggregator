@@ -49,10 +49,38 @@ describe("nothing the specification dropped can reach the page", () => {
 });
 
 describe("the page renders every section of the supplied design", () => {
-  it("leads with the brand guide's tagline", () => {
+  it("leads with the plan's positioning rather than with unification", () => {
     expect(text).toContain(SITE.heroLine1);
     expect(text).toContain(SITE.heroLine2);
     expect(text).toContain(SITE.heroLead);
+    expect(text).toContain(SITE.eyebrow);
+  });
+
+  it("carries a sample label on the hero panel, and no owner, quote or customer", () => {
+    // Section 5.3 of the reconciliation refuses a named Chiang Mai cafe as proof AT ANY PRICE:
+    // there are no customers, the artboard's owner quotes are unapproved drafts and its figures
+    // are invented. The resolution the issue settles on is the artboard's own -- label the example
+    // as a sample -- so the label is asserted rather than trusted to survive an edit.
+    expect(text).toContain(SITE.heroVisualLabel);
+    expect(text.toLowerCase()).toContain("sample");
+
+    // The two failure modes a proof section would take. Neither may appear anywhere on the page.
+    expect(text).not.toMatch(/\btrusted by\b/i);
+    expect(text).not.toMatch(/\btestimonial/i);
+  });
+
+  it("shows the hero's sample business in baht, not the dollar figures 5.1 banned", () => {
+    // Section 5.1 names the exact strings that had to go -- "$186.2K, 5.42x ROAS, Everyday Mug,
+    // Northstar Studio" -- because a dollar-denominated ecommerce brand is not the baht-billed
+    // Thai owner-operator the plan is written for. Each is asserted individually rather than by
+    // banning "$" across the page: the PRICING tiers are still quoted in dollars, docs/marketplane
+    // 58 section 4.8 records that the THB ladder is an unsettled founder decision (two files in
+    // this repository disagree by 2.3x at the top tier), and quoting baht prices before it is
+    // settled would publish whichever file the writer happened to open.
+    expect(text).toContain("\u0e3f15,420");
+    for (const banned of ["186.2", "5.42", "ROAS", "Everyday Mug", "Northstar Studio"]) {
+      expect(text, banned).not.toContain(banned);
+    }
   });
 
   it("shows every platform mark as ARTWORK, not as its name in text", () => {
@@ -64,19 +92,30 @@ describe("the page renders every section of the supplied design", () => {
     }
   });
 
-  it("renders all eleven sections of the reference, in its order", () => {
+  it("renders all twelve sections of the reference, in its order", () => {
     // One landmark string per section, checked for ORDER rather than mere presence -- a section
     // rendered in the wrong place is a different page from the one that was designed.
+    //
+    // THE LIST MOVED WITH THE REPOSITIONING, and the three strings that left are the point of it:
+    // "One connected workspace", "From insights to impact" and "Ready to unify your data" are all
+    // named in docs/marketplane/58-plan-reconciliation.md section 5.1 as copy that must stop --
+    // two of them because they sell unification, the third because it was byte-identical to the
+    // section directly above it. The action sheet's landmark is new, and it is the one section the
+    // page did not have: the whole argument is that an insight ends in a to-do.
     const landmarks = [
       SITE.heroLine1,
-      "One connected workspace",
-      "A simpler way to work",
-      "From insights to impact",
+      "The tools your business already runs on",
+      "Told what to do",
+      "Every insight ends in a to-do",
+      "in a decision",
+      "Never the number",
       "In one place",
+      "The page you open",
+      "would write. On the 1st",
       "Simple, transparent pricing",
-      "A clearer view, for every team",
+      "Built for owner-run businesses",
       "We're here to help",
-      "Ready to unify your data",
+      "Connect tonight. Decide at breakfast",
     ];
     let cursor = -1;
     for (const landmark of landmarks) {

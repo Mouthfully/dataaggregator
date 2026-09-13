@@ -1,25 +1,31 @@
 /**
- * THE TEMPLATES SECTION -- the reference's `<section id="templates" class="section container split">`
- * headed "Go from data to insights in minutes." Copy on the left, a panelled grid of template
- * cards on the right, each card a title over a mini bar chart over a preview link.
+ * CONSOLIDATED REPORTS -- the fourth capability, in the section that used to sell templates.
  *
- * THE ID IS LOAD-BEARING IN THE REFERENCE, NOT HERE (YET). The supplied page set links its header
- * and footer at `#templates`; this app's nav in `_content.ts` does not, so the id is kept for the
- * day it does and costs nothing until then.
+ * WHY IT IS NOT A TEMPLATES SECTION ANY MORE. `docs/marketplane/58-plan-reconciliation.md` section
+ * 5.1 lists `Templates` under copy that must stop, with the reason in one line: "the plan's owner
+ * does not build reports from templates; the product decides for them". An owner-operator with no
+ * analyst does not want a gallery to choose from -- choosing is the work they do not have time
+ * for. The section was re-aimed rather than deleted, because the founder's plan has a fourth
+ * capability (consolidated reports) with nowhere else to live, and it is exactly a four-up of
+ * named, finished documents.
+ *
+ * THE FOUR ARE THE PLAN'S OWN LIST: monthly investor update, P&L by unit and channel, bank loan
+ * pack, accountant export. Not a category each -- a document each, with a name the person who
+ * asked for it would use.
  *
  * THE CARDS ARE LINKS, NOT BUTTONS. The reference ships each card as `<button data-template="...">`,
  * wired by its own script to open the page's `<dialog id="demo">` with a preview. Neither that
- * script nor a per-template route exists in this app, so a literal transcription would ship four
+ * script nor a per-report route exists in this app, so a literal transcription would ship four
  * buttons that swallow a click. Each card is an `<a>` to `/dashboard` instead -- a route that
- * exists and shows the same numbers a template would -- which is the treatment `UseCases.tsx`
- * already settled on for the same `data-template` markup. This stays a server component as a
- * result: nothing here holds state. When a template surface lands, only the hrefs move.
+ * exists -- which is the treatment `UseCases.tsx` already settled on for the same `data-template`
+ * markup. This stays a server component as a result: nothing here holds state.
  *
  * THE BARS. Heights and per-bar opacities are the reference's own inline styles, transcribed value
  * for value (35/51/42/67/57/85/75/96 on the first card, and so on), because the stagger is the
  * design -- a flat or evenly-ascending set reads as a placeholder. They are inline `style` because
  * they are data that varies per bar, not a design decision: eight Tailwind height classes per card
- * would put the same numbers in the markup with more ceremony. No colour is written there.
+ * would put the same numbers in the markup with more ceremony. No colour is written there, and the
+ * chart's accessible name says "sample" for the reason section 5.3 gives.
  *
  * COLOUR AND RADII, WITH TWO SUBSTITUTIONS, BOTH REPORTED:
  *   * The bar fill is a two-stop vertical gradient in the reference. Its first stop IS the value
@@ -41,31 +47,34 @@
 
 /** Section copy. `scripts/check-copy.mjs` refuses a sentence typed into the JSX, so every line
  *  arrives from here. The eyebrow is stored in sentence case because the capitals are CSS. */
-const EYEBROW = "Ready-to-use templates";
+const EYEBROW = "Consolidated reports";
 
 /** The line break inside the heading is the design's, so the two lines are two values. */
-const HEADING_TOP = "Go from data to insights";
-const HEADING_BOTTOM = "in minutes.";
+const HEADING_TOP = "The report a finance team";
+const HEADING_BOTTOM = "would write. On the 1st.";
 
 const LEAD =
-  "Start with a template or build your own. Track performance, find opportunities, and share beautiful reports with your team.";
+  "Every unit, channel, bank account and ad account consolidated into one set of numbers, then written up as the document your co-founder, your bank or your accountant actually asked for. Every figure links back to where it came from.";
 
-const CTA_LABEL = "Explore templates";
+const CTA_LABEL = "See what is in one";
 
 /** One label for all four cards, as in the reference. */
-const CARD_CTA_LABEL = "Preview template";
+const CARD_CTA_LABEL = "Preview";
 
 /** Names the bar chart for assistive tech, which would otherwise hear eight empty elements. The
- *  chart is illustrative in the reference too, so it says so rather than implying real figures. */
-const CHART_LABEL = "Illustrative trend";
+ *  figures are invented, and section 5.3 requires an invented figure to say so. */
+const CHART_LABEL = "Sample figures";
 
 /**
- * The four templates, in the reference's order. `bars` is that card's eight `[height %, opacity]`
- * pairs, transcribed from the reference's inline styles.
+ * The four reports, in the plan's own order. `bars` is that card's eight `[height %, opacity]`
+ * pairs, transcribed from the reference's inline styles and left exactly as drawn.
+ *
+ * NONE OF THESE IS GENERATED TODAY. There is no report writer anywhere in `apps/` or `packages/`,
+ * and the accompanying design note records all four as claims written ahead of the capability.
  */
-const TEMPLATES = [
+const REPORTS = [
   {
-    name: "Marketing Performance",
+    name: "Monthly investor update",
     bars: [
       [35, 0.45],
       [51, 0.52],
@@ -78,7 +87,7 @@ const TEMPLATES = [
     ],
   },
   {
-    name: "Ecommerce Overview",
+    name: "P&L by unit and channel",
     bars: [
       [29, 0.45],
       [45, 0.52],
@@ -91,7 +100,7 @@ const TEMPLATES = [
     ],
   },
   {
-    name: "Paid Ads",
+    name: "Bank loan pack",
     bars: [
       [23, 0.45],
       [39, 0.52],
@@ -104,7 +113,7 @@ const TEMPLATES = [
     ],
   },
   {
-    name: "Sales Pipeline",
+    name: "Accountant export",
     bars: [
       [20, 0.45],
       [33, 0.52],
@@ -118,11 +127,11 @@ const TEMPLATES = [
   },
 ] as const;
 
-export function Templates() {
+export function Reports() {
   return (
     <section
-      id="templates"
-      aria-labelledby="templates-heading"
+      id="reports"
+      aria-labelledby="reports-heading"
       className="mx-auto grid max-w-[1200px] items-center gap-8 px-8 py-12 md:grid-cols-2 md:gap-10 md:py-20 lg:gap-20"
     >
       <div className="min-w-0">
@@ -130,8 +139,8 @@ export function Templates() {
           {EYEBROW}
         </span>
         <h2
-          id="templates-heading"
-          className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-bold tracking-[-0.03em] md:text-[36px]"
+          id="reports-heading"
+          className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-semibold tracking-[-0.03em] md:text-[36px]"
         >
           {HEADING_TOP}
           <br />
@@ -153,20 +162,20 @@ export function Templates() {
           which is what reads as a set rather than four loose cards. It stays two-up at every width
           -- these cards carry two short lines and a chart, so they survive a phone in pairs. */}
       <ul className="bg-surface-subtle grid min-w-0 grid-cols-2 gap-2.5 rounded-xl p-2.5 md:gap-4 md:p-[18px]">
-        {TEMPLATES.map((template) => (
-          <li key={template.name} className="flex">
+        {REPORTS.map((report) => (
+          <li key={report.name} className="flex">
             <a
               href="/dashboard"
               className="border-line bg-surface hover:border-accent flex flex-1 flex-col rounded-lg border p-3 text-left transition-colors md:p-[18px]"
             >
-              <strong className="text-ink text-xs leading-[1.3] font-bold">{template.name}</strong>
+              <strong className="text-ink text-xs leading-[1.3] font-bold">{report.name}</strong>
 
               <div
                 role="img"
                 aria-label={CHART_LABEL}
                 className="mt-5 flex h-[78px] items-end gap-[7px]"
               >
-                {template.bars.map(([height, opacity], index) => (
+                {report.bars.map(([height, opacity], index) => (
                   <span
                     key={index}
                     /* Height and opacity are per-bar data, so they stay inline; the fill is a

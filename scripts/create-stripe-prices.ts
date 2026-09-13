@@ -14,7 +14,8 @@
  * what it finds. Running it twice produces the same six ids rather than twelve prices, half of them
  * orphaned and indistinguishable in the dashboard.
  *
- * A LIVE KEY REQUIRES `--live`. `sk_live_` creates objects customers can be charged against, in a
+ * A LIVE KEY REQUIRES `--live` -- any live key, `sk_live_` or the restricted `rk_live_`. It creates
+ * objects customers can be charged against, in a
  * real tax entity's name. The flag is not a confirmation prompt for its own sake: the commonest way
  * to make live objects by accident is to export the wrong key into a shell and forget.
  */
@@ -45,6 +46,23 @@ import {
  * local currency from their IP when the Price supports it, falling back to the default when it does
  * not -- so a visitor in Bangkok is offered baht without this app detecting anything.
  */
+
+/**
+ * Does this key write to the LIVE account?
+ *
+ * ANY LIVE KEY, NOT JUST A SECRET ONE. This was `key.startsWith("sk_live_")`, which misses the key
+ * type Stripe itself recommends for a script like this: a RESTRICTED key, `rk_live_...`, scoped to
+ * just Products and Prices. Such a key creates live objects exactly as a secret one does, and under
+ * the old test `live` came out false -- so the guard waved it through, AND the progress line
+ * announced "TEST mode" while it wrote to the real account.
+ *
+ * A guard bypassed by the SAFEST key available is worse than no guard, because it is the one people
+ * trust. The prefix before `_live_` is the key's type (`sk`, `rk`, `pk`); what follows decides the
+ * account, so that is what this reads.
+ */
+export function isLiveKey(key: string): boolean {
+  return /^[a-z]+_live_/.test(key);
+}
 
 /** Stable across runs and across accounts, so a re-run finds what a previous run made. */
 function lookupKey(plan: Plan, interval: Interval): string {
@@ -81,7 +99,7 @@ async function main(argv: readonly string[]): Promise<number> {
     return 2;
   }
 
-  const live = key.startsWith("sk_live_");
+  const live = isLiveKey(key);
   if (live && !argv.includes("--live")) {
     process.stderr.write(
       "Refusing to run: STRIPE_SECRET_KEY is a LIVE key and --live was not passed.\n\n" +

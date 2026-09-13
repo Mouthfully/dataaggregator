@@ -558,7 +558,7 @@ export default function GoogleAdsFieldsPage() {
               <span>{SOURCE_CATEGORY}</span>
             </div>
 
-            <h1 className="font-display text-ink mb-5 text-[34px] leading-[1.12] font-bold tracking-[-0.035em] md:text-[42px]">
+            <h1 className="font-display text-ink mb-5 text-[34px] leading-[1.12] font-semibold tracking-[-0.035em] md:text-[42px]">
               {HEADING_LINE_1}
               <br />
               {HEADING_LINE_2}
@@ -581,7 +581,7 @@ export default function GoogleAdsFieldsPage() {
             <dl className="mt-7 flex gap-[9px] md:gap-4">
               {STATS.map((stat) => (
                 <div key={stat.id} className="border-line flex-1 rounded-md border p-3 md:p-[15px]">
-                  <dd className="font-display text-ink text-[22px] font-bold md:text-[25px]">
+                  <dd className="font-display text-ink text-[22px] font-semibold md:text-[25px]">
                     {stat.value}
                   </dd>
                   <dt className="text-ink-muted text-[11px] md:text-xs">{stat.label}</dt>
@@ -596,7 +596,7 @@ export default function GoogleAdsFieldsPage() {
             >
               <h2
                 id="catalog-heading"
-                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-bold tracking-[-0.02em] md:text-[26px]"
+                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-semibold tracking-[-0.02em] md:text-[26px]"
               >
                 {CATALOG_HEADING}
               </h2>
@@ -696,14 +696,14 @@ export default function GoogleAdsFieldsPage() {
             >
               <h2
                 id="understanding-heading"
-                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-bold tracking-[-0.02em] md:text-[26px]"
+                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-semibold tracking-[-0.02em] md:text-[26px]"
               >
                 {UNDERSTANDING_HEADING}
               </h2>
               <dl>
                 {UNDERSTANDING.map((entry) => (
                   <div key={entry.id} className="border-line-soft border-b py-[18px]">
-                    <dt className="font-display text-ink text-base font-bold">{entry.term}</dt>
+                    <dt className="font-display text-ink text-base font-semibold">{entry.term}</dt>
                     <dd className="text-ink-muted mt-2 ml-0 text-[15px] leading-[1.65]">
                       {entry.body}
                     </dd>
@@ -719,7 +719,7 @@ export default function GoogleAdsFieldsPage() {
             >
               <h2
                 id="query-heading"
-                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-bold tracking-[-0.02em] md:text-[26px]"
+                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-semibold tracking-[-0.02em] md:text-[26px]"
               >
                 {QUERY_HEADING}
               </h2>
@@ -746,7 +746,7 @@ export default function GoogleAdsFieldsPage() {
             >
               <h2
                 id="sources-heading"
-                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-bold tracking-[-0.02em] md:text-[26px]"
+                className="font-display text-ink mb-4 text-[25px] leading-[1.2] font-semibold tracking-[-0.02em] md:text-[26px]"
               >
                 {SOURCES_HEADING}
               </h2>

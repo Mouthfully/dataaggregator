@@ -42,9 +42,32 @@ import { connectionAllowance } from "../_content";
  */
 
 /**
- * Section copy. Every sentence lives here rather than in the JSX because `scripts/check-copy.mjs`
- * refuses one typed into the page, and the questions and answers are transcribed from the reference
- * unchanged. The eyebrow is stored in sentence case because the capitals are CSS, not content.
+ * Section copy, rewritten for the new positioning.
+ *
+ * THE OLD FAQ ANSWERED A DASHBOARD BUYER. "What platforms does it support?", "Do I need technical
+ * skills?" -- the questions of someone deciding between reporting tools. The page no longer sells a
+ * reporting tool, so the questions an owner-operator actually has are the ones asked here: what
+ * lands, where the numbers came from, whether anything gets changed on their behalf, and what it
+ * costs.
+ *
+ * AND THE TRAP THIS FILE ALREADY WALKED INTO ONCE, which is why it is written down twice. The old
+ * "Can I try it for free?" answer restated three claims -- "three connectors, daily refresh and
+ * standard reports" -- that the pricing block one section above had just dropped. The FAQ is where
+ * a reader goes precisely when the card did not answer them, so a claim withheld above and
+ * restated here is a claim republished. Three consequences bind every answer below:
+ *
+ *   * No answer names a source. `docs/marketplane/58-plan-reconciliation.md` section 5.1 stops the
+ *     Thai POS vendors, the delivery platforms and the banks appearing as sources anywhere on this
+ *     site, and the old first answer listed an integration library by category. Gone, not moved.
+ *   * No answer counts anything. `check-claim-sources.mjs` bans a source or integration count, and
+ *     the reconciliation notes "200+" once evaded the pattern by putting the `+` where the regex
+ *     expected whitespace. The guard is not the reason not to write a count.
+ *   * Read-only is worded as WHAT WE ASK FOR AND ENFORCE, never as a guarantee the platforms make.
+ *     Section 5.1 is explicit: it is true of Loyverse and Xero, and on QuickBooks, FlowAccount,
+ *     Grab, foodpanda and StoreHub one token covers read and write, so the promise there is our
+ *     code and not their scope.
+ *
+ * The eyebrow is stored in sentence case because the capitals are CSS, not content.
  */
 const EYEBROW = "Frequently asked questions";
 
@@ -65,16 +88,30 @@ const PRODUCT = brand.productName;
 
 const QUESTIONS = [
   {
-    question: `What platforms does ${PRODUCT} support?`,
+    question: `What does ${PRODUCT} send me each morning?`,
     answer:
-      "The planned integration library covers advertising, ecommerce, CRM, and analytics " +
-      "platforms, including Google Ads, Meta, Shopify, HubSpot, and more.",
+      "Yesterday in three lines, anything that looks unusual, and one thing worth doing today. " +
+      "You can reply to ask a follow-up, in Thai or English.",
   },
   {
-    question: "Do I need technical skills?",
+    question: "Where do the numbers come from?",
     answer:
-      "The experience is designed around connecting your tools and choosing a report template, " +
-      "without writing code.",
+      "From the tools you log in to yourself. Every figure carries the time it was read and a " +
+      "marker for as long as the platform may still revise it. On a shop's own till that marker " +
+      "never comes off, and the brief says so in words.",
+  },
+  {
+    question: "Will it change anything in my accounts?",
+    answer:
+      "No. Nothing is done for you: you stay in control of prices, ads and staff. We ask each " +
+      "platform for read access only, and where a platform will not issue a token limited to " +
+      "reading, our own code is what refuses to write.",
+  },
+  {
+    question: "Do I need to understand any of the charts?",
+    answer:
+      "The brief is sentences. A chart is there if you want to look, and nothing asks you to " +
+      "read one to find out what to do.",
   },
   {
     question: "Can I try it for free?",
@@ -93,9 +130,23 @@ const QUESTIONS = [
   },
 ] as const;
 
-/** The closing panel. Its heading is the page's last question and its lead the design's sign-off. */
-const CTA_HEADING = "Ready to unify your data?";
-const CTA_LEAD = "One connected workspace. A clearer way forward.";
+/**
+ * The closing panel.
+ *
+ * "READY TO UNIFY YOUR DATA?" IS NAMED IN SECTION 5.1 AS COPY THAT MUST STOP, alongside its lead,
+ * "One connected workspace. A clearer way forward." Both sold the plumbing. The panel now closes on
+ * the thing the page spent its length arguing: connect it tonight, and tomorrow you are told what
+ * to do rather than shown a chart.
+ *
+ * WHAT THE ARTBOARD'S OWN CLOSING LINE SAYS, AND WHY IT IS NOT HERE. It reads "Free to start; pay
+ * as you go after that, nothing monthly." `FORBIDDEN_CLAIMS` in `packages/brand/src/claims.ts` bans
+ * `/\bnothing monthly\b|\bpay as you go\b/i` and `page.test.tsx` asserts the rendered page matches
+ * no forbidden pattern, so writing the plan's sign-off would be a red build. Billing is
+ * subscriptions -- four plans and six live Stripe prices -- and the lead says only what the Free
+ * tier really is.
+ */
+const CTA_HEADING = "Connect tonight. Decide at breakfast.";
+const CTA_LEAD = "Free to start. We ask each platform for read access and nothing more.";
 const CTA_LABEL = "Start free";
 
 export function Faq() {
@@ -112,7 +163,7 @@ export function Faq() {
         <span className="text-ink-faint block text-[11px] font-bold tracking-[0.14em] uppercase md:text-xs">
           {EYEBROW}
         </span>
-        <h2 className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-bold tracking-[-0.03em] md:text-[36px]">
+        <h2 className="font-display text-ink mt-[18px] text-[28px] leading-[1.16] font-semibold tracking-[-0.03em] md:text-[36px]">
           {HEADING_TOP}
           <br />
           {HEADING_BOTTOM}
@@ -158,7 +209,7 @@ export function FinalCta() {
     <section className="mx-auto mt-5 mb-[45px] max-w-[1200px] px-8 md:mb-[70px]">
       <div className="bg-surface-inset flex flex-col gap-6 rounded-xl p-[30px] md:flex-row md:items-center md:justify-between md:p-12">
         <div className="min-w-0">
-          <h2 className="font-display text-ink text-[28px] leading-[1.16] font-bold tracking-[-0.03em] md:text-[30px]">
+          <h2 className="font-display text-ink text-[28px] leading-[1.16] font-semibold tracking-[-0.03em] md:text-[30px]">
             {CTA_HEADING}
           </h2>
           <p className="text-ink-muted mt-2.5 leading-[1.65]">{CTA_LEAD}</p>

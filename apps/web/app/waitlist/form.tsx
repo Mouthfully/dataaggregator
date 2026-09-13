@@ -4,6 +4,29 @@ import { useActionState, useId } from "react";
 
 import { joinWaitlist, type WaitlistState } from "./actions";
 
+/**
+ * THE COLLECTION NOTICE, AND WHY THIS FORM IS THE ONE THAT MOST NEEDED ONE.
+ *
+ * The gate redirects every route to this page until somebody enters the password, so while the
+ * product is pre-launch THIS IS THE ONLY SURFACE ON WHICH A STRANGER GIVES US PERSONAL DATA. It
+ * took an email address with no statement of who was collecting it, what for, how long it would be
+ * kept, or where the privacy notice was -- which made the least-guarded page the one carrying the
+ * whole of the company's live collection.
+ *
+ * Thailand's PDPA is the law here and it is not conditional on anything: section 5 binds a
+ * controller located in the Kingdom, and `packages/brand/src/brand.ts` records a Thai juristic
+ * person. Section 19 requires consent to be requested in a form that is explicitly distinguishable,
+ * and section 23 requires the purpose, the controller's identity and contact, the retention period
+ * and the categories of recipient to be given AT OR BEFORE collection.
+ *
+ * WHAT IS WRITTEN HERE IS WHAT IS TRUE, AND THE RETENTION LINE IS THE HONEST ONE. No retention
+ * schedule exists for this table or any other -- `docs/marketplane/62-compliance-claims.md` and the
+ * privacy page's open clauses both record that -- so the notice says the address is kept until the
+ * product opens or the reader asks for it to be deleted, which is a commitment this company can
+ * actually keep, rather than a period nobody has set. Writing "12 months" here would be a
+ * fabricated assurance, and the privacy page's own header explains why that is worse than an
+ * admitted gap.
+ */
 const COPY = {
   label: "Work email",
   placeholder: "you@yourcompany.com",
@@ -11,6 +34,10 @@ const COPY = {
   pending: "Adding…",
   done: "You're on the list.",
   doneBody: "We'll be in touch when there's something worth showing you.",
+  noticeLead: "Your address is used to tell you when the product opens, and for nothing else.",
+  noticeRetention:
+    "It is kept until then, or until you ask us to delete it, whichever comes first. It is never sold or shared.",
+  noticeLink: "Who holds it, and how to ask",
 } as const;
 
 export function WaitlistForm({ source }: { source: string }) {
@@ -57,6 +84,17 @@ export function WaitlistForm({ source }: { source: string }) {
           {state.error}
         </p>
       ) : null}
+
+      {/* Below the control and above nothing else: a notice given after the address has been typed
+          is not given "at or before" collection in any sense a reader would recognise, but one
+          placed between the label and the input separates the person from the thing they came to
+          do. This sits with the control, in the same visual block, before submission. */}
+      <p className="text-ink-subtle mt-3 max-w-[420px] text-xs leading-[1.55]">
+        {COPY.noticeLead} {COPY.noticeRetention}{" "}
+        <a href="/privacy" className="text-accent font-bold hover:underline">
+          {COPY.noticeLink}
+        </a>
+      </p>
     </form>
   );
 }

@@ -31,6 +31,7 @@ type BrandField = keyof Brand;
 export const IMPLEMENTED_SOURCE_IDS = [
   "ga4",
   "google_ads",
+  "loyverse",
   "meta_ads",
   "search_console",
   "woocommerce",
@@ -41,6 +42,7 @@ export type ImplementedSourceId = (typeof IMPLEMENTED_SOURCE_IDS)[number];
 const SOURCE_LABELS: Readonly<Record<ImplementedSourceId, string>> = {
   ga4: "GA4",
   google_ads: "Google Ads",
+  loyverse: "Loyverse",
   meta_ads: "Meta Ads",
   search_console: "Search Console",
   woocommerce: "WooCommerce",
@@ -267,6 +269,35 @@ export const CLAIMS: readonly Claim[] = [
     requiresCapabilities: ["billing:credits"],
   },
 
+  // --- Certifications and the governing law ---------------------------------------------------
+  //
+  // THREE CLAIMS THAT NO AMOUNT OF CODE TURNS ON. The first two are withheld by a brand fact only a
+  // third party can set; the third is not a certification at all and is withheld for a different
+  // reason, stated on it.
+  {
+    id: "soc2",
+    text: "Independently audited against the SOC 2 Trust Services Criteria, with a Type II report covering a stated observation window.",
+    source: ["3.2", "15"],
+    requires: ["soc2TypeIIReport"],
+  },
+  {
+    id: "iso27001",
+    text: "Certified to ISO/IEC 27001 by an accredited certification body.",
+    source: ["3.2", "15"],
+    requires: ["iso27001Certificate"],
+  },
+  {
+    // THE LAW, NOT A BADGE, and the distinction is why the text says "operates under" rather than
+    // "complies with". A statute applies to this entity whether or not anything is claimed, so the
+    // honest sentence names the law and the authority a data subject can actually write to. It is
+    // withheld until a DPO exists, because a notice that names an authority and no contact leaves
+    // the reader with half a route -- see brand.dataProtectionOfficer on why that null is real.
+    id: "governing-law",
+    text: "Operated by a Thai company under Thailand's Personal Data Protection Act, with complaints to the Personal Data Protection Committee.",
+    source: ["3.2"],
+    requires: ["dataProtectionOfficer"],
+  },
+
   // --- Developer surface ---------------------------------------------------------------------
   {
     id: "one-shape",
@@ -357,5 +388,64 @@ export const FORBIDDEN_CLAIMS: ReadonlyArray<{ pattern: RegExp; reason: string }
     pattern: /\bfrankfurt\b|\buk gdpr\b|\bsaml sso\b|\bsso included\b/i,
     reason:
       "Unsupported anywhere in the specification, and the entity is Thai. See docs/marketplane/01-brand-identity.md.",
+  },
+
+  /* --- Certification claims. ------------------------------------------------------------------
+   *
+   * A CERTIFICATION IS A THIRD PARTY'S ATTESTATION, AND NOTHING IN THIS REPOSITORY CONFERS ONE.
+   * SOC 2 Type II is a CPA's report on operating effectiveness over an observation window; ISO/IEC
+   * 27001 is an accredited body's certificate against an ISMS. `brand.soc2TypeIIReport` and
+   * `brand.iso27001Certificate` are both false, so the `soc2` and `iso27001` claims above are
+   * withheld -- but a withheld claim only stops copy that goes THROUGH `claim()`, and issue #49 is
+   * entirely about the hand-written sentence that goes round it. These patterns are the other half.
+   *
+   * THE PATTERNS ARE BUILT AGAINST THIS LIST'S OWN NEAR-MISSES, which are recorded rather than
+   * theoretical: `/\b\d+\s+(sources|integrations)\b/` let "200+ integrations" through because the
+   * "+" sat exactly where the regex expected whitespace, and the competitor pattern catches
+   * "competitor" but not "competitors" because `\b` fails before the plural. So the separator here
+   * is `\W{0,3}` rather than `\s`, which takes "SOC 2", "SOC2", "SOC-2", "SOC . 2" and "ISO/IEC
+   * 27001" alike, and the bare standard number is banned on its own line because "certified to
+   * 27001" names no acronym at all.
+   *
+   * WHEN A CERTIFICATE IS ACTUALLY OBTAINED, the fix is to delete the matching pattern here in the
+   * same change that flips the brand fact. That is not a chore -- `brand.test.ts` asserts no
+   * ALLOWED claim matches a forbidden pattern, so flipping the fact turns the suite red until the
+   * ban goes. A compliance claim therefore cannot be published by a one-character edit.
+   */
+  {
+    pattern: /\bsoc\W{0,3}2\b|\bservice organi[sz]ation control\b/i,
+    reason:
+      "SOC 2 is a CPA firm's report, not a property of a codebase, and brand.soc2TypeIIReport is " +
+      "false. A Type II report additionally requires an observation window that no engineering " +
+      "work shortens. Delete this pattern in the change that flips the fact.",
+  },
+  {
+    pattern: /\biso\W{0,6}(?:iec\W{0,3})?27001\b|\b27001\b/i,
+    reason:
+      "ISO/IEC 27001 is an accredited certification body's certificate against an ISMS, and " +
+      "brand.iso27001Certificate is false. Implementing every technical control in Annex A does " +
+      "not produce one. Delete this pattern in the change that flips the fact.",
+  },
+  {
+    // The ACRONYMS STAY LEGAL deliberately: a privacy notice has to be able to name the law it
+    // operates under, and `governing-law` above does exactly that. What is banned is the
+    // ASSERTION -- "compliant", "certified", "fully" -- because that is the part nobody can
+    // substantiate and a reader relies on.
+    pattern:
+      /\b(?:gdpr|pdpa|ccpa|hipaa|soc\W{0,3}2|iso)\W{0,3}(?:compliant|compliance|certified|accredited)\b|\bcompliant\s+with\s+(?:the\s+)?(?:gdpr|pdpa)\b|\b(?:fully|100%|completely|certified)\s+(?:gdpr|pdpa)\b/i,
+    reason:
+      "A compliance assertion a reader would rely on. The GDPR claim is separately withheld " +
+      "because brand.euRepresentative is null -- the entity is Thai and no Article 27 " +
+      "representative is appointed -- and the PDPA is a law this entity is subject to rather than " +
+      "a badge it holds. Name the law; do not assert a verdict on it.",
+  },
+  {
+    pattern:
+      /\b(?:independently|third[\s-]party|externally)\W{0,3}(?:audited|certified|assessed|verified|pen(?:etration)?[\s-]?tested)\b|\bpen(?:etration)?[\s-]?test(?:ed|ing)\b/i,
+    reason:
+      "An audit or penetration test is a thing a named third party did on a stated date, and " +
+      "none has been commissioned. apps/web/app/privacy/page.tsx already states the rule this " +
+      "enforces: no certification, audit, attestation or compliance claim appears on that page, " +
+      "because the company is pre-launch and holds none of them.",
   },
 ];

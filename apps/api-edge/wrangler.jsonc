@@ -16,14 +16,21 @@
 
   // The scheduled half (docs/marketplane/28-cron-and-retention.md). Delivery every minute, because
   // a restatement detected during a nightly backfill should not wait for morning; the prune daily,
-  // at an arbitrary minute rather than on the hour.
+  // at an arbitrary minute rather than on the hour; and the ingest sweep daily, which is the one
+  // that makes the product's "every morning" mean anything.
   //
-  // BOTH STRINGS ARE DUPLICATED IN src/webhooks.ts, and that duplication is checked rather than
-  // trusted: the handler refuses a cron it does not recognise, and a test asserts the two lists
-  // agree. Wrangler cannot import a TypeScript constant and this file is the only place Cloudflare
-  // reads.
+  // THE INGEST INTERVAL IS A CLOUDFLARE CONSTRAINT, NOT A PREFERENCE. CPU per Cron Trigger is 30
+  // seconds for an interval UNDER one hour and 15 minutes for an interval of one hour or more
+  // (developers.cloudflare.com/workers/platform/limits). A sweep opens a sealed credential, pages a
+  // merchant's store and writes envelope rows; under an hour it would be killed mid-run with a
+  // lease held. See INGEST_CRON in src/scheduled.ts.
+  //
+  // ALL THREE STRINGS ARE DUPLICATED IN src/, and that duplication is checked rather than trusted,
+  // in BOTH directions: a test asserts every cron here is dispatched AND every cron dispatched
+  // appears here. Wrangler cannot import a TypeScript constant and this file is the only place
+  // Cloudflare reads.
   "triggers": {
-    "crons": ["* * * * *", "17 3 * * *"]
+    "crons": ["* * * * *", "17 3 * * *", "23 2 * * *"]
   },
 
   // Verbatim raw platform payloads (00-repo-map.md section 5). The binding exists here because

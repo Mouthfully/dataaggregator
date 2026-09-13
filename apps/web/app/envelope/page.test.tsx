@@ -43,21 +43,49 @@ const text = html
   .replace(/\s+/g, " ");
 
 describe("the page runs the connectors offline", () => {
-  it("shows a panel for every source that has a normaliser, and no others", () => {
+  it("shows a panel for every source whose normaliser emits ENVELOPE rows, and no others", () => {
     // Read off the tree rather than counted here, which is the rule `check-capabilities.mjs`
-    // applies to the marketing claim: a source is real when its directory holds a normaliser. A
-    // hard-coded five would go on saying five after a sixth connector landed, and the page would
-    // quietly under-report the product. The contract's vocabulary is the second check -- a panel
-    // whose id is not a source the envelope can carry is not a source at all.
+    // applies to the marketing claim: a hard-coded five would go on saying five after a sixth
+    // connector landed, and the page would quietly under-report the product.
+    //
+    // "HAS A NORMALISER" WAS THE WRONG PREMISE, and `air4thai` is what proved it. That connector
+    // has a `normalize.ts` and it returns `AmbientReading[]`, not `EnvelopeRow[]`: public air
+    // quality readings have no account, no entity and no attribution window, so three of the five
+    // parts of the section 7 upsert key do not exist for them. This page is THE OFFLINE ENVELOPE
+    // page -- every panel it prints is a row parsed by `envelopeRowSchema` -- so a panel for it
+    // could only be built by fabricating those three, which is exactly what
+    // `20260912000900_ambient_readings.sql` refuses to do in the store.
+    //
+    // The filter is `CONTRACT_SOURCES`, not a name list, and that is the point: `SOURCES` in
+    // @repo/contract IS the definition of "a source the envelope can carry a row from", it is kept
+    // identical to the database enum by `check-dictionary.mjs`, and it was already the second
+    // assertion in this test. A connector outside it has no business on this page, and a sixth
+    // ENVELOPE connector still lands here automatically.
     const dir = new URL("../../../../packages/connectors/src/sources/", import.meta.url);
     const implemented = readdirSync(dir)
       .filter((name) => existsSync(new URL(`${name}/normalize.ts`, dir)))
       .sort();
+    const envelopeSources = implemented.filter((name) =>
+      (CONTRACT_SOURCES as readonly string[]).includes(name),
+    );
 
-    expect(implemented.length).toBeGreaterThan(0);
-    expect([...SOURCES.map((s) => s.id)].sort()).toEqual(implemented);
+    expect(envelopeSources.length).toBeGreaterThan(0);
+    expect([...SOURCES.map((s) => s.id)].sort()).toEqual(envelopeSources);
     for (const source of SOURCES) {
       expect(CONTRACT_SOURCES, source.id).toContain(source.id);
+    }
+
+    // AND THE EXCLUSION IS DELIBERATE RATHER THAN A SIDE EFFECT. Without this, the filter above
+    // would silently swallow a real envelope connector whose id someone forgot to add to the
+    // contract -- the page would drop a panel and this test would still be green, which is the
+    // failure mode the hard-coded five had.
+    for (const name of implemented.filter((n) => !envelopeSources.includes(n))) {
+      expect(
+        name,
+        `"${name}" has a normaliser but is not in the contract's SOURCES. If it emits envelope ` +
+          "rows, that absence is the bug and this page is missing a panel; if it is ambient data, " +
+          "say so where the connector is defined.",
+      ).toBe("air4thai");
     }
   });
 
@@ -98,12 +126,15 @@ describe("the page runs the connectors offline", () => {
   it("counts the rows it rendered rather than announcing a number", () => {
     // ROW_COUNT IS DEFINED AS THIS SUM, so re-deriving it here and asserting equality restated the
     // definition and could not fail. The number that can be wrong is the one the page PRINTS, and
-    // the count the fixtures actually yield -- so both are pinned to a literal. 16 is what the
-    // five normalisers produce today (2 ga4 + 2 google_ads + 7 meta_ads + 2 search_console +
-    // 3 woocommerce); a normaliser that changes its fan-out fails here and should.
-    expect(ROW_COUNT).toBe(16);
-    expect(SOURCES.reduce((total, s) => total + s.rows.length, 0)).toBe(16);
-    expect(text).toContain("16");
+    // the count the fixtures actually yield -- so both are pinned to a literal. 20 is what the
+    // six normalisers produce today (2 ga4 + 2 google_ads + 4 loyverse + 7 meta_ads +
+    // 2 search_console + 3 woocommerce); a normaliser that changes its fan-out fails here and
+    // should. Loyverse contributes ONE ROW PER RECEIPT -- a sale, a refund, a cancellation and a
+    // late-night sale -- because a receipt is the `order` grain and a refund is a second receipt
+    // rather than a mutation of the first.
+    expect(ROW_COUNT).toBe(20);
+    expect(SOURCES.reduce((total, s) => total + s.rows.length, 0)).toBe(20);
+    expect(text).toContain("20");
   });
 
   it("carries a Meta row per attribution window plus one unattributed delivery row", () => {

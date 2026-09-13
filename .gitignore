@@ -14,3 +14,6 @@ next-env.d.ts
 # Python bytecode from running the financial model
 __pycache__/
 *.pyc
+
+# scripts/gate.sh writes one log per check here.
+.gate-logs/

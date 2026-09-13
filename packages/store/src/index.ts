@@ -39,6 +39,7 @@ export {
   createSchedulerStore,
   toDueConnection,
   type DueConnection,
+  type RecordedBackfill,
   type SchedulerStorePort,
 } from "./scheduler.js";
 export {

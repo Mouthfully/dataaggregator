@@ -79,7 +79,31 @@ export interface DueConnection {
   readonly drivable: boolean;
   /** Null means never pulled. */
   readonly lastBackfillAt: string | null;
-  readonly restatementWindowDays: number;
+  /**
+   * NULL IS A REAL ANSWER HERE, and making it one was a bug fix rather than a widening.
+   *
+   * `connections.restatement_window_days` is `integer` with no default and a check constraint that
+   * explicitly permits null -- and NOTHING IN THIS REPOSITORY WRITES IT. `scripts/seal-connection.ts`
+   * is the only path that creates a connection and it omits the column, so every real row carries
+   * null today.
+   *
+   * This field used to be `number`, and `toDueConnection` threw on anything that was not an
+   * integer. `due()` maps every row through it, so THE FIRST REAL CONNECTION WOULD HAVE ABORTED
+   * EVERY SWEEP, for every tenant, before a single lease was taken -- breaking the rule stated a
+   * few lines above on `provider`, in this same file: "a cross-tenant read must not be refusable by
+   * one tenant's data."
+   *
+   * So a null travels, the way an undrivable provider travels, and the caller decides. A non-null
+   * value that is not an integer is still refused, because that is a database returning something
+   * the column cannot hold.
+   *
+   * NOT DEFAULTED TO A NUMBER, and that is the important half. `google_ads` is `perAccount: true`
+   * with a per-conversion-action window; a hardcoded fallback would silently re-read the wrong span
+   * and every row it produced would look correct. For the one source this build can drive the
+   * question does not even arise -- `RESTATEMENT_CLOCKS.woocommerce.windowDays` is null, because
+   * restatements there are caught by a `modified_after` pull rather than by a ladder.
+   */
+  readonly restatementWindowDays: number | null;
 }
 
 export interface SchedulerStorePort {
@@ -87,8 +111,36 @@ export interface SchedulerStorePort {
   due(limit?: number): Promise<readonly DueConnection[]>;
   /** Take the lease. False means another instance holds it; that is an outcome, not an error. */
   claim(connectionId: string, claimedBy: string): Promise<boolean>;
-  /** Close the lease. Returns the instant the database recorded. */
-  recordBackfill(connectionId: string, succeeded: boolean): Promise<string>;
+  /**
+   * Close the lease this instance took.
+   *
+   * `claimedBy` MUST be the same name `claim` was given. The database compares it against
+   * `connections.claimed_by` and refuses to close a lease a different instance now holds -- a gap
+   * `20260912000800_scheduler_entry_point.sql` recorded as known and unreachable while nothing
+   * claimed. Passing a different name here is not an error the type system can catch, so the
+   * caller keeps one value and passes it to both calls.
+   *
+   * `checkpoint` is how far the walk reached, as the instant the completed window CLOSED, or null
+   * when the run made no progress. It is advanced ONLY on a successful run.
+   */
+  recordBackfill(
+    connectionId: string,
+    succeeded: boolean,
+    claimedBy: string,
+    checkpoint: string | null,
+  ): Promise<RecordedBackfill>;
+}
+
+/** What closing a lease reports. `leaseClosed: false` is an outcome, not a failure. */
+export interface RecordedBackfill {
+  /** The instant the database recorded, which the caller cannot otherwise know. */
+  readonly recordedAt: string;
+  /**
+   * False means another instance holds this lease now. The pull that just ran is not invalidated by
+   * it -- the rows are written -- but the caller must not report a closed lease, and an operator
+   * needs to know two instances were on one connection.
+   */
+  readonly leaseClosed: boolean;
 }
 
 const DRIVABLE: ReadonlySet<string> = new Set(Object.keys(PROVIDER_LANES));
@@ -151,11 +203,15 @@ export function toDueConnection(row: unknown): DueConnection {
   }
 
   const provider = requiredText(r, "provider");
-  const windowDays = r.restatement_window_days;
-  if (typeof windowDays !== "number" || !Number.isInteger(windowDays)) {
+  // Null travels; see the note on `DueConnection.restatementWindowDays`. A non-null value that is
+  // not an integer is still refused -- that is the column returning something it cannot hold, which
+  // is a defect rather than an unset field.
+  const raw = r.restatement_window_days;
+  const windowDays = raw === null || raw === undefined ? null : raw;
+  if (windowDays !== null && (typeof windowDays !== "number" || !Number.isInteger(windowDays))) {
     throw new StoreError(
-      "the work list returned a row with no integer restatement_window_days; that number decides " +
-        "how far back a pull reaches, and it is not a value to guess.",
+      "the work list returned a non-integer restatement_window_days; that number decides how far " +
+        "back a pull reaches, and it is not a value to guess.",
       "upstream",
       200,
     );
@@ -254,9 +310,27 @@ export function createSchedulerStore(config: PostgrestConfig): SchedulerStorePor
       return answer;
     },
 
-    async recordBackfill(connectionId, succeeded) {
+    async recordBackfill(connectionId, succeeded, claimedBy, checkpoint) {
       if (connectionId === "") {
         throw new StoreError("a lease needs a connection to be closed on", "invalid_row");
+      }
+      const who = claimedBy.trim();
+      if (who === "") {
+        // The same refusal `claim` makes, for a sharper reason: an empty name would make the
+        // database's ownership check a clause that matches nothing, so every close would silently
+        // report a lost lease.
+        throw new StoreError(
+          "closing a lease must name the instance that took it; without it the ownership check " +
+            "cannot be made.",
+          "invalid_row",
+        );
+      }
+      if (checkpoint !== null && Number.isNaN(Date.parse(checkpoint))) {
+        throw new StoreError(
+          `the checkpoint ${JSON.stringify(checkpoint)} is not a timestamp; refusing to advance a ` +
+            "watermark to a value the next walk would resume from.",
+          "invalid_row",
+        );
       }
 
       const answer = await callPostgrest(config, {
@@ -264,24 +338,50 @@ export function createSchedulerStore(config: PostgrestConfig): SchedulerStorePor
         method: "POST",
         token: await schedulerToken(config),
         action: "write",
-        body: { p_connection_id: connectionId, p_succeeded: succeeded },
+        body: {
+          p_connection_id: connectionId,
+          p_succeeded: succeeded,
+          p_claimed_by: who,
+          p_checkpoint: checkpoint,
+        },
       });
 
-      // The wrapper returns the instant it recorded -- the value this caller cannot otherwise know,
-      // now that the clock is the database's, and the value that decides whether the connection is
-      // due again tomorrow. A non-timestamp answer means the call did not reach the function it was
-      // aimed at, and reporting a closed lease on that basis would strand the connection for the
-      // rest of the lease window with nothing said.
-      if (typeof answer !== "string" || Number.isNaN(Date.parse(answer))) {
+      // The wrapper returns two facts and both are load-bearing: the instant it recorded, which
+      // decides whether this connection is due again tomorrow, and whether the lease was still
+      // ours. A shape that is not that object means the call did not reach the function it was
+      // aimed at, and reporting a closed lease on that basis strands the connection for the rest of
+      // the lease window with nothing said.
+      if (typeof answer !== "object" || answer === null || Array.isArray(answer)) {
         throw new StoreError(
-          `closing a lease answered with ${JSON.stringify(answer)} rather than the instant it ` +
+          `closing a lease answered with ${JSON.stringify(answer)} rather than an object; ` +
+            "refusing to report a lease closed on that.",
+          "upstream",
+          200,
+        );
+      }
+      const record = answer as Record<string, unknown>;
+      const recordedAt = record.recorded_at;
+      const leaseClosed = record.lease_closed;
+      if (typeof recordedAt !== "string" || Number.isNaN(Date.parse(recordedAt))) {
+        throw new StoreError(
+          `closing a lease answered with ${JSON.stringify(recordedAt)} rather than the instant it ` +
             "recorded; refusing to report a lease closed on that.",
           "upstream",
           200,
         );
       }
+      if (typeof leaseClosed !== "boolean") {
+        // Anything truthy-but-unknown read as a closed lease hides the one case this field exists
+        // for: two instances on one connection.
+        throw new StoreError(
+          `closing a lease answered with ${JSON.stringify(leaseClosed)} rather than a boolean for ` +
+            "whether the lease was still ours.",
+          "upstream",
+          200,
+        );
+      }
 
-      return answer;
+      return { recordedAt, leaseClosed };
     },
   };
 }

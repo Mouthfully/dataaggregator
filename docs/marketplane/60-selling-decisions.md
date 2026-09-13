@@ -233,9 +233,27 @@ Every one of these asserts a cadence:
 | `FinalCta` | "Connect tonight. Decide at breakfast." |
 | FAQ | "What does \<product\> send me each morning?" |
 
-**What backs it today:** nothing. **What would:** the scheduler identity of note 58 §2.3 — this is
-step one of everything, and until it lands every line above is a promise about a clock that does
-not tick.
+**`HERO.synced` was deleted rather than recorded, and it is the only line so far that has been.**
+"Still provisional" is true every morning — a shop's own till never finalises. "Read at 06:40" was
+not, and could not become true by building anything short of a founder decision:
+`app.due_connections` offers a connection when `last_backfill_at < date_trunc('day', now())`, which
+truncates in a **session TimeZone nothing in this repository sets** — and which is not
+`connections.timezone`, a column that exists and that this predicate does not read. There is no
+configuration of this system that produces a 06:40 local read. Being inside a sample-labelled panel
+does not license a false *mechanism*: a sample figure illustrates a number, a sample clock time
+illustrates a capability.
+
+**What backs the rest today:** the data refreshes daily, which is what "The page you open once a
+day" claims and nothing more. **What each remaining line still needs:** a channel adapter and a
+delivery record for "wake up to" and "send me"; a weekly cron and a follow-up check for "each
+Monday"; a monthly one and four reports for "on the 1st". None of those is a consequence of the
+sweep.
+
+**And one founder decision is still open, recorded in `20260913000100_ingest_watermark.sql`:**
+whose midnight the day boundary uses. Making the predicate timezone-aware means replacing
+`app.due_connections`'s body and deciding what a null `timezone` does there — and
+`20260912000400`'s own rule forbids `coalesce(timezone, 'UTC')`, calling a default "a guess wearing
+the costume of a fact".
 
 ### 6.2 The three capabilities that do not exist
 

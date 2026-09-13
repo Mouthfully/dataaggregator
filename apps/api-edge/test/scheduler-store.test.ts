@@ -190,6 +190,18 @@ describe("reading a work-list row", () => {
     expect(() => toDueConnection(dueRow({ restatement_window_days: 7.5 }))).toThrow(StoreError);
   });
 
+  it("CARRIES a null restatement window rather than refusing the row", () => {
+    // `connections.restatement_window_days` is nullable, has no default, and nothing in this
+    // repository writes it -- `scripts/seal-connection.ts` omits the column -- so every real row
+    // carries null today. Refusing here aborted the whole cross-tenant sweep on the first real
+    // connection, breaking this file's own rule about `provider`: a cross-tenant read must not be
+    // refusable by one tenant's data. The null travels and the caller decides.
+    expect(
+      toDueConnection(dueRow({ restatement_window_days: null })).restatementWindowDays,
+    ).toBeNull();
+    expect(toDueConnection(dueRow({ restatement_window_days: 7 })).restatementWindowDays).toBe(7);
+  });
+
   it("refuses something that is not a row at all", () => {
     expect(() => toDueConnection(null)).toThrow(/not a row/);
     expect(() => toDueConnection([dueRow()])).toThrow(/not a row/);
@@ -233,6 +245,37 @@ describe("the work list over the wire", () => {
     const f = fake([{ body: { rows: [] } }]);
     await expect(createSchedulerStore(config(f.impl)).due()).rejects.toThrow(/other than a list/);
   });
+
+  it("ONE TENANT'S NULL DOES NOT ABORT THE SWEEP", async () => {
+    // The whole point of the fix, asserted at the level it actually mattered: a batch, not a row.
+    // `restatement_window_days` is null on every connection this repository can create, so the
+    // previous refusal meant the first real customer stopped every other customer's backfill.
+    const f = fake([
+      {
+        body: [
+          dueRow({
+            connection_id: "11111111-1111-4111-8111-111111111111",
+            restatement_window_days: null,
+          }),
+          dueRow({
+            connection_id: "22222222-2222-4222-8222-222222222222",
+            restatement_window_days: 7,
+          }),
+        ],
+      },
+    ]);
+    const rows = await createSchedulerStore(config(f.impl)).due();
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.restatementWindowDays).toBeNull();
+    expect(rows[1]?.restatementWindowDays).toBe(7);
+  });
+
+  it("still aborts on a column it does not expect, which is the credential guard", async () => {
+    // The widening above must not have loosened the thing that stops a credential column arriving
+    // unannounced. Different failure, same batch.
+    const f = fake([{ body: [dueRow({ credential_ciphertext: "\\xdead" })] }]);
+    await expect(createSchedulerStore(config(f.impl)).due()).rejects.toThrow(/does not expect/);
+  });
 });
 
 describe("taking and closing a lease", () => {
@@ -269,23 +312,72 @@ describe("taking and closing a lease", () => {
     expect(f.calls).toHaveLength(0);
   });
 
-  it("returns the instant the database recorded when closing", async () => {
-    const f = fake([{ body: "2026-09-12T09:00:00+00:00" }]);
-    const at = await createSchedulerStore(config(f.impl)).recordBackfill(CONNECTION, true);
-    expect(at).toBe("2026-09-12T09:00:00+00:00");
+  it("returns the instant the database recorded, and sends the lease holder and the checkpoint", async () => {
+    const f = fake([{ body: { recorded_at: "2026-09-12T09:00:00+00:00", lease_closed: true } }]);
+    const result = await createSchedulerStore(config(f.impl)).recordBackfill(
+      CONNECTION,
+      true,
+      "worker-a",
+      "2026-09-12T08:59:00+00:00",
+    );
+    expect(result).toEqual({ recordedAt: "2026-09-12T09:00:00+00:00", leaseClosed: true });
     expect(JSON.parse((f.calls[0] as Call).body as string)).toEqual({
       p_connection_id: CONNECTION,
       p_succeeded: true,
+      p_claimed_by: "worker-a",
+      p_checkpoint: "2026-09-12T08:59:00+00:00",
     });
   });
 
-  it("REFUSES to report a lease closed on a non-timestamp answer", async () => {
+  it("reports a lease another instance now holds as an OUTCOME, not an error", async () => {
+    // The pull that just ran is not invalidated -- its rows are written. What the caller must not
+    // do is report a closed lease, and what an operator needs to know is that two instances were on
+    // one connection.
+    const f = fake([{ body: { recorded_at: "2026-09-12T09:00:00+00:00", lease_closed: false } }]);
+    const result = await createSchedulerStore(config(f.impl)).recordBackfill(
+      CONNECTION,
+      true,
+      "worker-b",
+      null,
+    );
+    expect(result.leaseClosed).toBe(false);
+  });
+
+  it("REFUSES to report a lease closed on an answer that is not the expected shape", async () => {
     // The wrapper returns the instant because the adapter took the clock away from the caller. An
     // answer that is not one means the call did not reach the function it was aimed at, and
     // reporting success would strand the connection for the rest of the lease window in silence.
-    const f = fake([{ raw: "null" }]);
+    const store = (body: unknown) => createSchedulerStore(config(fake([{ body }]).impl));
+    await expect(store(null).recordBackfill(CONNECTION, false, "worker-a", null)).rejects.toThrow(
+      /rather than an object/,
+    );
     await expect(
-      createSchedulerStore(config(f.impl)).recordBackfill(CONNECTION, false),
+      store({ lease_closed: true }).recordBackfill(CONNECTION, false, "worker-a", null),
     ).rejects.toThrow(/rather than the instant it recorded/);
+    await expect(
+      store({ recorded_at: "2026-09-12T09:00:00+00:00", lease_closed: "yes" }).recordBackfill(
+        CONNECTION,
+        false,
+        "worker-a",
+        null,
+      ),
+    ).rejects.toThrow(/rather than a boolean/);
+  });
+
+  it("refuses an anonymous close, because the ownership check could not then be made", async () => {
+    const f = fake([]);
+    await expect(
+      createSchedulerStore(config(f.impl)).recordBackfill(CONNECTION, true, "   ", null),
+    ).rejects.toThrow(/must name the instance that took it/);
+    // Refused before the network, so a bad close costs no request.
+    expect(f.calls).toHaveLength(0);
+  });
+
+  it("refuses a checkpoint that is not a timestamp", async () => {
+    const f = fake([]);
+    await expect(
+      createSchedulerStore(config(f.impl)).recordBackfill(CONNECTION, true, "worker-a", "soon"),
+    ).rejects.toThrow(/not a timestamp/);
+    expect(f.calls).toHaveLength(0);
   });
 });

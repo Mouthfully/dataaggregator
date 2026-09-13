@@ -138,9 +138,16 @@ select app_test.check('public.claim_connection takes no clock from the caller',
   to_regprocedure('public.claim_connection(uuid, text, timestamptz)') is null,
   'a caller-supplied future clock makes every live lease look abandoned');
 
-select app_test.check('public.record_backfill takes no clock from the caller',
-  to_regprocedure('public.record_backfill(uuid, boolean, timestamptz)') is null,
-  'a caller-supplied future clock stamps last_backfill_at ahead and suppresses tomorrow''s pull');
+select app_test.check('public.record_backfill takes no clock from the caller, at any arity',
+  to_regprocedure('public.record_backfill(uuid, boolean, timestamptz)') is null
+    and to_regprocedure('public.record_backfill(uuid, boolean, text, timestamptz, timestamptz)') is null,
+  'a caller-supplied future clock stamps last_backfill_at ahead and suppresses tomorrow''s pull, '
+  'and it would also defeat the p_checkpoint > p_now refusal by moving both');
+
+select app_test.check('the two-argument record_backfill is gone, not merely unused',
+  to_regprocedure('public.record_backfill(uuid, boolean)') is null,
+  'it had no ownership check and no checkpoint, so leaving it callable left both properties '
+  'optional');
 
 -- ---------------------------------------------------------------------------------------------
 -- SCHEDULING METADATA ONLY, asserted as an exact set.
@@ -189,7 +196,7 @@ begin;
   select app_test.check_refused('anon cannot take a lease',
     'select public.claim_connection(''a7400000-0000-4000-8000-000000000001''::uuid, ''forged'')', 'anon');
   select app_test.check_refused('anon cannot close a lease',
-    'select public.record_backfill(''a7400000-0000-4000-8000-000000000001''::uuid, true)', 'anon');
+    'select public.record_backfill(''a7400000-0000-4000-8000-000000000001''::uuid, true, ''forged'', null)', 'anon');
 commit;
 
 begin;
@@ -202,7 +209,7 @@ begin;
   select app_test.check_refused('a tenant cannot take a lease on anything',
     'select public.claim_connection(''a7400000-0000-4000-8000-000000000001''::uuid, ''forged'')', 'authenticated');
   select app_test.check_refused('a tenant cannot close a lease',
-    'select public.record_backfill(''a7400000-0000-4000-8000-000000000001''::uuid, true)', 'authenticated');
+    'select public.record_backfill(''a7400000-0000-4000-8000-000000000001''::uuid, true, ''forged'', null)', 'authenticated');
 commit;
 
 -- ---------------------------------------------------------------------------------------------
@@ -234,7 +241,7 @@ begin;
     'select public.claim_connection(''a7400000-0000-4000-8000-000000000001''::uuid, ''   '')',
     'app_scheduler');
   select app_test.check_rejected('an unknown outcome is refused rather than recorded as failure',
-    'select public.record_backfill(''a7400000-0000-4000-8000-000000000001''::uuid, null::boolean)',
+    'select public.record_backfill(''a7400000-0000-4000-8000-000000000001''::uuid, null::boolean, ''worker-a'', null)',
     'app_scheduler');
 commit;
 
@@ -270,21 +277,55 @@ begin;
   -- The return value is the instant recorded, which the caller cannot otherwise know now that the
   -- clock is the database's. It is also what makes this reachable over PostgREST at all: a
   -- `returns void` RPC answers 204 with an empty body, which the store adapter reads as a fault.
+  -- A LEASE ANOTHER INSTANCE HOLDS CANNOT BE CLOSED, and the answer is an outcome rather than an
+  -- error: the caller needs to learn it lost the race and must not report a failed pull.
+  select app_test.check('a lease cannot be closed by an instance that does not hold it',
+    (select not (public.record_backfill('a7400000-0000-4000-8000-000000000001'::uuid, true,
+       'worker-b', null) ->> 'lease_closed')::boolean),
+    'worker-a holds this lease; 20260912000800 recorded the missing ownership check as a known gap');
+
+  -- THE PROPERTY IS THAT THE LEASE SURVIVED, and it is asserted by behaviour rather than by a
+  -- proxy. A first draft checked that the connection was still offered by `due_connections`, which
+  -- FAILED for a reason that is the design working: a leased connection is not due, so a held lease
+  -- and a closed one look identical through that window. `app_scheduler` holds no grant on
+  -- `public.connections`, so the honest check is the one that matters operationally -- worker-b
+  -- still cannot take a lease worker-a holds.
+  select app_test.check('the losing close did not release worker-a''s lease',
+    (select not public.claim_connection('a7400000-0000-4000-8000-000000000001'::uuid, 'worker-b')),
+    'if the failed close had cleared claimed_at, the next instance would take the lease and two '
+    'runs would pull the same connection');
+
+  -- The return value carries the instant recorded, which the caller cannot otherwise know now that
+  -- the clock is the database's. It is jsonb rather than a bare timestamp because the caller needs
+  -- two facts, and it is not `void` for the reason it never was: PostgREST answers a void RPC with
+  -- 204 and an empty body, which the store adapter reads as a fault.
   select app_test.check('closing a lease reports the instant it recorded',
-    (select public.record_backfill('a7400000-0000-4000-8000-000000000001'::uuid, true)
+    (select ((public.record_backfill('a7400000-0000-4000-8000-000000000001'::uuid, true,
+       'worker-a', now() - interval '2 minutes') ->> 'recorded_at')::timestamptz)
        between now() - interval '1 minute' and now() + interval '1 minute'));
 
   select app_test.check('a successful run stops the connection being due today',
     (select count(*) = 0 from public.due_connections(500)
       where connection_id = 'a7400000-0000-4000-8000-000000000001'));
 
+  select app_test.check_rejected('a checkpoint in the future is refused through the forwarder',
+    'select public.record_backfill(''a7400000-0000-4000-8000-000000000001''::uuid, true, '
+    '''worker-a'', ''2030-01-01T00:00:00Z''::timestamptz)', 'app_scheduler');
+
   select public.claim_connection('a7400000-0000-4000-8000-000000000002'::uuid, 'worker-c');
-  select public.record_backfill('a7400000-0000-4000-8000-000000000002'::uuid, false);
+  select public.record_backfill('a7400000-0000-4000-8000-000000000002'::uuid, false, 'worker-c', null);
 
   select app_test.check('a failed run is offered again rather than skipped for the day',
     (select count(*) = 1 from public.due_connections(500)
       where connection_id = 'a7400000-0000-4000-8000-000000000002'),
     'record_backfill(false) releases the claim WITHOUT advancing last_backfill_at');
+commit;
+
+-- Read outside the scheduler's transaction: it holds no grant on `public.connections`.
+begin;
+  select app_test.check('a successful run advances the watermark through the forwarder',
+    (select ingest_checkpoint is not null
+       from public.connections where id = 'a7400000-0000-4000-8000-000000000001'));
 commit;
 
 -- ---------------------------------------------------------------------------------------------

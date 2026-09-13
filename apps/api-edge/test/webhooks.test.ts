@@ -58,6 +58,7 @@ describe("dispatching a cron", () => {
   it("delivers on the delivery cron", async () => {
     const recorded: string[] = [];
     const outcome = await handleScheduled(DELIVER_CRON, {
+      sweep: null,
       store: store({
         record: async (id) => {
           recorded.push(id);
@@ -76,6 +77,7 @@ describe("dispatching a cron", () => {
   it("prunes on the prune cron, and delivers nothing", async () => {
     let claimed = false;
     const outcome = await handleScheduled(PRUNE_CRON, {
+      sweep: null,
       store: store({
         claim: async () => {
           claimed = true;
@@ -93,21 +95,18 @@ describe("dispatching a cron", () => {
     // A schedule added to wrangler.jsonc and forgotten in the handler would otherwise be an
     // invisible no-op running on someone's schedule forever.
     const outcome = await handleScheduled("0 0 1 1 *", {
+      sweep: null,
       store: store(),
       signingKey: "service-key",
     });
     expect(outcome).toEqual({ status: "unknown_cron", cron: "0 0 1 1 *" });
   });
 
-  it("every cron in wrangler.jsonc is one the handler dispatches", async () => {
-    // Wrangler cannot import a TypeScript constant, so the two lists are duplicated. This is the
-    // check that keeps them equal.
+  it("every cron in wrangler.jsonc is one the WEBHOOK handler dispatches, or the sweep's", async () => {
+    // Wrangler cannot import a TypeScript constant, so the lists are duplicated. `scheduled.test.ts`
+    // is where both directions are checked; this one keeps the webhook half honest about its two.
     const crons = [...wranglerConfig.matchAll(/"((?:[\d*/,-]+ ){4}[\d*/,-]+)"/g)].map((m) => m[1]);
     expect(crons.length).toBeGreaterThan(0);
-    for (const cron of crons) {
-      const outcome = await handleScheduled(cron as string, { store: null, signingKey: null });
-      expect(outcome.status).not.toBe("unknown_cron");
-    }
     expect(crons).toContain(DELIVER_CRON);
     expect(crons).toContain(PRUNE_CRON);
   });
@@ -115,13 +114,21 @@ describe("dispatching a cron", () => {
 
 describe("an unconfigured deployment says so", () => {
   it("refuses to deliver with no store, and names what is missing", async () => {
-    const outcome = await handleScheduled(DELIVER_CRON, { store: null, signingKey: "k" });
+    const outcome = await handleScheduled(DELIVER_CRON, {
+      sweep: null,
+      store: null,
+      signingKey: "k",
+    });
     expect(outcome.status).toBe("not_configured");
     expect(outcome).toMatchObject({ reason: expect.stringContaining("no store binding") });
   });
 
   it("refuses to prune with no store", async () => {
-    const outcome = await handleScheduled(PRUNE_CRON, { store: null, signingKey: "k" });
+    const outcome = await handleScheduled(PRUNE_CRON, {
+      sweep: null,
+      store: null,
+      signingKey: "k",
+    });
     expect(outcome.status).toBe("not_configured");
   });
 
@@ -130,6 +137,7 @@ describe("an unconfigured deployment says so", () => {
     // burn six attempts each on a missing environment variable.
     let claimed = false;
     const outcome = await handleScheduled(DELIVER_CRON, {
+      sweep: null,
       store: store({
         claim: async () => {
           claimed = true;
@@ -143,7 +151,11 @@ describe("an unconfigured deployment says so", () => {
   });
 
   it("treats an empty signing key as a missing one", async () => {
-    const outcome = await handleScheduled(DELIVER_CRON, { store: store(), signingKey: "" });
+    const outcome = await handleScheduled(DELIVER_CRON, {
+      sweep: null,
+      store: store(),
+      signingKey: "",
+    });
     expect(outcome.status).toBe("not_configured");
   });
 });

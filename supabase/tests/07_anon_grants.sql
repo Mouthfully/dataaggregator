@@ -303,7 +303,7 @@ begin
     select unnest(array[
       'public.due_connections(integer)',
       'public.claim_connection(uuid, text)',
-      'public.record_backfill(uuid, boolean)'
+      'public.record_backfill(uuid, boolean, text, timestamptz)'
     ]) as sig
   loop
     perform app_test.check(

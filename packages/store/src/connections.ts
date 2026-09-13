@@ -70,6 +70,19 @@ import { mintToken } from "./jwt.js";
 export interface ConnectionRecord extends ConnectionRow {
   /** Null means NOBODY HAS TOLD US, never UTC. See `20260912000400_connection_timezone.sql`. */
   readonly timezone: string | null;
+  /**
+   * How far the incremental walk has reached, as the instant the last completed window CLOSED.
+   * Null means NEVER WALKED, and the scheduled sweep refuses such a connection rather than
+   * inventing a first window -- `52-ingest-runtime.md` section 4 on why a default here is the worst
+   * kind of default.
+   *
+   * IT IS READ HERE AND NOT FROM THE WORK LIST, deliberately. `public.due_connections` returns
+   * exactly six columns and `supabase/tests/13_scheduler_entry_point.sql` asserts that set exactly,
+   * because the scheduler is granted enumeration and not access. The checkpoint is per-connection
+   * tenant data and belongs on the path that reads a connection as `authenticated`, for one
+   * workspace, under row-level security -- the same path that fetches the credential.
+   */
+  readonly ingestCheckpoint: string | null;
 }
 
 /**
@@ -108,6 +121,7 @@ export const CONNECTION_COLUMNS: readonly string[] = [
   "last_error",
   "revoked_at",
   "timezone",
+  "ingest_checkpoint",
 ];
 
 export interface ConnectionQuery {
@@ -241,6 +255,7 @@ export function toConnectionRecord(row: unknown): ConnectionRecord {
     lastError: nullableText(r.last_error),
     revokedAt: nullableText(r.revoked_at),
     timezone: nullableText(r.timezone),
+    ingestCheckpoint: nullableText(r.ingest_checkpoint),
   };
 }
 

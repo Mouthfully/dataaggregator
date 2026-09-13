@@ -59,7 +59,20 @@ const HERO = {
   sample: "Sample",
   chart: "Revenue by hour",
   period: "Yesterday",
-  synced: "Read at 06:40. Still provisional.",
+  // WHAT THIS USED TO SAY, AND WHY IT COULD NOT STAY: "Read at 06:40. Still provisional."
+  //
+  // The second sentence is backed -- `RESTATEMENT_CLOCKS.woocommerce.windowDays` is null, so a
+  // shop's own till never finalises and the marker never comes off. The first was not, and it was
+  // the wrong-number-that-looks-right in its purest form: `app.due_connections` offers a connection
+  // when `last_backfill_at < date_trunc('day', now())`, which truncates in a session TimeZone
+  // NOTHING IN THIS REPOSITORY SETS -- and which is not `connections.timezone`, a column that
+  // exists and that this predicate does not read. There is no configuration of this system that
+  // produces a 06:40 local read, and 06:40 is a DELIVERY time besides, with nothing delivering.
+  //
+  // Being inside a panel the page labels as a sample does not license a false MECHANISM: a sample
+  // figure is an illustration of a number, and a sample clock time is an illustration of a
+  // capability. The provisional half stays, because it is true every morning.
+  synced: "Still provisional, as a shop\u2019s own till always is.",
 } as const;
 
 const HERO_NAV = ["Today", "Do", "Ask", "Reports", "Sources", "Settings"] as const;

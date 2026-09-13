@@ -109,6 +109,7 @@ async function connection(
     lastError: null,
     revokedAt: null,
     timezone: "Asia/Bangkok",
+    ingestCheckpoint: null,
     ...overrides,
   };
 }

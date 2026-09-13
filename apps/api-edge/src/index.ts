@@ -23,6 +23,7 @@ import {
   createApiKeyAuthenticator,
   createConnectionStore,
   createIngestStore,
+  createSchedulerStore,
   createPerformanceStore,
 } from "@repo/store";
 import type { CryptoLike as VaultCrypto } from "@repo/vault";
@@ -34,7 +35,8 @@ import {
   runIngest,
 } from "./ingest.js";
 import { handlePerformance } from "./performance.js";
-import { type ScheduledOutcome, handleScheduled } from "./webhooks.js";
+import { type ScheduledOutcome, handleScheduled } from "./scheduled.js";
+import type { SweepDeps } from "./scheduled-ingest.js";
 
 /**
  * The bindings are declared once, in `env.d.ts`, as `Cloudflare.Env` -- the extension point both
@@ -339,24 +341,68 @@ function log(report: IngestReport, requestId: string, failure: string | null): v
   );
 }
 
+/**
+ * The sweep's ports, or null when this deployment cannot reach the database as `app_scheduler`.
+ *
+ * GATHERED THE SAME WAY `/v1/ingest/run` GATHERS ITS BINDINGS, and null for the same reason the
+ * route answers 503: a deployment that cannot reach its database must not be indistinguishable
+ * from a platform with no work to do. `handleScheduled` turns the null into a `not_configured`
+ * naming what is absent.
+ *
+ * THE INSTANCE NAME IS A FRESH UUID PER INVOCATION, and that is not cosmetic. Since
+ * `20260913000100_ingest_watermark.sql` the database compares it against `connections.claimed_by`
+ * before letting this instance close a lease, so a constant like "api-edge" would make every
+ * instance look like the same one and turn the ownership check into a clause that always matches --
+ * a guard that passes its test and protects nothing. It is also the only thing an operator has to
+ * go on when a connection is found stuck.
+ */
+function sweepDeps(env: Env): SweepDeps | null {
+  const config = supabaseConfig(env);
+  if ("missing" in config) return null;
+  if (!env.CREDENTIAL_KEK) return null;
+
+  return {
+    scheduler: createSchedulerStore(config),
+    ingest: {
+      connections: createConnectionStore(config),
+      ingest: createIngestStore(config),
+      kek: env.CREDENTIAL_KEK,
+      fetchImpl: fetch,
+      crypto: crypto as unknown as VaultCrypto,
+    },
+    instanceName: crypto.randomUUID(),
+  };
+}
+
 export default {
   /**
-   * The scheduled half. Two crons, declared in `wrangler.jsonc` and dispatched by name in
-   * `src/webhooks.ts` -- which reports a cron it does not recognise rather than doing nothing,
-   * because a schedule added there and forgotten here would run every minute forever, invisibly.
+   * The scheduled half. THREE crons now, declared in `wrangler.jsonc` and dispatched by name in
+   * `src/scheduled.ts` -- which reports a cron it does not recognise rather than doing nothing,
+   * because a schedule added there and forgotten here would run on its interval forever, invisibly.
    *
-   * THE STORE IS STILL NULL, AND NO LONGER FOR THE SAME REASON AS `/v1/performance`. The read path
-   * is bound (see the module note); this one cannot use it. The drain's whole vocabulary is
-   * `app.due_restatement_events`, `app.record_delivery` and `app.prune_restatement_events`, which
-   * live in the schema `supabase/config.toml` deliberately does not expose to PostgREST, and
-   * `app_webhook` is `NOLOGIN` -- so it needs a direct connection through Hyperdrive, a different
-   * identity with its own cost line. The outcome is logged either way, and logging it is what makes
-   * an unconfigured deployment visible instead of quiet.
+   * TWO OF THE THREE ARE STILL UNCONFIGURED, AND FOR DIFFERENT REASONS. Being precise about which
+   * is which matters, because "two of three crons say not_configured" reads as a scheduler that did
+   * not land:
+   *
+   *   THE INGEST SWEEP IS BOUND HERE. `app_scheduler` reaches `public.due_connections`,
+   *   `claim_connection` and `record_backfill` over PostgREST, exactly as the ingest route reaches
+   *   `ingest_envelope_rows`. It is configured whenever the four bindings below are set.
+   *
+   *   THE DELIVER AND PRUNE CRONS ARE NOT, and cannot be from here. The drain's whole vocabulary is
+   *   `app.due_restatement_events`, `app.record_delivery` and `app.prune_restatement_events`, which
+   *   live in the schema `supabase/config.toml` deliberately does not expose to PostgREST, and
+   *   `app_webhook` is `NOLOGIN` with no `public.` forwarder migration. That needs a direct
+   *   connection through Hyperdrive -- a different identity with its own cost line, and a separate
+   *   piece of work. `store: null` below is that, and it is not the scheduler's.
+   *
+   * The outcome is logged either way, and logging it is what makes an unconfigured deployment
+   * visible instead of quiet.
    */
   async scheduled(controller, env, ctx) {
     const run = handleScheduled(controller.cron, {
       store: null,
       signingKey: env.WEBHOOK_SIGNING_KEY ?? null,
+      sweep: sweepDeps(env),
     }).then((outcome: ScheduledOutcome) => {
       // Counts and reasons only. A payload or a secret must never reach a log line, and the shape
       // of `ScheduledOutcome` is what guarantees neither can.

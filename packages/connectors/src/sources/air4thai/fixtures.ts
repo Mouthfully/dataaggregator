@@ -7,13 +7,14 @@
  *
  * Specification section 13.3 rule 6 requires "every fixture is a recorded real response with PII
  * scrubbed". These are not, for a different reason than `ga4/fixtures.ts`: GA4 is missing a
- * credential, while Air4Thai needs none and was simply not reachable. Both
- * `air4thai.pcd.go.th` and `air4thai.com` resolved and returned
+ * credential, while Air4Thai needs none and the response was simply never read here.
  *
- *     503  upstream connect error or disconnect/reset before headers.
- *          retried and the latest reset reason: remote connection failure
+ * AND NOT BECAUSE THE HOST WAS DOWN, which is what this comment used to say. `air4thai.pcd.go.th`
+ * answers -- plain http returns a 301 from a live server. The https request fails at
+ * `unable to get local issuer certificate`: a certificate CHAIN problem, not a connection one, and
+ * a different thing to go and fix. Whether the incomplete chain belongs to the platform or to this
+ * sandbox's egress could not be separated from inside it. `client.ts` carries the detail.
  *
- * from the egress gateway, on every path tried, over http and https, direct and through the proxy.
  * So the field names and nesting below come from the DOCUMENTED shape of `getNewAQI_JSON.php` --
  * the endpoint's published form and the fields its long-standing third-party consumers read -- and
  * not from a response anybody here observed.

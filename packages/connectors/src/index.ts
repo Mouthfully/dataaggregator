@@ -53,6 +53,7 @@ export {
   stationsUrl,
 } from "./sources/air4thai/client.ts";
 export {
+  AIR4THAI_MAX_STATION_ID,
   AIR4THAI_MISSING,
   AIR4THAI_NON_MEASUREMENT_KEYS,
   AIR4THAI_PARAMETERS,

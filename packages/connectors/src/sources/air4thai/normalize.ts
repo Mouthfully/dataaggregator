@@ -13,10 +13,15 @@
  *   measurement has no account, no entity and no attribution window, and its grain is an HOUR, not
  *   a calendar date. Landing it there means fabricating three of the five key parts.
  *
- *   THE ATTRIBUTION REFUSAL -- "the API refuses to emit an unlabelled conversion count",
- *   specification section 2, the product's headline guarantee -- would have to be satisfied with a
- *   placeholder window on a number nobody attributed to anything. Do that once and the label is
- *   decorative forever after.
+ *   NOT the attribution refusal, and an earlier version of this comment claimed otherwise. It said
+ *   the refusal "would have to be satisfied with a placeholder window on a number nobody attributed
+ *   to anything". Checked: `packages/contract/src/envelope.ts` declares
+ *   `attribution_window: z.enum(ATTRIBUTION_WINDOWS).nullable()` and its `superRefine` fires ONLY
+ *   when a conversion metric is present -- "a row with no conversion metric may leave it null". An
+ *   ambient reading carries no conversion metric, so it would pass with a null window and no
+ *   placeholder would be needed. The argument against the envelope is the OTHER three key parts,
+ *   which is enough on its own; this fourth reason was invented and is removed rather than
+ *   softened.
  *
  *   THE DICTIONARY. `SOURCES` in `packages/contract/src/source.ts` is what
  *   `scripts/check-dictionary.mjs` keeps identical on both sides of the wire, and a member of it
@@ -182,6 +187,13 @@ export const AIR4THAI_NON_MEASUREMENT_KEYS = ["date", "time"] as const;
 export const AIR4THAI_UTC_OFFSET = "+07:00";
 
 /** The IANA name, carried so a reader can see which zone the offset above claims to be. */
+/**
+ * The ceiling `ambient_readings.station_id` declares, mirrored here so the refusal happens at
+ * normalisation rather than at INSERT. Both halves of that column's check constraint are now
+ * enforced in this file; only the empty half used to be.
+ */
+export const AIR4THAI_MAX_STATION_ID = 64;
+
 export const AIR4THAI_TIMEZONE = "Asia/Bangkok";
 
 /** ASSUMPTION: the sentinel a station uses when it has nothing to report. Trap 2. */
@@ -357,6 +369,21 @@ export function normalizeAir4Thai(options: Air4ThaiNormalizeOptions): AmbientRea
         "air4thai: a station carries no stationID. It is the only identifier the readings table " +
           "keys on, so a row without one could never be updated by a re-fetch or joined to a " +
           "subscription.",
+        "missing_station_id",
+      );
+    }
+    // AND THE COLUMN'S OWN CEILING, WHICH THIS DID NOT CHECK. `ambient_readings.station_id` is
+    // `check (length(station_id) between 1 and 64)`. The empty half was enforced above and the
+    // long half was not, so an over-long publisher id normalised cleanly and failed hours later on
+    // INSERT -- with the whole batch refused, at write time, far from the station that caused it.
+    // That is exactly the failure the unknown-parameter refusal exists to prevent, and the
+    // contract test that claimed to cover it asserted `length <= 64` over hand-written fixtures
+    // whose ids are three characters: a property of the fixtures, not of the normaliser.
+    if (stationId.length > AIR4THAI_MAX_STATION_ID) {
+      throw new Air4ThaiNormalizeError(
+        `air4thai: station id ${JSON.stringify(stationId)} is ${stationId.length} characters; ` +
+          `ambient_readings.station_id allows ${AIR4THAI_MAX_STATION_ID}. Refused here rather ` +
+          "than at INSERT, where it would take the whole batch down with it.",
         "missing_station_id",
       );
     }

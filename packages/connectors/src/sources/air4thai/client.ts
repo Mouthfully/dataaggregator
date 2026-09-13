@@ -36,9 +36,25 @@
  * ============================================================================================
  *
  * Stated at the top rather than buried in the fixtures, because everything below depends on it.
- * The endpoint was NOT reachable from the environment this was written in: `air4thai.pcd.go.th`
- * and `air4thai.com` both resolved and both returned `503 upstream connect error ... remote
- * connection failure` from the egress gateway, for every path tried, over both http and https.
+ * The endpoint was not READ from the environment this was written in -- but the earlier version of
+ * this comment said it "never answered", and that was wrong in a way that would have sent the next
+ * person to the wrong place entirely.
+ *
+ * WHAT ACTUALLY HAPPENS, re-checked rather than remembered:
+ *
+ *   http://air4thai.pcd.go.th/services/getNewAQI_JSON.php   ->  301, a real redirect from a live host
+ *   https://  same path                                     ->  curl (60) SSL certificate problem:
+ *                                                               unable to get local issuer certificate
+ *
+ * The host is up and serving. What fails is CHAIN VERIFICATION, and that is a different fix from an
+ * unreachable host: an incomplete chain is repaired by supplying the missing intermediate, not by
+ * hunting for a working hostname. "It never answered" would have had somebody looking for a dead
+ * endpoint that is not dead.
+ *
+ * WHAT COULD NOT BE SEPARATED HERE, and is therefore not asserted: whether the incomplete chain is
+ * the platform's or this sandbox's egress path. Passing the local CA bundle explicitly did not fix
+ * it, which points at the server, but a proxied environment cannot settle that on its own. Check
+ * from an ordinary network before treating either answer as established.
  *
  * So the URL and every field name here come from the DOCUMENTED shape -- the service's published
  * endpoint and the field names its long-standing third-party consumers read -- and not from a
@@ -76,8 +92,10 @@ import type { Air4ThaiResponse } from "./normalize.ts";
  * `GET {base}/getNewAQI_JSON.php`.
  *
  * ASSUMPTION: the host, the path and the https scheme. Overridable so tests never resolve a real
- * host, which is also the only way this module is testable at all given the service was
- * unreachable.
+ * host, which is also the only way this module is testable at all given the response was never
+ * read here. Note the scheme: the host redirects http -> https and the https chain does not verify
+ * from this environment, so the FIRST real call will fail on the certificate rather than on the
+ * URL. See the header.
  */
 export const AIR4THAI_API_BASE = "https://air4thai.pcd.go.th/services";
 

@@ -316,8 +316,22 @@ create policy ambient_subscriptions_delete on public.ambient_subscriptions
 -- posture is grant-revocation AND row-level security, and a table with one layer where every other
 -- has two is one `create policy ... for insert` away from mattering.
 --
--- So both tables are stripped to nothing and then given back exactly what they need. That is also
--- why the readings grant reads `select` alone rather than trusting the absence of a write policy.
+-- So both tables are stripped OF EVERY TENANT GRANT and then given back exactly what they need.
+-- That is also why the readings grant reads `select` alone rather than trusting the absence of a
+-- write policy.
+--
+-- NOT "STRIPPED TO NOTHING", WHICH IS WHAT THIS SAID AND IS NOT TRUE. The revoke below names
+-- `public, anon, authenticated` and stops there. `service_role` keeps everything -- the live ACL is
+-- {postgres=arwdDxt, service_role=arwdDxt, authenticated=r} -- two paragraphs after this comment
+-- quotes Supabase's default as granting to "anon, authenticated, service_role". service_role also
+-- carries rolbypassrls, so the neighbouring sentence that the write path "is the SECURITY DEFINER
+-- function below, which only app_ingest may execute" is true of the TENANT roles and not of
+-- service_role, which can write these rows directly.
+--
+-- Left as it is, because service_role is the platform's own escape hatch and every other table in
+-- this schema has the same shape -- but said plainly, because the value of this comment is that
+-- somebody reasons from it, and reasoning from "stripped to nothing" gets the wrong answer about
+-- what a leaked service key can do.
 revoke all on public.ambient_readings from public, anon, authenticated;
 grant select on public.ambient_readings to authenticated;
 

@@ -385,9 +385,17 @@ select app_test.check('app_ingest may execute the ambient upsert',
     'app.upsert_ambient_reading(app.ambient_source, text, timestamptz, app.ambient_parameter, numeric, text, timestamptz)',
     'EXECUTE'));
 
--- `anon` and `authenticated` hold no USAGE on schema `app`, so has_function_privilege answers yes
--- for them via PUBLIC's built-in grant and means nothing. The revoke is asserted off the ACL
--- instead, which is where the fix actually lives.
+-- `has_function_privilege` is the wrong instrument here, and the reason this comment used to give
+-- was FALSE IN A WAY THAT UNDERSTATED THE RISK. It said `anon` and `authenticated` "hold no USAGE
+-- on schema `app`". They do not both: `20260908000100_extensions.sql` is
+-- `grant usage on schema app to authenticated, service_role`, and the live cluster agrees --
+-- `has_schema_privilege('authenticated','app','USAGE')` is true.
+--
+-- Which makes the assertion below MORE necessary than the old comment realised, not less.
+-- `authenticated` genuinely reaches schema `app`, so the only thing standing between a tenant and
+-- `app.upsert_ambient_reading` is the function's own ACL -- exactly the thing asserted here, read
+-- directly off `pg_proc.proacl` rather than inferred from a privilege helper that answers yes for
+-- everyone through PUBLIC's built-in grant on a new function.
 do $$
 declare v_acl text;
 begin

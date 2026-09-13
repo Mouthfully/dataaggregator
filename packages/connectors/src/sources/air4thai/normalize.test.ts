@@ -14,6 +14,7 @@ import {
   UNPARSEABLE_VALUE,
 } from "./fixtures.ts";
 import {
+  AIR4THAI_MAX_STATION_ID,
   AIR4THAI_MISSING,
   Air4ThaiNormalizeError,
   type Air4ThaiResponse,
@@ -218,15 +219,60 @@ describe("the refusals", () => {
     expect(() => normalize(HOUR_24)).toThrow(/ambiguous/);
   });
 
-  it("refuses the unknown parameter BEFORE emitting the known ones from that station", () => {
-    // A per-parameter loop that threw mid-way would leave the caller with a half-station, which
-    // upserts cleanly and is missing rows nobody counts.
-    let emitted: unknown[] = [];
-    try {
-      emitted = normalize(UNKNOWN_PARAMETER);
-    } catch {
-      // expected
-    }
-    expect(emitted).toEqual([]);
+  it("refuses a station id longer than the column allows, rather than failing at INSERT", () => {
+    // `ambient_readings.station_id` is `check (length(station_id) between 1 and 64)`. The empty
+    // half was refused here and the long half was not, so an over-long publisher id normalised
+    // cleanly and took the whole batch down at write time, far from the station that caused it.
+    //
+    // The contract test that appeared to cover this asserted `length <= 64` over hand-written
+    // fixtures whose ids are three characters long -- a property of the fixtures, not of the code.
+    const long = {
+      stations: [
+        {
+          ...(ONE_STATION.stations?.[0] as NonNullable<Air4ThaiResponse["stations"]>[number]),
+          stationID: "x".repeat(AIR4THAI_MAX_STATION_ID + 1),
+        },
+      ],
+    } as Air4ThaiResponse;
+    expect(() => normalize(long)).toThrow(/65 characters/);
+
+    // Exactly at the ceiling is fine -- the constraint is inclusive, and an off-by-one here would
+    // silently drop a legitimate station.
+    const exact = {
+      stations: [
+        {
+          ...(ONE_STATION.stations?.[0] as NonNullable<Air4ThaiResponse["stations"]>[number]),
+          stationID: "y".repeat(AIR4THAI_MAX_STATION_ID),
+        },
+      ],
+    } as Air4ThaiResponse;
+    expect(normalize(exact).length).toBeGreaterThan(0);
+  });
+
+  it("refuses the WHOLE DOCUMENT, not just the station carrying the unknown parameter", () => {
+    // THE PREVIOUS VERSION OF THIS TEST COULD NOT FAIL. It read:
+    //
+    //     let emitted = [];
+    //     try { emitted = normalize(UNKNOWN_PARAMETER); } catch {}
+    //     expect(emitted).toEqual([]);
+    //
+    // `emitted` is [] before the call, and when normalize throws it is never assigned -- so the
+    // assertion held whatever the implementation did first. A normaliser that pushed every known
+    // parameter into an array and THEN threw passed it identically. It could only ever detect
+    // "did not throw at all", which the test above it already covers.
+    //
+    // The property worth asserting is the one a caller can be hurt by: a document mixing a good
+    // station with a bad one must yield NOTHING, not the good station's rows. Partial output
+    // upserts perfectly cleanly and is short by rows nobody is counting -- and unlike an outage,
+    // nothing marks it. This fixture is a real station plus one carrying an unpublished pollutant,
+    // so an implementation that skipped the bad station and returned the good one fails here.
+    const mixed = {
+      stations: [...(TWO_STATIONS.stations ?? []), ...(UNKNOWN_PARAMETER.stations ?? [])],
+    } as Air4ThaiResponse;
+
+    // The good stations on their own do produce rows, so the refusal below is the refusal and not
+    // an empty fixture.
+    expect(normalize(TWO_STATIONS).length).toBeGreaterThan(0);
+    expect(() => normalize(mixed)).toThrow(/PM1\b/);
   });
 });

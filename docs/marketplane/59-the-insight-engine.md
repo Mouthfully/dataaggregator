@@ -14,7 +14,8 @@
 this month:"` above three invented task rows. The copy was live and there was nothing behind it.
 
 Six modules: `figures.ts` (the arithmetic), `brief.ts` (the prompt), `request.ts` (the body),
-`client.ts` (the fetch), `verify.ts` (the gate), `generate.ts` (the loop once). 95 tests.
+`client.ts` (the fetch), `verify.ts` (the gate), `generate.ts` (the loop once). 104 tests, one of
+which runs the whole engine over rows a real connector produced -- see §7.
 
 **The decision: the model writes language and never does arithmetic, and this is enforced at two
 ends rather than asked for in a prompt.** Every delta, share, ranking and impact estimate is
@@ -194,6 +195,19 @@ brief with its provenance. Then the claim is true.
 
 **No caller, no cron, no route.** See §2.
 
+**Two environment variables are named here and set nowhere.** Issue #39 Part 3 lists
+`OPENROUTER_API_KEY` under "not yet, and deliberately so — nothing calls OpenRouter yet". That
+remains the right place for it: the code now exists, and nothing calls it, so setting the key early
+is still configuration for a code path with no entry point. When a caller lands it needs two:
+
+| Variable | Why |
+|---|---|
+| `OPENROUTER_API_KEY` | the platform key. **Not** a tenant credential — it must stay out of `CREDENTIAL_KEK` and the vault path, which exist for per-tenant secrets under RLS |
+| `INSIGHTS_TENANT_SALT` | the salt for `opaqueTenantId`. Without it the `user` field would be a bare hash of a workspace uuid, which anyone holding the uuid can reproduce — the join the field exists to prevent. `opaqueTenantId` refuses an empty salt rather than defaulting |
+
+Neither is read by this package: both are passed in by whatever calls it, so there is no
+`process.env` access anywhere in `packages/insights` and it typechecks with `"types": []`.
+
 **No hourly grain, no `occupancy`, no `cost_of_goods`.** The artboard's café screens lead with
 hourly revenue and its guesthouse screens with occupancy. `date` is a calendar day and the upsert
 key has no time component; `occupancy` and `cost_of_goods` are not in the dictionary. Adding either
@@ -267,3 +281,43 @@ suite run, the exit code recorded, and the mutation reverted. `1` means the guar
 All eleven reverted; the suite is green at 95 passing. Mutation 6 is worth singling out: it is the
 one-character change that turns this package back into every other BI tool, and the test that
 catches it asserts the *absence* of a number rather than the presence of one.
+
+## 7. What running it against a real connector changed
+
+The unit tests build their rows by hand, which proves the arithmetic and proves nothing about
+whether `InsightRow` describes what the store actually holds. `envelope.test.ts` runs three
+WooCommerce orders through `normalizeWooOrders` — the real connector, unmodified — and generates a
+brief from whatever rows come out. `@repo/connectors` is a **dev** dependency: the engine reads
+rows, it does not fetch them.
+
+It found a wrong number that looked right, and the fix is the most useful thing in this PR after
+the gate itself.
+
+**`normalizeWooOrders` writes `net_revenue` only where a payment fee is knowable.** A Stripe order
+carries `_stripe_fee` in its meta and an Omise order carries nothing, so a day of three orders
+emits gross on all three and net on one. The original `takingsMetric` preferred net whenever *any*
+row had it, so the brief printed:
+
+```
+revenue, as the source reported it:          THB 2,310.00
+takings after what the platform kept:        THB   967.50
+```
+
+Both figures are correct sums. Placed side by side they assert something false and obvious: that
+the platform kept THB 1,342.50. It kept THB 32.50. The rest of that gap is two orders whose fee was
+never reported — **absent, not zero** — and no arithmetic error was made anywhere on the way to it.
+
+Two changes:
+
+1. **Net leads only when it covers every row gross covers.** Partial coverage falls back to gross,
+   so the channel shares, the ranking and the average ticket are all built on a metric every row
+   reports. The ticket goes from THB 967.50 ÷ 3 to THB 770.00, which is the number the shop would
+   recognise.
+2. **A partly-reported total says so, on the figure.** `THB 967.50 (reported on 1 of 3 rows from
+   this source)`. The denominator is rows *from the contributing sources*, not every row in the
+   period — against a whole-period denominator `spend` would read "2 of 8" on every brief and mean
+   nothing, and a caveat that fires on every figure is one a reader stops seeing. Both coverage
+   numbers are licensed, so a model repeating the caveat is not refused for it.
+
+This is the class of failure the whole package exists for, and it survived seven test files of
+hand-built rows. It took forty lines of a real connector to surface it.

@@ -589,15 +589,53 @@ function renderEstimate(
  * THE TAKINGS METRIC, and why it is chosen rather than fixed.
  *
  * `net_revenue` is what the owner keeps and is the number the whole product is about; `revenue` is
- * what the platform reported before it took its cut. Where both exist the net one leads. Where only
- * gross exists -- which is every source that cannot report a commission, and the reconciliation
- * doc records that GrabFood and foodpanda are both in that class -- the brief says "takings" and
- * means gross, rather than quietly presenting a gross number under a net label.
+ * what the platform reported before it took its cut. Where only gross exists -- which is every
+ * source that cannot report a commission, and the reconciliation doc records that GrabFood and
+ * foodpanda are both in that class -- the brief says "takings" and means gross, rather than quietly
+ * presenting a gross number under a net label.
+ *
+ * NET LEADS ONLY WHEN IT COVERS EVERY ROW GROSS COVERS, and that condition was added because the
+ * real connector broke the naive rule. `normalizeWooOrders` emits `net_revenue` only on orders
+ * where a payment fee was knowable -- a Stripe order writes `_stripe_fee`, an Omise order writes
+ * nothing -- so a day of three orders can carry gross on all three and net on one. Summing that net
+ * gives the takings of the ONE order whose fee happened to be readable, and printing it as the
+ * day's takings beside a gross figure three times larger invites exactly one inference: that the
+ * platform kept the difference. It did not. That is a wrong number that looks right, arrived at
+ * without a single arithmetic error.
+ *
+ * So partial coverage falls back to gross, and `coverageNote` below says what was missing.
  */
 function takingsMetric(rows: readonly ReadRow[]): MetricName | null {
-  if (rows.some((r) => r.values.net_revenue !== undefined)) return "net_revenue";
-  if (rows.some((r) => r.values.revenue !== undefined)) return "revenue";
+  const net = rows.filter((r) => r.values.net_revenue !== undefined).length;
+  const gross = rows.filter((r) => r.values.revenue !== undefined).length;
+  if (net > 0 && net >= gross) return "net_revenue";
+  if (gross > 0) return "revenue";
+  if (net > 0) return "net_revenue";
   return null;
+}
+
+/**
+ * "reported on 1 of 3 rows from this source", or null when every row reported it.
+ *
+ * THE DENOMINATOR IS ROWS FROM THE CONTRIBUTING SOURCES, not every row in the period, and the
+ * difference is the whole usefulness of the note. `spend` appears on ad rows and never on commerce
+ * rows; against a whole-period denominator it would always read "2 of 8" and mean nothing, and a
+ * caveat that fires on every figure is one a reader stops seeing. Against its own source's rows it
+ * reads "2 of 2" and stays silent -- so when it does speak, something really is missing.
+ */
+function coverageNote(
+  contributing: readonly ReadRow[],
+  all: readonly ReadRow[],
+): { text: string; allows: readonly string[] } | null {
+  const sources = new Set(contributing.map((r) => r.row.source));
+  const denominator = all.filter((r) => sources.has(r.row.source)).length;
+  if (denominator === 0 || contributing.length >= denominator) return null;
+  const have = renderCount(contributing.length);
+  const total = renderCount(denominator);
+  return {
+    text: ` (reported on ${have.text} of ${total.text} rows from this source)`,
+    allows: [...have.allows, ...total.allows],
+  };
 }
 
 export function buildFigureSet(input: FigureInput): FigureSetResult {
@@ -778,12 +816,15 @@ function metricFigures(
     return { figures: [unreadableFigure(`metric.${name}`, label, contributing)], readable: false };
   }
   const { sources, fetchedAt, provisional } = provenanceOf(contributing);
+  // The coverage caveat rides on the TOTAL and not on the delta or the share, because it is the
+  // total a reader compares against another total. See `coverageNote`.
+  const coverage = coverageNote(contributing, current);
   figures.push({
     id: `metric.${name}`,
     kind: "total",
     label,
-    text: rendered.text,
-    allows: rendered.allows,
+    text: coverage === null ? rendered.text : `${rendered.text}${coverage.text}`,
+    allows: coverage === null ? rendered.allows : [...rendered.allows, ...coverage.allows],
     sources,
     fetchedAt,
     provisional,

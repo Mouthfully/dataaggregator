@@ -282,6 +282,9 @@ importers:
         specifier: workspace:*
         version: link:../contract
     devDependencies:
+      '@repo/connectors':
+        specifier: workspace:*
+        version: link:../connectors
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

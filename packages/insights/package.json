@@ -15,6 +15,7 @@
     "@repo/contract": "workspace:*"
   },
   "devDependencies": {
+    "@repo/connectors": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

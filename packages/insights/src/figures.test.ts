@@ -261,6 +261,51 @@ describe("uncertainty is measured, never decorated", () => {
   });
 });
 
+describe("a metric reported on only some rows says so", () => {
+  it("names the coverage when a metric is missing from rows of the same source", () => {
+    const set = build([
+      row({
+        source: "woocommerce",
+        date: "2026-09-07",
+        metrics: { revenue: 1_000, net_revenue: 900 },
+      }),
+      row({ source: "woocommerce", date: "2026-09-08", metrics: { revenue: 1_000 } }),
+      row({ source: "woocommerce", date: "2026-08-31", metrics: { revenue: 1_000 } }),
+    ]);
+    // Printing THB 900 as takings beside a gross of THB 2,000 invites the reader to conclude the
+    // platform kept THB 1,100. It did not; the other order's fee was simply never reported.
+    expect(figure(set, "metric.net_revenue").text).toBe(
+      "THB 900.00 (reported on 1 of 2 rows from this source)",
+    );
+    // Both coverage numbers are licensed, so a model repeating the caveat is not refused for it.
+    expect(figure(set, "metric.net_revenue").allows).toContain("1");
+    expect(figure(set, "metric.net_revenue").allows).toContain("2");
+  });
+
+  it("stays silent when every row of the source reported it", () => {
+    const set = build(settledWeek());
+    // `spend` is on both meta_ads rows and on neither woocommerce row. Measured against its own
+    // source it is complete, so there is no caveat -- a caveat on every figure is one nobody reads.
+    expect(figure(set, "metric.spend").text).toBe("THB 4,500.00");
+    expect(figure(set, "metric.revenue").text).toBe("THB 29,000.00");
+  });
+
+  it("does not let a partly-reported metric become the one shares are built on", () => {
+    const set = build([
+      row({
+        source: "woocommerce",
+        date: "2026-09-07",
+        metrics: { revenue: 1_000, net_revenue: 900, orders: 10 },
+      }),
+      row({ source: "woocommerce", date: "2026-09-08", metrics: { revenue: 1_000, orders: 10 } }),
+      row({ source: "woocommerce", date: "2026-08-31", metrics: { revenue: 1_000, orders: 10 } }),
+    ]);
+    // Gross covers every row, so gross is what the channel total and the ticket use.
+    expect(figure(set, "channel.woocommerce.takings").text).toBe("THB 2,000.00");
+    expect(figure(set, "derived.average_ticket").text).toBe("THB 100.00");
+  });
+});
+
 describe("the action sheet", () => {
   it("is ordered by value, biggest first", () => {
     const set = build(settledWeek());

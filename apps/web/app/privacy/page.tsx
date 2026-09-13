@@ -107,11 +107,33 @@ const HEADLINE_NOTE =
 /* The controller panel. Every value is read from the brand package; none is typed here. */
 const CONTROLLER_LABEL = "Responsible for this data";
 
+/**
+ * THE GOVERNING LAW AND THE AUTHORITY WERE MISSING, AND THAT WAS THE GAP ON THIS PAGE.
+ *
+ * Seven hundred lines describing who holds what, and the notice named no law and no supervisory
+ * authority. For a Thai juristic person processing personal data that is not a stylistic omission:
+ * the PDPA is what these obligations come FROM, and a reader with a complaint had no route out of
+ * this page. Naming the authority is the practical half of the rights the statute grants -- rights
+ * with no address are rights on paper.
+ *
+ * BOTH VALUES COME FROM THE BRAND PACKAGE, like every other row here. `brand.governingPrivacyLaw`
+ * is a plain string and not a nullable one, because unlike `euRepresentative` there is nothing to
+ * arrange: the law applies to this entity whether or not anyone writes it down.
+ *
+ * THE GDPR IS DELIBERATELY NOT NAMED HERE. `brand.euRepresentative` is null, and whether the GDPR
+ * reaches this entity at all turns on Article 3(2) -- on whether the business offers services to
+ * data subjects in the Union -- which is a decision nobody has taken. Naming a second law in the
+ * controller panel would assert that it applies. The `dpa` and `gdpr` claims stay withheld in
+ * `packages/brand/src/claims.ts`, and the clause below on international arrangements is where that
+ * gap is stated rather than papered over.
+ */
 const CONTROLLER_ROWS = [
   { key: "Controller", value: brand.legalEntity },
   { key: "Registered address", value: formatAddress() },
   { key: "Company registration", value: brand.companyRegistration },
   { key: "Country of registration", value: brand.postalAddress.country },
+  { key: "Governing law", value: brand.governingPrivacyLaw },
+  { key: "Supervisory authority", value: brand.supervisoryAuthority },
 ] as const;
 
 const CONTACT_ROW_LABEL = "Contact";
@@ -293,6 +315,19 @@ const CLAUSES: readonly Clause[] = [
     id: "hosting",
     title: "Where data is held",
     body: [HOSTING_LINE],
+  },
+  {
+    // THE PDPA APPOINTS A DPO IN DEFINED CIRCUMSTANCES, and whether this entity meets the trigger
+    // is a question for counsel rather than for a source file. So the clause says the appointment
+    // has not been made and names the route that exists in the meantime, rather than printing a
+    // contact nobody staffs. `brand.dataProtectionOfficer` is null for the same reason.
+    id: "data-protection-officer",
+    title: "Data protection officer",
+    open: true,
+    body: [
+      "No data protection officer has been appointed. The Personal Data Protection Act requires one in defined circumstances, and whether this company meets them has not been determined.",
+      "Until it is, questions and requests about personal data go to the contact address above, and are answered by the people responsible for the service rather than by a named officer. A contact printed here that nobody staffs would be worse than none, because it is the address a person would write to and wait at.",
+    ],
   },
   {
     id: "sub-processors",

@@ -215,6 +215,96 @@ describe("the forbidden-claims list", () => {
     });
   }
 
+  /**
+   * THE EVASION SHAPES, not the obvious spellings.
+   *
+   * This list's two recorded near-misses are the design input: "200+ integrations" slipped a
+   * source-count pattern because the "+" sat where the regex expected whitespace, and the
+   * competitor pattern catches "competitor" but not "competitors" because the word boundary fails
+   * before the plural. So each entry below is a form somebody would plausibly write that a naive
+   * `\bsoc 2\b` would miss.
+   */
+  const certificationEvasions = [
+    "SOC 2 Type II certified",
+    "SOC2 audited",
+    "SOC-2 compliant infrastructure",
+    "Service Organization Control 2",
+    "ISO 27001 certified",
+    "ISO27001",
+    "ISO/IEC 27001 certified",
+    "ISO-27001 aligned",
+    "certified to 27001",
+    "GDPR compliant",
+    "GDPR-compliant by design",
+    "fully GDPR",
+    "compliant with the GDPR",
+    "PDPA compliant",
+    "PDPA-certified",
+    "independently audited",
+    "third-party audited",
+    "externally verified",
+    "penetration tested",
+    "pen-tested quarterly",
+  ];
+
+  for (const copy of certificationEvasions) {
+    it(`catches the certification claim ${JSON.stringify(copy)}`, () => {
+      const hit = FORBIDDEN_CLAIMS.find((f) => f.pattern.test(copy));
+      expect(hit, `nothing in FORBIDDEN_CLAIMS matched: ${copy}`).toBeDefined();
+      expect(hit?.reason).not.toHaveLength(0);
+    });
+  }
+
+  /**
+   * THE BAN MUST BE NARROW, and this is the half that keeps it switchable-on.
+   *
+   * A guard with false positives gets turned off, which is strictly worse than not having one. A
+   * privacy notice has to be able to NAME the law it operates under -- that is the whole of the
+   * `governing-law` claim -- so the acronyms stay legal and only the assertion is banned.
+   */
+  const mustStayLegal = [
+    "Operated by a Thai company under Thailand's Personal Data Protection Act.",
+    "Complaints go to the Personal Data Protection Committee.",
+    "We are not established in the Union and have appointed no representative.",
+    "The GDPR may apply where a customer offers services to data subjects in the Union.",
+    "Your data is held in Singapore.",
+    "Every query, export and API key is logged.",
+    "Social media accounts are not a source.",
+    // Probes the SOC pattern's own boundaries: `\bsoc\W{0,3}2` must not fire on "Social", and a
+    // bare "2" beside an unrelated noun must not fire at all.
+    "Social sharing is not a feature of this product.",
+    "Clause 2 of the agreement covers termination.",
+    "Associate accounts are billed separately.",
+  ];
+
+  for (const copy of mustStayLegal) {
+    it(`does NOT fire on ${JSON.stringify(copy.slice(0, 44))}`, () => {
+      const hit = FORBIDDEN_CLAIMS.find((f) => f.pattern.test(copy));
+      expect(hit, `FORBIDDEN_CLAIMS fired on legal copy: ${hit?.reason}`).toBeUndefined();
+    });
+  }
+
+  it("withholds both certification claims, because neither document exists", () => {
+    // The claims are DECLARED so the machinery gates them, and the machinery is a brand fact only a
+    // third party can set. `allowedClaims()` must not contain either one.
+    const allowed = allowedClaims().map((c) => c.id);
+    expect(allowed).not.toContain("soc2");
+    expect(allowed).not.toContain("iso27001");
+    expect(brand.soc2TypeIIReport).toBe(false);
+    expect(brand.iso27001Certificate).toBe(false);
+  });
+
+  it("names a governing law and an authority, because a Thai entity has both", () => {
+    // Not a certification and not optional: the PDPA applies whether or not anything is claimed.
+    // A privacy notice naming no authority leaves a data subject with no route.
+    expect(brand.governingPrivacyLaw).toContain("Personal Data Protection Act");
+    expect(brand.supervisoryAuthority).toContain("Personal Data Protection Committee");
+    // The DPO is null, and the null is real. A plausible-looking name would be written to by a
+    // data subject and answered by nobody.
+    expect(brand.dataProtectionOfficer).toBeNull();
+    expect(allowedClaims().map((c) => c.id)).not.toContain("governing-law");
+  });
+
   it("does not fire on the claims that are allowed", () => {
     for (const claim of allowedClaims()) {
       const hit = FORBIDDEN_CLAIMS.find((f) => f.pattern.test(claim.text));

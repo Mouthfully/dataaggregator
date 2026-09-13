@@ -35,6 +35,13 @@ export {
   type MintedRole,
 } from "./jwt.js";
 export {
+  MAX_DUE_LIMIT,
+  createSchedulerStore,
+  toDueConnection,
+  type DueConnection,
+  type SchedulerStorePort,
+} from "./scheduler.js";
+export {
   createPerformanceStore,
   type PerformancePage,
   type PerformanceQuery,

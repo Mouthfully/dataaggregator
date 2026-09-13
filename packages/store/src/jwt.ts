@@ -57,8 +57,57 @@ export const TOKEN_TTL_SECONDS = 60;
  * A token minted for `app_ingest` carries NO `workspace_id` claim. The workspace is an argument to
  * the function, which reaches the table through a `security definer` that does not consult RLS, so
  * a claim here would be decoration that reads like a constraint.
+ *
+ * `app_scheduler` IS THE FOURTH, and it is the second time this union has been widened
+ * deliberately rather than in passing. What it may do is exactly three functions, and the list is
+ * the whole privilege:
+ *
+ *   MAY   call `public.due_connections` -- the work list, across every tenant. SCHEDULING METADATA
+ *         ONLY: connection id, workspace id, organisation id, provider, last backfill, restatement
+ *         window. Nothing that could be used to authenticate as anyone.
+ *   MAY   call `public.claim_connection` and `public.record_backfill` -- take and close the
+ *         fifteen-minute lease that stops two instances spending a shared platform quota twice.
+ *   MAY NOT read `connections`, `api_keys`, `members` or `organisations`, or any other table in
+ *         `public`. It holds no table grant at all, which `supabase/tests/02_scheduler.sql` proves
+ *         by executing the reads and asserting the refusals.
+ *   MAY NOT reach a credential. Not the ciphertext, not the IV, not the wrapped DEK, not even the
+ *         external account id. Enumeration and access are deliberately different privileges
+ *         (`20260908001000_scheduler.sql`), so a compromised scheduler learns which tenants exist
+ *         and when each was last pulled -- and not one credential. The credential is fetched
+ *         separately by `connections.ts`, as `authenticated`, under row-level security, for one
+ *         workspace it already knows it is acting for.
+ *   MAY NOT supply a clock. The three `app.` functions take `p_now` so the SQL suite can drive a
+ *         fixed timeline; the `public.` wrappers take none, because a caller-supplied future clock
+ *         makes every live lease look abandoned and the lease is the only thing standing between
+ *         two cron ticks and a double-spent quota.
+ *
+ * THE COST, WHICH IS LARGER THAN `app_ingest`'S AND IS STATED WHERE IT IS FELT. That role made
+ * `SUPABASE_JWT_SECRET` a write credential. This one makes it a CROSS-TENANT ENUMERATION
+ * credential: anything that can mint a token can now ask which connections exist across every
+ * workspace on the platform. That is the question row-level security exists to make unaskable, and
+ * the only reason it is acceptable is the shape of the answer -- workspace ids and timestamps, no
+ * credential material, which `supabase/tests/13_scheduler_entry_point.sql` asserts as an exact
+ * column set rather than as an absence of three known-bad names. Hyperdrive is what would replace
+ * the secret with a connection, and it remains the deferred decision.
+ *
+ * A SCHEDULER TOKEN CARRIES NO `workspace_id`, AND FOR A STRONGER REASON THAN THE INGEST ONE. For
+ * `app_ingest` the claim would be inert decoration. Here it would be actively false: the
+ * scheduler's entire purpose is the one question that spans tenants, so a token that appeared to
+ * name a single workspace would describe a per-tenant scheduler that does not exist and cannot be
+ * built out of these three functions. `mintToken` refuses it below rather than dropping it,
+ * because a silently ignored claim is how a reader comes to believe in a narrowing that was never
+ * there.
  */
-export type MintedRole = "anon" | "authenticated" | "app_ingest";
+export type MintedRole = "anon" | "authenticated" | "app_ingest" | "app_scheduler";
+
+/**
+ * The roles whose authority comes from a GRANT rather than from a workspace claim.
+ *
+ * Both reach their tables through `security definer` functions that never consult row-level
+ * security, so nothing anywhere reads a `workspace_id` claim on one of these tokens. Listing them
+ * turns the two module comments that already said so into something that fails.
+ */
+const SYSTEM_ROLES: readonly MintedRole[] = ["app_ingest", "app_scheduler"];
 
 export interface CryptoLike {
   subtle: Pick<SubtleCrypto, "importKey" | "sign" | "digest">;
@@ -114,6 +163,18 @@ export async function mintToken(options: {
     // Refused rather than signed with nothing: an HMAC over an empty key produces a perfectly
     // well-formed token that every deployment sharing the mistake would accept from every other.
     throw new Error("store: refusing to mint a token with an empty signing secret");
+  }
+
+  if (options.workspaceId !== undefined && SYSTEM_ROLES.includes(options.role)) {
+    // REFUSED, NOT DROPPED. A system role's authority is its grant; nothing reads a workspace claim
+    // on one of these tokens, so silently ignoring it would mint a credential that LOOKS narrowed
+    // to one tenant and is not. For `app_scheduler` that reading is not merely optimistic, it is
+    // backwards: the role exists to ask the one question that spans every tenant.
+    throw new Error(
+      `store: refusing to mint a ${options.role} token carrying a workspace_id claim. This role's ` +
+        "authority is its grant, not a claim -- nothing reads one here, so the claim would read " +
+        "as a narrowing that does not exist.",
+    );
   }
 
   const issuedAt = Math.floor(options.now.getTime() / 1000);

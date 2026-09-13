@@ -2,6 +2,7 @@ import { type FetchOptions } from "@repo/extract";
 import { describe, expect, it } from "vitest";
 import {
   LOYVERSE_BACKFILL_CHUNK_DAYS,
+  LOYVERSE_BOUNDARY_OVERLAP_MS,
   type LoyverseBackfillBatch,
   LoyverseBackfillError,
   type LoyverseCheckpoint,
@@ -91,15 +92,39 @@ describe("the chunk plan", () => {
     expect(chunks.at(-1)?.updatedBefore).toBe("2026-09-22T00:00:00.000Z");
   });
 
-  it("makes adjacent chunks SHARE their boundary instant, never skip it", () => {
-    // An overlap is collapsed by the upsert, because a re-read receipt has the same key. A gap is
-    // not recoverable by anything: nothing asks for that window again.
+  it("makes adjacent chunks OVERLAP their boundary, never merely share it", () => {
+    // SHARING WAS NOT ENOUGH, and this test used to assert that it was. Loyverse documents neither
+    // bound's inclusivity, and inclusivity is two properties, not one. Under `min >` AND `max <` a
+    // receipt stamped EXACTLY at a shared boundary is returned by neither chunk, and the watermark
+    // then advances past an instant nothing read -- one sale missing from the day's revenue, with
+    // nothing anywhere reporting a failure.
+    //
+    // An overlap is recoverable by the upsert, because a re-read receipt has the same key. A gap is
+    // recoverable by nothing: no run asks for that window again.
     const chunks = loyverseBackfillChunks(
       span("2026-09-01T00:00:00.000Z", "2026-09-22T00:00:00.000Z"),
     );
+    expect(chunks.length).toBeGreaterThan(1);
     for (let i = 1; i < chunks.length; i++) {
-      expect(chunks[i]?.updatedAfter).toBe(chunks[i - 1]?.updatedBefore);
+      const previousEnd = Date.parse(chunks[i - 1]?.updatedBefore as string);
+      const thisStart = Date.parse(chunks[i]?.updatedAfter as string);
+      expect(thisStart).toBe(previousEnd - LOYVERSE_BOUNDARY_OVERLAP_MS);
+      // The property, stated as the thing that must be true rather than as the arithmetic that
+      // happens to produce it: a receipt AT the previous chunk's end instant is STRICTLY inside
+      // this chunk, so it survives even the reading where both bounds are exclusive.
+      expect(thisStart).toBeLessThan(previousEnd);
+      expect(Date.parse(chunks[i]?.updatedBefore as string)).toBeGreaterThan(previousEnd);
     }
+  });
+
+  it("does not step the START of the span back, only the joins inside it", () => {
+    // The overlap fixes a boundary BETWEEN chunks. Applying it to the span's own start would read
+    // receipts from before the window the caller asked for -- a different defect, introduced by
+    // the fix for this one.
+    const chunks = loyverseBackfillChunks(
+      span("2026-09-01T00:00:00.000Z", "2026-09-22T00:00:00.000Z"),
+    );
+    expect(chunks[0]?.updatedAfter).toBe("2026-09-01T00:00:00.000Z");
   });
 
   it("never runs past the end of the span it was given", () => {
@@ -267,7 +292,14 @@ describe("the watermark, which is where a permanent hole would come from", () =>
     );
     expect(seen).toHaveLength(3);
     expect(seen.map((c) => c.chunks)).toEqual([1, 2, 3]);
-    expect(checkpoint.updatedAfter).toBe(SPAN.updatedBefore);
+    // THE WATERMARK NEVER LANDS ON THE SPAN'S END INSTANT, IT LANDS JUST BEFORE IT. This is the
+    // boundary BETWEEN RUNS -- the one where a hole is least likely to ever be noticed, because
+    // no later run and no log mentions the window nobody asked for. So the next run's window
+    // re-covers the last second of this one, and the upsert collapses whatever comes back twice.
+    expect(Date.parse(checkpoint.updatedAfter)).toBe(
+      Date.parse(SPAN.updatedBefore) - LOYVERSE_BOUNDARY_OVERLAP_MS,
+    );
+    expect(Date.parse(checkpoint.updatedAfter)).toBeLessThan(Date.parse(SPAN.updatedBefore));
   });
 
   it("leaves the watermark on the last COMPLETE chunk when a later one fails", async () => {
@@ -277,11 +309,19 @@ describe("the watermark, which is where a permanent hole would come from", () =>
     // requests and failed the second one -- and passed, because `fetchWithRetry` RETRIED the 500 and
     // the retry succeeded. A test of "the watermark stops at the last complete chunk" that is
     // silently testing "the retry worked" is exactly the false pass this suite exists to catch.
-    const { client } = account((url) =>
-      url.searchParams.get("updated_at_min") === "2026-09-08T00:00:00.000Z"
+    // KEYED ON THE DAY THE SECOND CHUNK STARTS, NOT ON AN EXACT INSTANT. The first version matched
+    // `2026-09-08T00:00:00.000Z` exactly; when the chunk boundary gained its one-second overlap the
+    // match stopped firing, the 500 was never served, and the test PASSED by asserting a rejection
+    // that had quietly become a success. A predicate that stops matching is a test that stops
+    // testing, and it does not fail to tell you.
+    const { client } = account((url) => {
+      const min = url.searchParams.get("updated_at_min") ?? "";
+      const secondChunkStarts = Date.parse(SPAN.updatedAfter) + 7 * 86_400_000;
+      return Date.parse(min) >= secondChunkStarts - LOYVERSE_BOUNDARY_OVERLAP_MS &&
+        Date.parse(min) < secondChunkStarts + 86_400_000
         ? new Response("{}", { status: 500 })
-        : page([SALE]),
-    );
+        : page([SALE]);
+    });
     const seen: LoyverseCheckpoint[] = [];
     await expect(
       drain(
@@ -296,22 +336,42 @@ describe("the watermark, which is where a permanent hole would come from", () =>
         }),
       ),
     ).rejects.toThrow();
-    // Exactly one chunk banked, and the watermark sits on ITS end -- not on the failed chunk's.
+    // Exactly one chunk banked, and the watermark sits just before ITS end -- not on the failed
+    // chunk's, and never past an instant nothing read.
     expect(seen).toHaveLength(1);
-    expect(seen[0]?.updatedAfter).toBe("2026-09-08T00:00:00.000Z");
+    const firstChunkEnds = Date.parse(SPAN.updatedAfter) + 7 * 86_400_000;
+    expect(Date.parse(seen[0]?.updatedAfter as string)).toBe(
+      firstChunkEnds - LOYVERSE_BOUNDARY_OVERLAP_MS,
+    );
   });
 
-  it("banks a checkpoint at the START of the span before anything has been read", async () => {
-    // Every chunk costs at least one request, so "nothing read, nothing skipped" is the only honest
-    // answer before the first one comes back.
+  it("banks NOTHING when the very first request fails, so the caller's watermark is untouched", () => {
+    // THIS TEST USED TO ASSERT ONLY THAT THE GENERATOR REJECTS. Its name said "banks a checkpoint
+    // at the START of the span", it never looked at a checkpoint, and it would have passed against
+    // an implementation that had no initial checkpoint at all or set the wrong one -- which an
+    // adversarial verifier demonstrated by mutating the initial value to anything and watching it
+    // stay green.
+    //
+    // The observable property is the one that actually matters to a caller: `onChunk` is THE ONLY
+    // PLACE a watermark may advance, so a run that dies on its first request must never call it.
+    // Nothing read, nothing skipped -- asserted on the thing the caller can see rather than on a
+    // local the caller never receives.
     const { client } = account(() => new Response("{}", { status: 500 }));
+    const banked: LoyverseCheckpoint[] = [];
     const gen = runLoyverseBackfill({
       client,
       window: SPAN,
       timezone: BANGKOK,
       fetchedAt: FETCHED_AT,
+      onChunk: (c) => {
+        banked.push(c);
+      },
     });
-    await expect(gen.next()).rejects.toThrow();
+    return expect(gen.next())
+      .rejects.toThrow()
+      .then(() => {
+        expect(banked).toEqual([]);
+      });
   });
 
   it("AWAITS an async onChunk before starting the next chunk", async () => {

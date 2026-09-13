@@ -353,7 +353,13 @@ export function receiptsUrl(query: LoyverseReceiptsQuery): string {
   const params = new URLSearchParams({
     updated_at_min: query.updatedAfter,
     updated_at_max: query.updatedBefore,
-    limit: String(Math.min(query.limit ?? LOYVERSE_PAGE_LIMIT, LOYVERSE_MAX_LIMIT)),
+    // CLAMPED AT BOTH ENDS. The top was clamped and the bottom was not, so a caller asking for
+    // 1,000 got 250 and a caller asking for 0 or -1 got it sent verbatim, below the `minimum: 1`
+    // the specification does state. `limit=0` is the dangerous half: a page of nothing reads as a
+    // finished walk.
+    limit: String(
+      Math.min(Math.max(Math.trunc(query.limit ?? LOYVERSE_PAGE_LIMIT), 1), LOYVERSE_MAX_LIMIT),
+    ),
   });
   if (query.storeId !== undefined) params.set("store_id", query.storeId);
   if (query.cursor !== undefined) params.set("cursor", query.cursor);
@@ -398,7 +404,23 @@ async function request(
   // SPENT BEFORE THE REQUEST, NOT AFTER IT. A request that throws still consumed the merchant's
   // budget -- Loyverse counted it -- so crediting it back on failure would let a run in an error
   // loop spend unboundedly while believing it had spent nothing.
-  const spent = spendRequest(budget, now);
+  let spent = spendRequest(budget, now);
+
+  // EVERY RETRY IS ANOTHER REQUEST LOYVERSE COUNTS, AND IT WAS NOT BEING COUNTED HERE.
+  //
+  // `fetchWithRetry` retries a 429 or a 5xx up to `maxAttempts`, so one logical call could put
+  // three requests on the wire while this function recorded one. An adversarial verifier measured
+  // it: a single `fetchReceiptsPage` against a handler that 429s once then succeeds made 2 HTTP
+  // requests and returned a budget showing 1.
+  //
+  // That is the budget failing at precisely the moment it exists for. `LOYVERSE_RATE_FLOOR` holds
+  // 30 requests back so the merchant's OWN integrations are not the ones that get the 429 -- and
+  // the run most likely to overshoot it is the run already being rate-limited, which is the run
+  // whose retries were invisible. The floor was a number we believed rather than one we held.
+  //
+  // `onRetry` fires once per retry ACTUALLY SCHEDULED, so the count is exact rather than an
+  // upper bound from `maxAttempts`. The caller's own hook is still called: this wraps it.
+  const callerOnRetry = options.onRetry;
   const response = await fetchWithRetry(
     options.fetchImpl,
     {
@@ -416,7 +438,16 @@ async function request(
         },
       },
     },
-    options,
+    {
+      ...options,
+      onRetry: (info) => {
+        // The clock is read again rather than reusing `now`: a retry happens after a backoff delay,
+        // and the 300-per-300-second window is a sliding one, so stamping the retry with the
+        // original instant would age it out of the window early and under-report the spend again.
+        spent = spendRequest(spent, options.now());
+        callerOnRetry?.(info);
+      },
+    },
   );
 
   return { body: (await response.json()) as unknown, budget: spent };
@@ -430,6 +461,12 @@ export async function fetchReceiptsPage(
   page = 1,
 ): Promise<LoyverseReceiptsPage> {
   assertReadOnlyCredential(options.credential);
+  // AT THIS ENTRY POINT TOO, and its absence here was the same mistake this file argues against
+  // one paragraph up for the credential: `fetchReceiptsPages` checked the window and this exported,
+  // barrel-re-exported function did not. A verifier watched an inverted, designator-less window
+  // leave for the platform and come back INVALID_RANGE -- one of the merchant's 300 requests spent
+  // to be told something knowable for free. A refusal at every entry point or at none.
+  assertWindow(query);
 
   const { body, budget: spent } = await request(options, receiptsUrl(query), budget);
   const envelope = body as { receipts?: unknown; cursor?: unknown } | null;

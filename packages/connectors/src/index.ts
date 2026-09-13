@@ -173,6 +173,7 @@ export {
 // -------------------------------------------------------------------------------------------
 export {
   LOYVERSE_BACKFILL_CHUNK_DAYS,
+  LOYVERSE_BOUNDARY_OVERLAP_MS,
   type LoyverseBackfillBatch,
   LoyverseBackfillError,
   type LoyverseBackfillErrorCode,

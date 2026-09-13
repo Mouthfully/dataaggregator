@@ -249,6 +249,30 @@ describe("decision 2: the budget is counted here, because nothing reports it", (
     const second = await fetchReceiptsPage(client, WINDOW, first.budget);
     expect(second.budget.at).toHaveLength(2);
   });
+
+  it("counts THE RETRY, because Loyverse counts it", async () => {
+    // THE BUDGET USED TO UNDER-COUNT EXACTLY WHEN IT MATTERED MOST. `fetchWithRetry` retries a 429
+    // or a 5xx, and each retry is a real request against the merchant's 300 -- but `spendRequest`
+    // ran once per logical call, so one `fetchReceiptsPage` could put several requests on the wire
+    // and report one. An adversarial verifier measured it: 2 requests, a budget showing 1.
+    //
+    // The run most likely to overshoot is the run ALREADY being rate-limited, which is the run
+    // whose retries were invisible. `LOYVERSE_RATE_FLOOR` holds 30 requests back so the merchant's
+    // own integrations are not the ones that get the 429; with retries uncounted, that floor was a
+    // number we believed rather than one we held.
+    let served = 0;
+    const { client, calls } = account(() => {
+      served += 1;
+      return served === 1 ? new Response("{}", { status: 429 }) : receiptsBody([SALE]);
+    });
+    const page = await fetchReceiptsPage(client, WINDOW);
+
+    // Two requests actually left, so two must be on the budget. Asserted against the observed call
+    // count rather than against the literal 2, so the test still says the right thing if the
+    // retry policy changes.
+    expect(calls).toHaveLength(2);
+    expect(page.budget.at).toHaveLength(calls.length);
+  });
 });
 
 // =================================================================================================
@@ -287,6 +311,33 @@ describe("decision 3: the upper bound is pinned, never left open", () => {
     expect(() =>
       assertWindow({ updatedAfter: "2026-09-09T00:00:00", updatedBefore: WINDOW.updatedBefore }),
     ).toThrow(/RFC3339/);
+  });
+
+  it("refuses it AT THE ENTRY POINT, not merely in a function the entry point could skip", async () => {
+    // THE THREE TESTS ABOVE CALL `assertWindow` DIRECTLY, and all three passed while the exported,
+    // barrel-re-exported `fetchReceiptsPage` never called it -- so an inverted, designator-less
+    // window went to the platform and came back INVALID_RANGE, spending one of the merchant's 300
+    // requests on something knowable for free. A verifier watched the URL leave.
+    //
+    // Testing the helper is not testing the door. This asserts NO REQUEST WAS MADE, which is the
+    // only thing that distinguishes a refusal at the entry point from a refusal by the platform.
+    const { client, calls } = account(() => receiptsBody([SALE]));
+    await expect(
+      fetchReceiptsPage(client, {
+        updatedAfter: WINDOW.updatedBefore,
+        updatedBefore: WINDOW.updatedAfter,
+      }),
+    ).rejects.toThrow(/INVALID_RANGE/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("clamps the page limit at BOTH ends, because 0 reads as a finished walk", () => {
+    // The top was clamped and the bottom was not. `limit=0` is the dangerous half: the platform
+    // documents `minimum: 1`, and a page of nothing is indistinguishable from the end of the
+    // cursor -- a walk that stops on its first page and reports success.
+    expect(new URL(receiptsUrl({ ...WINDOW, limit: 1000 })).searchParams.get("limit")).toBe("250");
+    expect(new URL(receiptsUrl({ ...WINDOW, limit: 0 })).searchParams.get("limit")).toBe("1");
+    expect(new URL(receiptsUrl({ ...WINDOW, limit: -5 })).searchParams.get("limit")).toBe("1");
   });
 });
 

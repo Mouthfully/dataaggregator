@@ -91,6 +91,21 @@ export const LOYVERSE_BACKFILL_CHUNK_DAYS = 7;
 const DAY_MS = 86_400_000;
 
 /**
+ * How far the start of each chunk after the first is stepped back from the previous chunk's end,
+ * and the same amount the between-run watermark is stepped back.
+ *
+ * ONE SECOND, NOT ONE MILLISECOND, because the platform's own examples are second-resolution
+ * (`updated_at_min=2026-09-10T00:00:00`) and a sub-second backstep may simply be truncated away --
+ * which would leave the hole exactly where it was while the code claimed to have closed it.
+ *
+ * The cost is bounded and known: one extra second of receipts re-read per chunk join, collapsed by
+ * the upsert because a re-read receipt carries the same key. The benefit is that no receipt can
+ * fall between two chunks under any of the four readings of `updated_at_min` / `updated_at_max`
+ * that Loyverse leaves undocumented. An overlap is recoverable; a gap is not.
+ */
+export const LOYVERSE_BOUNDARY_OVERLAP_MS = 1_000;
+
+/**
  * How this unit refuses.
  *
  * Separate from `LoyverseClientError` and `LoyverseNormalizeError` for the reason those two are
@@ -170,14 +185,29 @@ export interface LoyverseBackfillBatch {
 /** How far a run got, and therefore where the next one starts. */
 export interface LoyverseCheckpoint {
   /**
-   * The `updatedAfter` the NEXT run must use.
+   * The `updatedAfter` the NEXT run must use: the completed chunk's `updatedBefore` LESS
+   * `LOYVERSE_BOUNDARY_OVERLAP_MS`.
    *
-   * It is the completed chunk's `updatedBefore` EXACTLY, with no millisecond added, so consecutive
-   * runs share their boundary instant. The specification does not say whether `updated_at_min` and
-   * `updated_at_max` are inclusive. Sharing the instant re-reads one receipt under the inclusive
-   * reading -- which the upsert collapses, since a re-read receipt has the same key -- and reads
-   * every receipt exactly once under the exclusive one. Adding a millisecond would be the other way
-   * round: exact if inclusive, and a PERMANENT HOLE if not.
+   * THE EARLIER VERSION OF THIS COMMENT WAS WRONG, and an adversarial verifier proved it by
+   * enumerating a case the reasoning had collapsed. It said sharing the boundary instant was "exact
+   * under the exclusive reading" -- treating inclusivity as ONE property of both bounds. It is two,
+   * and Loyverse documents neither:
+   *
+   *     min >= / max <=   chunks overlap at the instant      re-read, collapsed by the upsert
+   *     min >  / max <=   exact
+   *     min >= / max <    exact
+   *     min >  / max <    A RECEIPT AT EXACTLY THE BOUNDARY IS RETURNED BY NEITHER CHUNK
+   *
+   * Three of four readings were safe, which is not the same as either reading, and the fourth loses
+   * the receipt permanently: the watermark advances past an instant nothing ever read. The loss is
+   * silent, it is one receipt rather than a run, and the day's revenue is then wrong by one sale
+   * with nothing anywhere reporting a failure -- which is the exact shape of wrongness this
+   * repository exists to refuse.
+   *
+   * So the boundary is no longer shared, it is OVERLAPPED. Stepping the next start back makes the
+   * fourth row safe -- a receipt at the boundary is strictly inside the next chunk's open interval
+   * -- and turns rows two and three into small re-reads, which the upsert collapses exactly as row
+   * one's already did. Overlap is recoverable by the upsert; a gap is recoverable by nothing.
    */
   readonly updatedAfter: string;
   /** Chunks read in full so far, this run. */
@@ -221,11 +251,15 @@ export function loyverseBackfillChunks(
   const step = Math.max(1000, Math.round(chunkDays * DAY_MS));
   const out: LoyverseWindow[] = [];
   for (let start = after; start < before; start += step) {
+    const end = Math.min(start + step, before);
     out.push({
-      updatedAfter: new Date(start).toISOString(),
-      // Adjacent chunks SHARE this instant. See `LoyverseCheckpoint.updatedAfter`: an overlap is
-      // collapsed by the upsert, a gap is not recoverable by anything.
-      updatedBefore: new Date(Math.min(start + step, before)).toISOString(),
+      // THE FIRST CHUNK STARTS EXACTLY WHERE THE CALLER SAID. Only the joins between chunks are
+      // overlapped -- stepping the span's own start back would read receipts from before the
+      // window the caller asked for, which is a different defect from the one being fixed.
+      updatedAfter: new Date(
+        start === after ? start : start - LOYVERSE_BOUNDARY_OVERLAP_MS,
+      ).toISOString(),
+      updatedBefore: new Date(end).toISOString(),
     });
   }
   return out;
@@ -382,7 +416,12 @@ export async function* runLoyverseBackfill(
     // spent, the page ceiling hit, a cursor that looped -- propagates out of the `for await` and
     // past this line, so the watermark stays where the last COMPLETE chunk left it.
     checkpoint = {
-      updatedAfter: chunk.updatedBefore,
+      // LESS THE OVERLAP, for the reason on `LoyverseCheckpoint.updatedAfter`: a shared instant is
+      // a permanent hole under one of the four inclusive/exclusive readings Loyverse does not
+      // document, and this is the boundary BETWEEN RUNS, where a hole is least likely to be noticed.
+      updatedAfter: new Date(
+        Date.parse(chunk.updatedBefore) - LOYVERSE_BOUNDARY_OVERLAP_MS,
+      ).toISOString(),
       chunks: checkpoint.chunks + 1,
       rows: checkpoint.rows + rowsThisChunk,
       budget,

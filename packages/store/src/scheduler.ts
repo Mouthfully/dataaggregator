@@ -43,6 +43,17 @@ import { type PostgrestConfig, StoreError, callPostgrest } from "./postgrest.js"
 export const MAX_DUE_LIMIT = 500;
 
 /**
+ * What PostgREST serialises a `timestamptz` as.
+ *
+ * `Date.parse` ALONE IS NOT A TIMESTAMP CHECK, which is why this exists: it is lenient enough to
+ * accept the string "5" and answer a real instant, so a guard written as `Number.isNaN(Date.parse(x))`
+ * passes values that are not timestamps at all. The values guarded here -- the instant a lease was
+ * closed at, and the watermark the next walk resumes from -- are ones the caller cannot otherwise
+ * know, so the shape is checked rather than inferred from a parse succeeding.
+ */
+const RFC3339 = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
+
+/**
  * One row of the work list.
  *
  * EXACTLY THE SIX COLUMNS THE WRAPPER RETURNS. This is not a convenience shape: it is asserted
@@ -162,6 +173,30 @@ const DUE_KEYS: ReadonlySet<string> = new Set([
   "restatement_window_days",
 ]);
 
+/**
+ * `last_backfill_at`, or a refusal. NULL IS A MEANING HERE, NOT AN ABSENCE.
+ *
+ * The old form was `typeof x === "string" ? x : null`, which read a number, an object, a boolean --
+ * anything at all -- as null. And null is not "unknown" in this column: `app.due_connections`
+ * treats it as NEVER PULLED, which means PERMANENTLY DUE. So a wire value this code could not
+ * understand became an instruction to re-pull that connection on every sweep, forever, spending a
+ * platform quota shared across every tenant, with nothing anywhere reporting a fault.
+ *
+ * Every sibling field in `toDueConnection` refuses a value it cannot read. This one defaulted, and
+ * it defaulted to the more consequential of the two meanings the column carries.
+ */
+function readLastBackfill(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" && RFC3339.test(value)) return value;
+  throw new StoreError(
+    `the work list returned ${JSON.stringify(value)} for last_backfill_at, which is neither an ` +
+      "instant nor null. Null there means NEVER PULLED, so reading an unreadable value as null " +
+      "would mark the connection permanently due and re-pull it on every sweep.",
+    "upstream",
+    200,
+  );
+}
+
 function requiredText(row: Record<string, unknown>, column: string): string {
   const value = row[column];
   if (typeof value !== "string" || value === "") {
@@ -223,7 +258,7 @@ export function toDueConnection(row: unknown): DueConnection {
     organisationId: requiredText(r, "organisation_id"),
     provider,
     drivable: DRIVABLE.has(provider),
-    lastBackfillAt: typeof r.last_backfill_at === "string" ? r.last_backfill_at : null,
+    lastBackfillAt: readLastBackfill(r.last_backfill_at),
     restatementWindowDays: windowDays,
   };
 }
@@ -314,6 +349,22 @@ export function createSchedulerStore(config: PostgrestConfig): SchedulerStorePor
       if (connectionId === "") {
         throw new StoreError("a lease needs a connection to be closed on", "invalid_row");
       }
+      // CHECKED HERE TOO, and its absence was an inconsistency with a consequence. Every other
+      // argument to this function is refused when it is wrong, while the OUTCOME -- the one the
+      // migration and the module comment both make their headline refusal -- was passed through
+      // unexamined. `app.record_backfill` reads it as `case when p_succeeded`, so a null falls to
+      // the else branch and is recorded as a FAILURE: the connection is offered again on the next
+      // sweep and the platform is called twice for data already stored. From JavaScript,
+      // `recordBackfill(id, undefined, ...)` dropped `p_succeeded` from the body entirely and
+      // arrived at PostgREST as a missing-overload 404, an error naming nothing.
+      if (typeof succeeded !== "boolean") {
+        throw new StoreError(
+          `closing a lease needs a definite outcome; got ${JSON.stringify(succeeded)}. A null is ` +
+            "recorded as a FAILURE and the connection is pulled again tomorrow for data already " +
+            "stored.",
+          "invalid_row",
+        );
+      }
       const who = claimedBy.trim();
       if (who === "") {
         // The same refusal `claim` makes, for a sharper reason: an empty name would make the
@@ -325,7 +376,7 @@ export function createSchedulerStore(config: PostgrestConfig): SchedulerStorePor
           "invalid_row",
         );
       }
-      if (checkpoint !== null && Number.isNaN(Date.parse(checkpoint))) {
+      if (checkpoint !== null && !RFC3339.test(checkpoint)) {
         throw new StoreError(
           `the checkpoint ${JSON.stringify(checkpoint)} is not a timestamp; refusing to advance a ` +
             "watermark to a value the next walk would resume from.",
@@ -362,7 +413,7 @@ export function createSchedulerStore(config: PostgrestConfig): SchedulerStorePor
       const record = answer as Record<string, unknown>;
       const recordedAt = record.recorded_at;
       const leaseClosed = record.lease_closed;
-      if (typeof recordedAt !== "string" || Number.isNaN(Date.parse(recordedAt))) {
+      if (typeof recordedAt !== "string" || !RFC3339.test(recordedAt)) {
         throw new StoreError(
           `closing a lease answered with ${JSON.stringify(recordedAt)} rather than the instant it ` +
             "recorded; refusing to report a lease closed on that.",

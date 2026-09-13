@@ -183,13 +183,49 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------------------------
--- ANON AND AUTHENTICATED ARE REFUSED, BY EXECUTION.
+-- ANON AND AUTHENTICATED ARE REFUSED -- AT THIS LAYER BY ACL, AND END TO END BY EXECUTION.
 --
 -- The anon key is public and ships in browsers. An anon-executable `due_connections` would put
 -- cross-tenant enumeration on the internet; an anon-executable `claim_connection` would let a
 -- stranger hold a lease on every connection on the platform and stop every backfill, fifteen
 -- minutes at a time, indefinitely.
+--
+-- THE EXECUTION TESTS BELOW WERE ONCE THE WHOLE SECTION, AND THEY WERE NOT ENOUGH. An adversarial
+-- verifier granted EXECUTE on all three `public` wrappers to BOTH anon and authenticated and re-ran
+-- this file: 24 passed, 0 failed -- unchanged. The reason is structural rather than careless. The
+-- wrappers are SECURITY INVOKER, so a call by anon reaches `app.due_connections` AS anon, and the
+-- inner grant refuses it one layer deeper. `check_refused` sees `insufficient_privilege` and cannot
+-- tell which layer raised it. Six assertions, and one of the four properties this file's header
+-- claims to prove, passed against a work list the internet could call.
+--
+-- 07_anon_grants.sql caught that mutation with ten failures, so the system was never unsafe -- but
+-- THIS file was not what kept it safe, while saying it was. The ACL block below is what makes the
+-- execution block mean what it says: the ACL proves the refusal belongs to THIS layer, the
+-- execution proves the refusal is actually enforced, and neither claim is the other one.
 -- ---------------------------------------------------------------------------------------------
+do $$
+declare
+  r record;
+begin
+  for r in
+    select unnest(array[
+      'public.due_connections(integer)',
+      'public.claim_connection(uuid, text)',
+      'public.record_backfill(uuid, boolean, text, timestamptz)'
+    ]) as sig
+  loop
+    perform app_test.check(
+      format('anon holds no EXECUTE on %s ITSELF, not merely on what it calls', r.sig),
+      not has_function_privilege('anon', r.sig, 'EXECUTE'),
+      'a wrapper the internet may execute still refuses at the inner grant, so every execution '
+      'test here would pass while cross-tenant enumeration sat one revoke away');
+
+    perform app_test.check(
+      format('authenticated holds no EXECUTE on %s ITSELF', r.sig),
+      not has_function_privilege('authenticated', r.sig, 'EXECUTE'),
+      'same shape: the refusal must belong to this layer, not be borrowed from the next one');
+  end loop;
+end $$;
 begin;
   select app_test.check_refused('anon cannot call the work list',
     'select count(*) from public.due_connections(10)', 'anon');
@@ -223,10 +259,22 @@ begin;
     (select count(*) = 2 from public.due_connections(500)
       where workspace_id = 'a7200000-0000-4000-8000-000000000001'));
 
-  select app_test.check('the provider comes back as resolvable text, not an unexposed enum',
-    (select provider = 'google_ads' from public.due_connections(500)
-      where connection_id = 'a7400000-0000-4000-8000-000000000001'),
+  -- THE DECLARED TYPE, NOT A VALUE COMPARISON. This assertion used to read
+  -- `provider = 'google_ads'`, which is a TAUTOLOGY: PostgreSQL compares an enum against an unknown
+  -- literal by coercing the literal, so it answers true whether the column is `text` or
+  -- `app.connection_provider`. Verified by running the identical predicate against
+  -- `app.due_connections`, which DOES return the enum -- also true. The assertion could not fail.
+  --
+  -- What actually matters is the DECLARED return type, because that is what PostgREST reads: a type
+  -- it cannot resolve arrives as an unexpanded record literal rather than a value, and schema `app`
+  -- is deliberately unexposed. So the declaration is asserted off the catalogue.
+  select app_test.check('the wrapper DECLARES provider as text, which is what PostgREST can resolve',
+    pg_get_function_result('public.due_connections(integer)'::regprocedure) like '%provider text%',
     'a type PostgREST cannot resolve arrives as an unexpanded record literal');
+
+  select app_test.check('and the value still reads correctly through it',
+    (select provider = 'google_ads' from public.due_connections(500)
+      where connection_id = 'a7400000-0000-4000-8000-000000000001'));
 commit;
 
 -- ---------------------------------------------------------------------------------------------
@@ -362,7 +410,10 @@ declare v_failed integer; v_total integer;
 begin
   select count(*) filter (where not passed), count(*) into v_failed, v_total from app_test.results;
   if v_failed > 0 then raise exception 'scheduler entry point: % assertion(s) failed', v_failed; end if;
-  if v_total < 20 then
-    raise exception 'scheduler entry point: only % assertion(s) ran; expected at least 20', v_total;
+  -- RAISED FROM 20 WITH THE SIX ACL ASSERTIONS AND THE RETURN-TYPE ONE. The floor exists because a
+  -- suite that stops running looks exactly like a suite that passes; it is raised deliberately
+  -- whenever assertions are added, so a file that quietly loses half its checks is caught.
+  if v_total < 27 then
+    raise exception 'scheduler entry point: only % assertion(s) ran; expected at least 27', v_total;
   end if;
 end $$;

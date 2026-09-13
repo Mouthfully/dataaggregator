@@ -176,6 +176,20 @@ describe("reading a work-list row", () => {
     expect(() => toDueConnection(dueRow({ credential_ciphertext: "\\xdead" }))).toThrow(StoreError);
   });
 
+  it("REFUSES an unreadable last_backfill_at rather than reading it as never-pulled", () => {
+    // NULL IS A MEANING IN THIS COLUMN, NOT AN ABSENCE. `app.due_connections` reads null as never
+    // pulled, which means permanently due -- so the old `typeof x === "string" ? x : null` turned
+    // any value it could not understand into an instruction to re-pull that connection on every
+    // sweep forever, spending a platform quota shared across every tenant, silently.
+    expect(() => toDueConnection(dueRow({ last_backfill_at: 1_757_635_200 }))).toThrow(
+      /last_backfill_at/,
+    );
+    expect(() => toDueConnection(dueRow({ last_backfill_at: { a: 1 } }))).toThrow(StoreError);
+    expect(() => toDueConnection(dueRow({ last_backfill_at: "5" }))).toThrow(StoreError);
+    // A real null still means what it says.
+    expect(toDueConnection(dueRow({ last_backfill_at: null })).lastBackfillAt).toBeNull();
+  });
+
   it("refuses a row missing an identifier rather than claiming a lease against nothing", () => {
     expect(() => toDueConnection(dueRow({ connection_id: "" }))).toThrow(/connection_id/);
     expect(() => toDueConnection(dueRow({ workspace_id: undefined }))).toThrow(/workspace_id/);

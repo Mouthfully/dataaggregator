@@ -263,6 +263,24 @@ revoke all on function public.due_connections(integer) from public, anon, authen
 revoke all on function public.claim_connection(uuid, text) from public, anon, authenticated;
 revoke all on function public.record_backfill(uuid, boolean) from public, anon, authenticated;
 
+-- service_role ALSO HOLDS EXECUTE ON ALL THREE, and saying so here is the point of this comment.
+--
+-- Three `comment on function` statements below used to end "Executable ONLY by app_scheduler",
+-- which is false: `00_supabase_shim.sql` carries Supabase's own
+-- `alter default privileges in schema public grant all on functions to anon, authenticated,
+-- service_role`, and the revoke above names `public, anon, authenticated` -- not service_role. The
+-- live ACL on each is {postgres=X, service_role=X, app_scheduler=X}.
+--
+-- IT IS NOT AN ESCALATION, and it is left in place deliberately rather than quietly revoked.
+-- service_role is BYPASSRLS: it can already read `public.connections` directly, credentials
+-- included, so reaching the same rows through a wrapper that returns six scheduling columns takes
+-- nothing it did not have. The shipped ingest entry point has the identical shape.
+--
+-- What was wrong was the SENTENCE, not the grant. A comment that overstates a boundary is worse
+-- than one that states it loosely, because the next person reasons from it: someone reading "ONLY
+-- app_scheduler" would conclude a service-role leak cannot reach the work list, and be wrong. The
+-- comments now say "of the tenant roles", which is what is actually enforced and what
+-- 07_anon_grants.sql and 13_scheduler_entry_point.sql actually assert.
 grant execute on function public.due_connections(integer) to app_scheduler;
 grant execute on function public.claim_connection(uuid, text) to app_scheduler;
 grant execute on function public.record_backfill(uuid, boolean) to app_scheduler;
@@ -271,14 +289,14 @@ comment on function public.due_connections(integer) is
   'The scheduler''s work list. Forwards to app.due_connections, which PostgREST cannot reach '
   'because schema `app` is deliberately unexposed. SCHEDULING METADATA ONLY -- no ciphertext, no '
   'wrapped key, no external account id: enumeration and access are different privileges. Takes no '
-  'clock; `now()` is the database''s. Executable ONLY by app_scheduler.';
+  'clock; `now()` is the database''s. Of the tenant roles, executable by app_scheduler alone.';
 
 comment on function public.claim_connection(uuid, text) is
   'Takes the 15-minute lease that stops two instances pulling one connection and spending a shared '
   'platform quota twice. Takes no clock, because a caller-supplied future clock makes every live '
-  'lease look abandoned. Executable ONLY by app_scheduler.';
+  'lease look abandoned. Of the tenant roles, executable by app_scheduler alone.';
 
 comment on function public.record_backfill(uuid, boolean) is
   'Closes a lease and returns the instant recorded. p_succeeded = false releases the claim without '
   'advancing last_backfill_at, so a failed run is retried rather than skipped for a day. Takes no '
-  'clock. Executable ONLY by app_scheduler.';
+  'clock. Of the tenant roles, executable by app_scheduler alone.';

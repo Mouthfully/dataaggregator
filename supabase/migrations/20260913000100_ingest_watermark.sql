@@ -49,23 +49,37 @@
 -- THREE DECISIONS TAKEN HERE, each of which could have gone the other way
 -- ============================================================================================
 --
--- DECISION 1 -- THE FIRST WALK STAYS MANUAL. `apps/api-edge/src/ingest.ts` makes `since` required,
--- and `52-ingest-runtime.md` section 4 says why: "A default window on a watermark walk is the worst
--- kind: too short opens a silent hole, too long spends the merchant's store on history it already
--- has, and the operator learns neither." A cron has nobody to suggest a number to. So the sweep
--- NEVER INVENTS A FIRST `since`: a connection whose `ingest_checkpoint` is null is reported as
--- awaiting its first run and skipped, and an operator does that pull through `POST /v1/ingest/run`
--- with a window they chose. The alternatives were a constant (guesses for every merchant) or a
--- per-connection `initial_backfill_since` set at seal time (better, and a larger change that
--- belongs with onboarding). This one never guesses and costs one column.
+-- DECISION 1 -- THE FIRST WINDOW IS CHOSEN BY THE OPERATOR AT SEAL TIME, AND THIS IS A CORRECTION.
 --
--- DECISION 2 -- THE CHECKPOINT ADVANCES ONLY ON SUCCESS. The argument for advancing it on partial
--- progress is that a backfill longer than one invocation would otherwise restart forever. That
--- argument does not apply here BECAUSE OF DECISION 1: the long first walk is manual, so the cron
--- only ever walks one incremental window, which fits an invocation comfortably. What is left is the
--- argument against, and it is the house rule -- trusting the arithmetic of a run that failed for an
--- unknown reason to move a watermark forward is how a silent hole gets written deliberately. If
--- onboarding is ever automated, this decision reopens with it.
+-- The sweep never invents a first `since` -- `52-ingest-runtime.md` section 4: "A default window on
+-- a watermark walk is the worst kind: too short opens a silent hole, too long spends the merchant's
+-- store on history it already has, and the operator learns neither." A cron has nobody to suggest a
+-- number to, so a connection whose `ingest_checkpoint` is null is skipped and reported.
+--
+-- THE FIRST VERSION OF THIS DECISION SAID AN OPERATOR WOULD SEED IT THROUGH `POST /v1/ingest/run`,
+-- AND THAT WAS A CLOSED LOOP. That route computes a checkpoint and RETURNS it in the response body;
+-- it persists nothing (`apps/api-edge/src/index.ts`). This function only ever ADVANCES a checkpoint
+-- that already exists. So nothing wrote the first one, every connection stayed
+-- `awaiting_first_run` forever, and the nightly sweep could never pull a single row. It shipped
+-- that way.
+--
+-- `scripts/seal-connection.ts` now takes a REQUIRED `--since` and writes `ingest_checkpoint` in the
+-- INSERT. The operator sealing the connection is the one person who can answer the question, and
+-- they are asked rather than defaulted to.
+--
+-- DECISION 2 -- THE CHECKPOINT ADVANCES ON PARTIAL PROGRESS, FORWARDS ONLY. This decision was taken
+-- the other way first and was wrong, so it is recorded with its correction rather than rewritten.
+--
+-- The instinct was the house rule: do not trust the arithmetic of a run that failed for an unknown
+-- reason. It does not apply here, because `runIngest` does not offer a checkpoint arrived at by
+-- arithmetic -- it awaits the write of each page before pulling the next, so every page behind a
+-- reported checkpoint is already in the database. That is the connector's own documented guarantee
+-- and it is what makes a partial advance safe.
+--
+-- Holding it back cost something real: a walk longer than one fifteen-minute invocation would have
+-- restarted from the same `since` every night, forever, reporting a failure each time and never
+-- finishing. `greatest` keeps it monotonic, so a run that failed before completing a chunk cannot
+-- drag the watermark backwards.
 --
 -- DECISION 3 -- WHOSE MIDNIGHT IS STILL OPEN, AND IS NOT SETTLED HERE. `app.due_connections` offers
 -- a connection when `last_backfill_at < date_trunc('day', p_now)`. `date_trunc` truncates in the
@@ -135,10 +149,28 @@ begin
   update public.connections
      set last_backfill_at =
            case when p_succeeded then p_now else last_backfill_at end,
-         -- Only on success, and only when the run actually offered one. See Decision 2.
+         -- THE CHECKPOINT ADVANCES ON PARTIAL PROGRESS TOO, AND ONLY EVER FORWARDS.
+         --
+         -- This was "only on success", and that was wrong for this connector specifically. The
+         -- generic instinct -- do not trust the arithmetic of a run that failed for an unknown
+         -- reason -- does not apply, because `apps/api-edge/src/ingest.ts` does not offer a
+         -- checkpoint arrived at by arithmetic. It awaits the WRITE of each page before pulling the
+         -- next, and says so: "by the time a checkpoint is offered EVERY PAGE BEHIND IT IS ALREADY
+         -- IN THE DATABASE". A failed run's checkpoint is the last chunk read in full, which is
+         -- precisely where a resume is safe.
+         --
+         -- Holding it back had a cost that was not hypothetical: `last_backfill_at` does not
+         -- advance on failure, so the connection is re-offered the next night -- and it would have
+         -- restarted from the same `since` every night forever, never finishing a walk longer than
+         -- one fifteen-minute invocation, while reporting a failure each time.
+         --
+         -- GREATEST, NOT ASSIGNMENT. A run that failed before completing a chunk reports the `since`
+         -- it started from; assigning that would move the watermark BACKWARDS and re-walk rows
+         -- already written. `greatest` ignores a null first argument, so a first advance still
+         -- lands.
          ingest_checkpoint =
            case
-             when p_succeeded and p_checkpoint is not null then p_checkpoint
+             when p_checkpoint is not null then greatest(ingest_checkpoint, p_checkpoint)
              else ingest_checkpoint
            end,
          claimed_at = null,

@@ -153,6 +153,22 @@ export interface SealInput {
   readonly connectionId: string;
   readonly storeUrl: string;
   readonly timezone: string;
+  /**
+   * RFC3339. Where the incremental walk starts, written to `connections.ingest_checkpoint`.
+   *
+   * REQUIRED, AND THE LOOP IT CLOSES IS WHY. The nightly sweep resumes from this column and
+   * `apps/api-edge/src/scheduled-ingest.ts` refuses a connection whose checkpoint is null rather
+   * than inventing a first window. Nothing else writes the column on a new row -- `record_backfill`
+   * only ever ADVANCES one that exists -- so a connection sealed without it is skipped every night,
+   * forever, reporting `awaiting_first_run` and never pulling a row. That is a closed loop, it
+   * shipped, and this argument is what opens it.
+   *
+   * NO DEFAULT, for the reason `52-ingest-runtime.md` section 4 gives about a watermark walk: too
+   * short opens a silent hole, too long spends the merchant's store on history it already has, and
+   * nobody learns which happened. The operator sealing the connection is the one person in the
+   * system who can answer it, so they are asked.
+   */
+  readonly since: string;
   readonly key: string;
   readonly secret: string;
   readonly displayName: string | null;
@@ -262,7 +278,7 @@ export async function sealConnection(
 insert into public.connections (
   id, workspace_id, provider, credential_lane, external_account_id, display_name,
   credential_ciphertext, credential_iv, wrapped_dek, key_version,
-  granted_scopes, expires_at, timezone, status
+  granted_scopes, expires_at, timezone, ingest_checkpoint, status
 ) values (
   ${sqlString(input.connectionId, "connection id")},
   ${sqlString(input.workspaceId, "workspace id")},
@@ -280,6 +296,10 @@ insert into public.connections (
   -- Required by POST /v1/ingest/run, and IMMUTABLE once set (20260912000500). The day an order
   -- belongs to is computed in this zone; UTC would move every evening order to the previous day.
   ${sqlString(input.timezone, "timezone")},
+  -- WHERE THE NIGHTLY WALK STARTS. The sweep refuses a connection whose checkpoint is null rather
+  -- than guessing a first window, and nothing else writes this column on a new row, so a row
+  -- inserted without it is one the scheduler skips every night forever.
+  ${sqlString(input.since, "since")}::timestamptz,
   'active'
 );
 `;
@@ -294,8 +314,12 @@ insert into public.connections (
 const USAGE = `Usage:
   CREDENTIAL_KEK=<base64>  WOO_CONSUMER_KEY=ck_...  WOO_CONSUMER_SECRET=cs_... \\
   pnpm exec tsx scripts/seal-connection.ts \\
-    --workspace <uuid> --store https://shop.example --timezone Asia/Bangkok [--name "Shop"]
-    [--connection-id <uuid>]
+    --workspace <uuid> --store https://shop.example --timezone Asia/Bangkok \\
+    --since 2026-09-01T00:00:00Z [--name "Shop"] [--connection-id <uuid>]
+
+--since is where the nightly walk starts, and it has no default on purpose. Too short opens a
+silent hole; too long spends the merchant's store on history it already has. Pick a window the
+first night's walk can finish.
 
 The key and secret are read from the ENVIRONMENT, never from arguments: everything on argv is
 visible to every process on the machine through ps, and lands in shell history.`;
@@ -373,6 +397,24 @@ export async function main(argv: readonly string[], env: NodeJS.ProcessEnv): Pro
   assertWooTimezone(timezone);
   assertStorableTimezone(timezone);
 
+  // REFUSED HERE RATHER THAN AT THE DATABASE. A malformed timestamp would insert as an error the
+  // operator reads as a SQL problem; this one names the argument and says what it is for.
+  const since = required(args, "since");
+  if (Number.isNaN(Date.parse(since))) {
+    throw new SealError(
+      `--since "${since}" is not an RFC3339 timestamp. It is where the nightly walk starts.`,
+      "bad_argument",
+    );
+  }
+  if (Date.parse(since) > Date.now()) {
+    // A checkpoint in the future claims a window that was never read, and the first walk would
+    // start past rows nobody pulled. `app.record_backfill` makes the same refusal one layer down.
+    throw new SealError(
+      `--since "${since}" is in the future. The walk would start past rows nobody has read.`,
+      "bad_argument",
+    );
+  }
+
   const kek = kekFromBase64(fromEnv(env, "CREDENTIAL_KEK"));
   const key = fromEnv(env, "WOO_CONSUMER_KEY");
   const secret = fromEnv(env, "WOO_CONSUMER_SECRET");
@@ -388,6 +430,7 @@ export async function main(argv: readonly string[], env: NodeJS.ProcessEnv): Pro
     connectionId,
     storeUrl,
     timezone,
+    since,
     key,
     secret,
     displayName: args.name?.trim() ?? null,

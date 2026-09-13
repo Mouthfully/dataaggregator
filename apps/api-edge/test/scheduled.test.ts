@@ -231,10 +231,10 @@ describe("closing the lease", () => {
     expect(s.closes[0]?.claimedBy).toBe("instance-7");
   });
 
-  it("does NOT advance the watermark when the run did not complete", async () => {
+  it("records the run as FAILED so it is retried tomorrow", async () => {
     // `runIngest` is reached and throws, because `fetchImpl` throws. The lease must still close,
-    // and the checkpoint must not move: trusting the arithmetic of a run that failed for an unknown
-    // reason is how a silent hole gets written deliberately.
+    // and `succeeded: false` is what stops `last_backfill_at` advancing -- which is what has the
+    // connection offered again on the next sweep rather than skipped for the day.
     const s = scheduler([dueConnection()]);
     const outcome = await sweepDueConnections({
       scheduler: s,
@@ -244,7 +244,6 @@ describe("closing the lease", () => {
 
     expect(s.closes).toHaveLength(1);
     expect(s.closes[0]?.succeeded).toBe(false);
-    expect(s.closes[0]?.checkpoint).toBeNull();
     expect(outcome.swept[0]?.failure).toBeDefined();
   });
 

@@ -41,6 +41,7 @@ const input = (overrides: Partial<Parameters<typeof sealConnection>[0]> = {}) =>
   connectionId: CONNECTION,
   storeUrl: "https://shop.example",
   timezone: "Asia/Bangkok",
+  since: "2026-09-01T00:00:00.000Z",
   key: KEY,
   secret: SECRET,
   displayName: null,
@@ -75,6 +76,18 @@ function rowFromSql(sql: string, connectionId = CONNECTION) {
     wrappedDek: decodeBytea(literals[2], "wrapped_dek"),
   };
 }
+
+describe("the emitted row seeds the watermark", () => {
+  it("writes ingest_checkpoint, because nothing else writes it on a new row", async () => {
+    // THE LOOP THIS CLOSES. `app.record_backfill` only ever ADVANCES a checkpoint that exists, and
+    // `scheduled-ingest.ts` refuses a connection whose checkpoint is null rather than inventing a
+    // first window. A row sealed without one is skipped every night, forever, reporting
+    // `awaiting_first_run` and never pulling a row -- which is exactly what shipped.
+    const { sql } = await sealConnection(input({ since: "2026-09-01T00:00:00.000Z" }));
+    expect(sql).toContain("ingest_checkpoint");
+    expect(sql).toContain("'2026-09-01T00:00:00.000Z'::timestamptz");
+  });
+});
 
 describe("what the script seals, the Worker opens", () => {
   it("round-trips the credential through openCredential, byte literals and all", async () => {

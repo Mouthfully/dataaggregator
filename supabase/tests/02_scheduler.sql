@@ -263,6 +263,13 @@ begin;
     (select count(*) = 1 from app.due_connections('2026-09-08T04:10:00Z'::timestamptz)
       where connection_id = '9e000000-0000-0000-0000-000000000003'));
 
+  select app_test.check('the watermark never moves BACKWARDS',
+    (select app.record_backfill('9e000000-0000-0000-0000-000000000003'::uuid, false,
+       '2026-09-08T04:06:00Z'::timestamptz, 'worker-d', '2020-01-01T00:00:00Z'::timestamptz)
+     is not null),
+    'a run that failed before completing a chunk reports the since it started from; assigning that '
+    'would re-walk rows already written');
+
   select app_test.check_rejected('a checkpoint in the future is refused',
     'select app.record_backfill(''9e000000-0000-0000-0000-000000000003''::uuid, true, '
     '''2026-09-08T04:05:00Z''::timestamptz, ''worker-d'', ''2030-01-01T00:00:00Z''::timestamptz)');
@@ -288,11 +295,11 @@ begin;
     'last_backfill_at is stamped at the END of a run, so resuming from it skips every row modified '
     'while the run was in flight');
 
-  select app_test.check('a FAILED run does not advance the watermark, even when it offers one',
-    (select ingest_checkpoint is null
+  select app_test.check('a FAILED run DOES advance the watermark, because its checkpoint is safe',
+    (select ingest_checkpoint = '2026-09-08T04:04:00Z'::timestamptz
        from public.connections where id = '9e000000-0000-0000-0000-000000000003'),
-    'trusting the arithmetic of a run that failed for an unknown reason is how a silent hole gets '
-    'written deliberately');
+    'runIngest writes each page before pulling the next, so every page behind a reported checkpoint '
+    'is already stored. Withholding it would restart a long walk from the same since every night');
 commit;
 
 -- ---------------------------------------------------------------------------------------------

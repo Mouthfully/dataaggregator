@@ -64,22 +64,67 @@ totals stay plausible and nothing errors.** `connections.ingest_checkpoint` is a
 because it answers a different question: *how far has the walk reached*, not *was a pull completed
 today*.
 
-## 2. Three decisions taken, and one deliberately left open
+## 2. A defect this PR shipped, and the correction
 
-**THE FIRST WALK STAYS MANUAL.** `runIngest` requires `since`, and `52-ingest-runtime.md` §4 says
-why: "A default window on a watermark walk is the worst kind: too short opens a silent hole, too
-long spends the merchant's store on history it already has, and the operator learns neither." A cron
-has nobody to suggest a number to, so **it does not guess one** — a connection whose
-`ingest_checkpoint` is null is reported `awaiting_first_run` and skipped. The alternatives were a
-constant (guesses for every merchant) or a per-connection `initial_backfill_since` set at seal time
-(better, and a larger change that belongs with onboarding).
+> **Added after the fact, because the first version of this was wrong and the record is worth more
+> than a tidy note.**
 
-**THE CHECKPOINT ADVANCES ONLY ON SUCCESS.** The argument for advancing on partial progress is that
-a backfill longer than one invocation would otherwise restart forever. That argument does not apply
-*because of the first decision*: the long first walk is manual, so the cron only ever walks one
-incremental window. What is left is the house rule — trusting the arithmetic of a run that failed
-for an unknown reason is how a silent hole gets written deliberately. **If onboarding is ever
-automated, this decision reopens with it.**
+**The sweep as first shipped could never pull a single row.** A closed loop:
+
+- `scheduled-ingest.ts` skips a connection whose `ingest_checkpoint` is null *before* it claims a
+  lease, reporting `awaiting_first_run`.
+- `app.record_backfill` is the **only** writer of that column, and it only ever *advances* one that
+  already exists.
+- Decision 1 said an operator seeds it through `POST /v1/ingest/run`. **That route computes a
+  checkpoint and returns it in the response body. It persists nothing.**
+- `scripts/seal-connection.ts` omitted the column.
+
+So every connection was permanently `awaiting_first_run`, and the nightly cron would have run, found
+work, skipped all of it and reported success. **The plan I built from missed this; the adversary
+checking that plan found it.** That is the whole argument for the refute stage.
+
+**Two fixes, at both ends of the loop:**
+
+1. **`scripts/seal-connection.ts` takes a required `--since`** and writes `ingest_checkpoint` in the
+   INSERT. The operator sealing the connection is the one person who can answer "where should the
+   walk start", so they are asked rather than defaulted to. A timestamp in the future is refused,
+   the same refusal `record_backfill` makes one layer down.
+2. **The checkpoint now advances on a partial run**, forwards only — which reverses Decision 2.
+
+### Why Decision 2 was wrong, specifically
+
+The instinct was the house rule: do not trust the arithmetic of a run that failed for an unknown
+reason. **It does not apply to this connector**, and the connector says so itself:
+
+> The write happens per page, and the order is the point… this awaits the write of each page before
+> pulling the next, so **by the time a checkpoint is offered EVERY PAGE BEHIND IT IS ALREADY IN THE
+> DATABASE.**
+
+A failed run's checkpoint is not a computation — it is the last chunk read *in full*, which is
+exactly where a resume is safe. Withholding it had a real cost: `last_backfill_at` does not advance
+on failure, so a walk longer than one fifteen-minute invocation would have restarted from the same
+`since` **every night, forever**, reporting a failure each time and never finishing.
+
+`greatest(ingest_checkpoint, p_checkpoint)` keeps it monotonic, so a run that failed before
+completing a chunk — which reports the `since` it started from — cannot drag the watermark backwards
+and re-walk rows already written. The SQL suite asserts both directions.
+
+**The general lesson, since it is the second time this session:** a house rule is a prior, not a
+proof. "Refuse rather than default" was right about inventing a first window and wrong about
+carrying a verified resume point forward, and the difference was written in the module I was
+calling.
+
+## 3. Three decisions taken, and one deliberately left open
+
+**THE FIRST WINDOW IS CHOSEN BY THE OPERATOR AT SEAL TIME.** The sweep never invents one —
+`52-ingest-runtime.md` §4: "A default window on a watermark walk is the worst kind: too short opens a
+silent hole, too long spends the merchant's store on history it already has, and the operator learns
+neither." A cron has nobody to suggest a number to, so a null checkpoint is reported
+`awaiting_first_run` and skipped. `scripts/seal-connection.ts` takes a required `--since` and writes
+it. **This decision was taken the other way first and produced the closed loop in §2.**
+
+**THE CHECKPOINT ADVANCES ON PARTIAL PROGRESS, FORWARDS ONLY.** Also reversed; §2 gives the
+reasoning and the connector's own guarantee that makes it safe.
 
 **WHOSE MIDNIGHT IS OPEN, AND IS NOT SETTLED HERE.** `app.due_connections` offers a connection when
 `last_backfill_at < date_trunc('day', p_now)`. `date_trunc` truncates in the **session's
@@ -96,7 +141,7 @@ untouched and the marketing copy that asserted a local read time was deleted ins
 One query would settle it against the live project: `select current_setting('TimeZone')` as
 `authenticator`.
 
-## 3. Cost estimate
+## 4. Cost estimate
 
 **Per connected account per month:** `~90 extra PostgREST requests`
 
@@ -127,7 +172,7 @@ about why. `scheduled.test.ts` asserts the minute and hour fields are not `*`.
 
 I did not read the Workers Paid monthly fee in this session and am not going to state a figure.
 
-## 4. Platform-terms check
+## 5. Platform-terms check
 
 **1. BYOC.** `PASS` — the sweep reaches a merchant's store through the same sealed per-workspace
 credential `POST /v1/ingest/run` uses, opened with `CREDENTIAL_KEK` for one connection at a time. No
@@ -176,7 +221,7 @@ data.
 
 **Result:** `12 PASS, 6 N/A, 0 FAIL`
 
-## 5. What was left out
+## 6. What was left out
 
 **The webhook drain is still unconfigured, and it is a different identity.**
 `apps/api-edge/src/index.ts` still passes `store: null` for the deliver and prune crons.
@@ -210,7 +255,7 @@ manual… Add the cron afterwards". Two design notes cite it as the reason no cr
 a refusal, and this is the afterwards; it is recorded here rather than left to contradict two notes
 silently.
 
-## 6. Open or unverified items
+## 7. Open or unverified items
 
 - **Whose midnight.** §2, Decision 3. One query settles it.
 - **Nothing writes `restatement_window_days`.** Is it a column waiting for the `google_ads`
@@ -222,7 +267,7 @@ silently.
 - **Workers Paid is not provisioned.** Nothing in this PR checks it, and on Free the sweep will be
   killed at 10 ms with a lease held.
 
-## 7. Mutation testing
+## 8. Mutation testing
 
 | Mutation | Result |
 |---|---|

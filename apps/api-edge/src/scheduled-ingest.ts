@@ -211,10 +211,17 @@ async function pullOne(
     complete = report.complete;
   } catch (cause) {
     if (cause instanceof IngestRunFailure) {
-      // A partial run: rows were written and the report says how far it reached. The checkpoint is
-      // NOT carried forward -- `record_backfill` advances it only on success, and the migration
-      // records why: trusting the arithmetic of a run that failed for an unknown reason is how a
-      // silent hole gets written deliberately.
+      // A PARTIAL RUN CARRIES ITS CHECKPOINT FORWARD, and that is safe for a reason specific to this
+      // connector rather than a general one. `runIngest` awaits the WRITE of each page before
+      // pulling the next and says so: "by the time a checkpoint is offered EVERY PAGE BEHIND IT IS
+      // ALREADY IN THE DATABASE". So a failed run's checkpoint is the last chunk read in full,
+      // which is where a resume is safe -- not arithmetic nobody checked.
+      //
+      // Withholding it was the first version of this code, and it had a cost: `last_backfill_at`
+      // does not advance on failure, so the connection is re-offered the next night and would have
+      // restarted from the same `since` every night forever, never finishing a walk longer than one
+      // invocation. `record_backfill` keeps it monotonic with `greatest`.
+      checkpoint = cause.report.checkpoint;
       rowsWritten = cause.report.rowsWritten;
       failure = "run_failed";
     } else if (cause instanceof Error) {
@@ -228,16 +235,19 @@ async function pullOne(
   }
 
   const succeeded = failure === undefined && complete;
+  // The checkpoint goes either way; `succeeded` decides only whether `last_backfill_at` moves, and
+  // therefore whether this connection is offered again tomorrow. A partial run should both resume
+  // where it reached AND be retried, which is exactly these two arguments disagreeing.
   const recorded = await deps.scheduler.recordBackfill(
     connectionId,
     succeeded,
     deps.instanceName,
-    succeeded ? checkpoint : null,
+    checkpoint,
   );
 
   return {
     connectionId,
-    checkpoint: succeeded ? checkpoint : null,
+    checkpoint,
     rowsWritten,
     complete,
     leaseClosed: recorded.leaseClosed,

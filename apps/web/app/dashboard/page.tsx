@@ -14,6 +14,7 @@ import {
   DASHBOARD_PRODUCTS,
   SITE_DASHBOARD,
 } from "../_content";
+import { LiveRows } from "./_rows";
 
 /**
  * ALWAYS RENDERED PER REQUEST.
@@ -62,6 +63,12 @@ const DASH_STATE = {
     "Your data could not be read just now. The screen below is the illustrative concept.",
   noRows:
     "Your workspace has no rows for this period yet. Connect a source and run a backfill to fill it.",
+  // A FAILED READ IS NOT AN EMPTY PERIOD, and until the live table landed the two shared a
+  // sentence: `performanceRows` returns no rows on error, so a customer whose query failed was
+  // told their period was empty. That is a statement about their business made from a database
+  // fault, which is the same class of mistake as printing zero for a null.
+  rowsUnavailable:
+    "Your rows could not be read just now, so no figures are shown. This is not a statement about the period.",
 } as const;
 
 export default async function DashboardPage() {
@@ -73,6 +80,10 @@ export default async function DashboardPage() {
   const live = state?.kind === "ready" ? state.workspace : null;
   const performance = live ? await performanceRows(SPAN.from, SPAN.to) : null;
 
+  // Rendered only when the read SUCCEEDED and returned something. An errored read has no rows to
+  // show and, more importantly, nothing true to say about the period -- `DASH_STATE` says so.
+  const liveRows = performance !== null && performance.error === null ? performance.rows : [];
+
   // Zero rows is the TRUE state of this project today -- envelope_rows is empty -- so it is said
   // rather than papered over. The designed screen still renders beneath, labelled as a concept,
   // because a signed-in person with an empty database should still see what the product looks like.
@@ -83,9 +94,11 @@ export default async function DashboardPage() {
         ? DASH_STATE.noWorkspace
         : state.kind === "unavailable"
           ? DASH_STATE.unavailable
-          : performance && performance.rows.length === 0
-            ? DASH_STATE.noRows
-            : null;
+          : performance && performance.error !== null
+            ? DASH_STATE.rowsUnavailable
+            : performance && performance.rows.length === 0
+              ? DASH_STATE.noRows
+              : null;
 
   return (
     <>
@@ -128,6 +141,16 @@ export default async function DashboardPage() {
             <p className="border-line bg-surface text-ink-muted rounded-lg border border-dashed px-5 py-4 text-sm">
               {emptyReason}
             </p>
+          </div>
+        )}
+
+        {/* THE LIVE TABLE GOES ABOVE THE CONCEPT, and the order is the decision. These are the
+            reader's own figures; everything below is the illustrative screen, which keeps its
+            `SITE_DASHBOARD.notice` label. If the two are ever confused for each other, the safe
+            direction is a real number mistaken for a concept -- never the reverse. */}
+        {liveRows.length === 0 ? null : (
+          <div className="mx-auto max-w-[1200px] px-8 pt-4 pb-2">
+            <LiveRows rows={liveRows} />
           </div>
         )}
 

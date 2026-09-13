@@ -221,6 +221,67 @@ export const NAV = [
  * itself is labelled as a concept, in the UI, by `SITE_DASHBOARD.notice`.
  * --------------------------------------------------------------------------------------------- */
 
+/* ---------------------------------------------------------------------------------------------
+ * THE LIVE TABLE'S VOCABULARY -- the half of the dashboard that is NOT illustrative.
+ *
+ * Nothing here is a figure. Every number on the live table is read out of `envelope_rows` at
+ * request time; these are the words around them, and they are constants because
+ * `scripts/check-copy.mjs` requires prose to come from a named constant and because the three
+ * marks below are a glossary that the legend and the cells must not be able to disagree about.
+ *
+ * THE MARKS ARE THE POINT OF THE TABLE.
+ *
+ *   provisionalMark  the platform may still restate this figure. A provisional number printed
+ *                    like a settled one is precisely the failure `is_provisional` exists to
+ *                    prevent, so it is marked ON THE FIGURE and not only in a status column --
+ *                    a figure read off a screen, or copied into a message, takes its mark with it.
+ *   absentMark       the platform reported nothing. NOT ZERO, and never rendered as zero.
+ *   unreadableMark   something was stored that the page could not read as a number. Shown rather
+ *                    than swallowed, because a defect hidden behind the absent mark is a defect
+ *                    nobody goes looking for.
+ * --------------------------------------------------------------------------------------------- */
+
+export const DASHBOARD_LIVE = {
+  heading: "Your envelope rows",
+  note: "Read from your workspace for the period above. Row-level security decided which rows these are, so this table shows what your session may see and nothing else.",
+  columns: {
+    source: "Source",
+    entity: "Entity",
+    date: "Date",
+    window: "Attribution window",
+    status: "Status",
+    fetched: "Read at",
+  },
+  provisional: "Provisional",
+  final: "Final",
+  unattributed: "Unattributed",
+  provisionalMark: "†",
+  absentMark: "—",
+  unreadableMark: "?",
+  provisionalTitle: "Still provisional",
+  absentTitle: "Not reported",
+  unreadableTitle: "Could not be read",
+  noMetrics:
+    "These rows carry no metric values at all, so there is nothing to total. Only the row metadata is shown.",
+  legend: [
+    {
+      id: "provisional",
+      mark: "†",
+      body: "The platform may still restate this figure, so it is not final yet.",
+    },
+    {
+      id: "absent",
+      mark: "—",
+      body: "The platform reported nothing for this metric on this row. That is not the same as zero.",
+    },
+    {
+      id: "unreadable",
+      mark: "?",
+      body: "A value was stored that this page could not read as a number, so no figure is shown.",
+    },
+  ],
+} as const;
+
 export const SITE_DASHBOARD = {
   eyebrow: "Client workspace",
   heroLine1: "A little less noise.",

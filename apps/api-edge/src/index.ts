@@ -18,18 +18,19 @@
  */
 
 import {
-  type PostgrestConfig,
-  StoreError,
   createApiKeyAuthenticator,
   createConnectionStore,
   createIngestStore,
   createSchedulerStore,
   createPerformanceStore,
+  type PostgrestConfig,
+  StoreError,
 } from "@repo/store";
 import type { CryptoLike as VaultCrypto } from "@repo/vault";
+import { type ConnectDeps, handleConnect } from "./connect.js";
 import {
-  type IngestReport,
   IngestError,
+  type IngestReport,
   IngestRunFailure,
   parseIngestRequest,
   runIngest,
@@ -270,6 +271,49 @@ async function handleIngestRun(request: Request, env: Env): Promise<Response> {
   }
 }
 
+/**
+ * `POST /v1/connections`.
+ *
+ * THE SECOND PLACE `env` BECOMES PORTS, and the only one that forwards a credential rather than
+ * minting one. `handleConnect` is a boundary over injected ports for `handlePerformance`'s reason,
+ * so the whole endpoint -- token verification, refusals, seal, insert -- is exercised in a test
+ * against a fake PostgREST with no network and no Supabase project.
+ *
+ * FOUR BINDINGS, GATHERED RATHER THAN SHORT-CIRCUITED, exactly as `/v1/ingest/run` gathers five.
+ * `SUPABASE_JWT_SECRET` is needed twice over here: to VERIFY the customer's access token, and as
+ * the material PostgREST verifies the same token with. `SUPABASE_ANON_KEY` only gets the request
+ * past the edge; the identity the insert runs under is the customer's own token and nothing else.
+ */
+async function handleConnections(request: Request, env: Env): Promise<Response> {
+  const config = supabaseConfig(env);
+  const missing = "missing" in config ? [...config.missing] : [];
+  if (!env.CREDENTIAL_KEK) missing.push("CREDENTIAL_KEK");
+  if (missing.length > 0) {
+    // The same 503 the other two routes answer with, and for the same reason: a deployment that
+    // cannot seal must not be indistinguishable from one that refused the credential.
+    return Response.json(
+      {
+        ok: false,
+        error: "not_configured",
+        message:
+          `\`/v1/connections\` is missing ${missing.join(", ")} on this deployment. The endpoint, ` +
+          "the vault and the insert are implemented and tested; this deployment is not configured.",
+      },
+      { status: 503 },
+    );
+  }
+
+  const deps: ConnectDeps = {
+    // Narrowed by the check above; TypeScript cannot see that `missing.length === 0` rules out the
+    // error arm of the union.
+    postgrest: config as PostgrestConfig,
+    kek: env.CREDENTIAL_KEK ?? "",
+    crypto: crypto as unknown as ConnectDeps["crypto"],
+    requestId: crypto.randomUUID(),
+  };
+  return await handleConnect(request, deps);
+}
+
 /** The wire shape. snake_case, like every other body this API emits. */
 function body_of(report: IngestReport): Record<string, unknown> {
   return {
@@ -463,10 +507,12 @@ export default {
       return await handleIngestRun(request, env);
     }
 
+    if (pathname === "/v1/connections") {
+      return await handleConnections(request, env);
+    }
+
     return Response.json({ ok: false, error: "not_found" }, { status: 404 });
   },
 } satisfies ExportedHandler<Env>;
 
-export { handleIngestRun };
-export { handlePerformance };
-export { handleScheduled };
+export { handleConnections, handleIngestRun, handlePerformance, handleScheduled };
